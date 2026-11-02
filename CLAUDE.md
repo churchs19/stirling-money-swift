@@ -18,12 +18,20 @@ Stirling Money/
 └── Extensions/
 ```
 
-## Build & Test
+## Build & Test — Always Use MCP
 
-```bash
-xcodebuild -scheme 'Stirling Money' -destination 'platform=iOS Simulator,name=iPhone 17' build
-xcodebuild -scheme 'Stirling Money' -destination 'platform=iOS Simulator,name=iPhone 17' test
-```
+Prefer MCP tools over raw shell commands for ALL build operations:
+
+- **Build**: `build_sim` / `build_device` (NOT `xcodebuild` via Bash)
+- **Test**: `test_sim` / `test_device` (NOT `xcodebuild test` via Bash)
+- **Simulators**: `list_sims`, `boot_sim`, `open_sim` (NOT `xcrun simctl` via Bash)
+- **Debug**: `debug_attach_sim`, `debug_stack`, `debug_variables`
+- **Apple docs**: `DocumentationSearch` (NOT WebSearch for Apple APIs)
+- **Swift verification**: `ExecuteSnippet` (NOT `swift` via Bash)
+- **Previews**: `RenderPreview` for headless SwiftUI verification
+
+MCP returns structured JSON. Bash returns unstructured text.
+Structured data means fewer tokens consumed and better error diagnosis.
 
 ## SwiftData Relationships
 
