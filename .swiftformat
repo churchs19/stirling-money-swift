@@ -1,0 +1,7 @@
+# .swiftformat
+--indent 4
+--allman false
+--stripunusedargs closure-only
+--importgrouping testable-bottom
+--header strip
+
