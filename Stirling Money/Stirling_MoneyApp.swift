@@ -1,19 +1,10 @@
-//
-//  Stirling_MoneyApp.swift
-//  Stirling Money
-//
-//  Created by Shane Church on 11/1/26.
-//
-
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 @main
 struct Stirling_MoneyApp: App {
     var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
+        let schema = Schema(AppSchema.models)
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
         do {
@@ -25,7 +16,7 @@ struct Stirling_MoneyApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            AccountsView()
         }
         .modelContainer(sharedModelContainer)
     }
