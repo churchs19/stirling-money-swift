@@ -1,0 +1,4 @@
+# SourceKit-LSP config from `xcode-build-server config`; contains machine-specific paths
+buildServer.json
+
+.DS_Store

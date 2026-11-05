@@ -4,6 +4,14 @@ import SwiftUI
 @main
 struct Stirling_MoneyApp: App {
     var sharedModelContainer: ModelContainer = {
+        #if DEBUG
+            // Launch with `-UseSampleData` to review screens with the preview data in memory.
+            // The real store on disk is left untouched.
+            if ProcessInfo.processInfo.arguments.contains("-UseSampleData") {
+                return .preview
+            }
+        #endif
+
         let schema = Schema(AppSchema.models)
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

@@ -3,24 +3,43 @@ import SwiftUI
 
 struct AccountsView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Account.name) private var accounts: [Account]
-    @State private var isAddingAccount = false
+    @Query private var accounts: [Account]
+    @AppStorage("accountSort") private var sort: AccountSort = .name
 
-    private let currencyCode = Locale.current.currency?.identifier ?? "USD"
+    @State private var isAddingAccount = false
+    @State private var accountPendingDeletion: Account?
 
     var body: some View {
+        let sortedAccounts = sort.sorted(accounts)
+
         NavigationStack {
             List {
-                ForEach(accounts) { account in
-                    HStack {
-                        Text(account.name)
-                        Spacer()
-                        Text(account.balance, format: .currency(code: currencyCode))
-                            .monospacedDigit()
-                            .foregroundStyle(account.balance < 0 ? .red : .primary)
+                if !accounts.isEmpty {
+                    Section {
+                        ForEach(sortedAccounts) { account in
+                            NavigationLink(value: account) {
+                                LabeledContent(account.name) {
+                                    AmountText(account.balance)
+                                }
+                            }
+                            .contextMenu {
+                                Button("Delete Account…", systemImage: "trash", role: .destructive) {
+                                    accountPendingDeletion = account
+                                }
+                            }
+                        }
+                        .onDelete { offsets in
+                            accountPendingDeletion = offsets.first.map { sortedAccounts[$0] }
+                        }
+                    }
+
+                    Section {
+                        LabeledContent("Total") {
+                            AmountText(accounts.reduce(0) { $0 + $1.balance })
+                        }
+                        .bold()
                     }
                 }
-                .onDelete(perform: deleteAccounts)
             }
             .overlay {
                 if accounts.isEmpty {
@@ -32,41 +51,66 @@ struct AccountsView: View {
                 }
             }
             .navigationTitle("Accounts")
+            .navigationDestination(for: Account.self) { account in
+                AccountRegisterView(account: account)
+            }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button("Add Account", systemImage: "plus") {
                         isAddingAccount = true
                     }
                 }
+                ToolbarItem(placement: .secondaryAction) {
+                    Picker("Sort By", systemImage: "arrow.up.arrow.down", selection: $sort) {
+                        ForEach(AccountSort.allCases) { option in
+                            Text(option.title).tag(option)
+                        }
+                    }
+                }
             }
             .sheet(isPresented: $isAddingAccount) {
                 NewAccountView()
             }
+            .confirmationDialog(
+                accountPendingDeletion.map { "Delete \($0.name)?" } ?? "",
+                isPresented: Binding(
+                    get: { accountPendingDeletion != nil },
+                    set: {
+                        if !$0 {
+                            accountPendingDeletion = nil
+                        }
+                    }
+                ),
+                titleVisibility: .visible,
+                presenting: accountPendingDeletion
+            ) { account in
+                Button("Delete Account", role: .destructive) {
+                    withAnimation {
+                        modelContext.delete(account)
+                    }
+                }
+            } message: { account in
+                deletionMessage(for: account)
+            }
         }
     }
 
-    private func deleteAccounts(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(accounts[index])
-            }
+    private func deletionMessage(for account: Account) -> Text {
+        let transactions = account.transactionCount
+        let goals = account.goals?.count ?? 0
+        if goals > 0 {
+            return Text("This also deletes ^[\(transactions) transaction](inflect: true) and ^[\(goals) goal](inflect: true). Transfers stay in the other accounts.")
         }
+        return Text("This also deletes ^[\(transactions) transaction](inflect: true). Transfers stay in the other accounts.")
     }
 }
 
 #Preview("With Accounts") {
-    let container = try! ModelContainer(
-        for: Account.self,
-        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-    )
-    container.mainContext.insert(Account(name: "Checking", initialBalance: 1250.75))
-    container.mainContext.insert(Account(name: "Savings", initialBalance: 8000))
-    container.mainContext.insert(Account(name: "Credit Card", initialBalance: -342.18))
-    return AccountsView()
-        .modelContainer(container)
+    AccountsView()
+        .modelContainer(.preview)
 }
 
 #Preview("Empty") {
     AccountsView()
-        .modelContainer(for: Account.self, inMemory: true)
+        .modelContainer(for: AppSchema.models, inMemory: true)
 }

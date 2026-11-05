@@ -19,11 +19,7 @@ struct NewAccountView: View {
 
     /// Empty text means a zero balance; otherwise the text must parse as a number.
     private var parsedBalance: Decimal? {
-        let text = balanceText.trimmingCharacters(in: .whitespaces)
-        if text.isEmpty {
-            return 0
-        }
-        return try? Decimal(text, format: .number)
+        Decimal(userInput: balanceText)
     }
 
     private var canSave: Bool {
@@ -35,20 +31,23 @@ struct NewAccountView: View {
             Form {
                 Section {
                     TextField("Account Name", text: $name)
-                        .textInputAutocapitalization(.words)
+                        .capitalizesWords()
                         .focused($focusedField, equals: .name)
                         .submitLabel(.next)
                         .onSubmit { focusedField = .balance }
                 }
 
                 Section {
-                    TextField("0.00", text: $balanceText)
-                        .keyboardType(.numbersAndPunctuation)
+                    TextField("Initial Balance", text: $balanceText, prompt: Text("0.00"))
+                        .amountKeyboard()
                         .focused($focusedField, equals: .balance)
                         .submitLabel(.done)
                         .onSubmit(save)
                 } header: {
-                    Text("Initial Balance")
+                    // macOS forms already show the field's title as its label.
+                    #if !os(macOS)
+                        Text("Initial Balance")
+                    #endif
                 } footer: {
                     if parsedBalance == nil {
                         Text("Enter a number, such as 1250.75 or -342.18.")
@@ -58,8 +57,9 @@ struct NewAccountView: View {
                     }
                 }
             }
+            .sheetForm()
             .navigationTitle("New Account")
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -82,5 +82,5 @@ struct NewAccountView: View {
 
 #Preview {
     NewAccountView()
-        .modelContainer(for: Account.self, inMemory: true)
+        .modelContainer(for: AppSchema.models, inMemory: true)
 }

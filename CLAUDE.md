@@ -1,7 +1,8 @@
 # Stirling Money
 
 **Bundle ID:** net.s-church.stirlingmoney
-**Target:** iOS 27+
+**Target:** iOS 27+, iPadOS 27+, macOS 27+ (one multiplatform target; visionOS is also listed but unverified)
+**Plan:** `docs/PLAN.md` — features being re-implemented from the old Windows Phone app, phase status, decisions
 **Architecture:** SwiftUI + SwiftData
 **Swift version:** 6.2
 
@@ -13,17 +14,25 @@ Stirling Money/
 ├── Models/
 │   ├── AppSchema.swift            # List of all @Model types for the container
 │   ├── Account.swift              # @Model: balance, posted balance, next check number
+│   ├── AccountSort.swift          # Name / most-used ordering for the accounts list
 │   ├── AccountTransaction.swift   # @Model: register entry + TransactionKind
+│   ├── AccountTransaction+Search.swift  # Register search matching
 │   ├── Category.swift             # @Model
 │   ├── Budget.swift               # @Model: current period, amount spent
 │   ├── BudgetPeriod.swift         # Weekly/monthly/yearly/custom period date math
 │   └── Goal.swift                 # @Model: savings target for one account
 ├── Views/
-│   ├── AccountsView.swift         # Accounts list (root view)
-│   └── NewAccountView.swift       # Add account sheet
+│   ├── AccountsView.swift         # Accounts list with total, sort, delete (root view)
+│   ├── AccountRegisterView.swift  # One account's transactions, balances, search
+│   ├── NewAccountView.swift       # Add account sheet
+│   ├── EditAccountView.swift      # Edit account sheet (@Bindable)
+│   ├── PreviewData.swift          # ModelContainer.preview sample data (DEBUG only)
+│   └── Components/                # AmountText, TransactionRow
 ├── Managers/
 │   └── Ledger.swift               # Create/delete transactions and transfers
 └── Extensions/
+    ├── Decimal+Money.swift        # .localCurrency format, parsing typed amounts
+    └── View+Platform.swift        # Touch-only modifiers that do nothing on macOS
 Stirling MoneyTests/               # Swift Testing; in-memory container + UTC calendar in TestSupport.swift
 ```
 
@@ -70,4 +79,6 @@ Structured data means fewer tokens consumed and better error diagnosis.
 - NEVER use NavigationView — use NavigationStack
 - @Model classes are already Observable — do not add @Observable macro
 - Use @Bindable for form bindings to model properties
+- Code must build for macOS as well as iOS. Don't call iOS-only modifiers (`textInputAutocapitalization`, `keyboardType`, `navigationBarTitleDisplayMode`) directly; use the helpers in `View+Platform.swift` or `#if os(macOS)`. Give swipe actions a matching `.contextMenu` for mouse users.
+- Debug builds launched with `-UseSampleData` use the in-memory preview data instead of the real store.
 

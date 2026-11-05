@@ -68,7 +68,12 @@ final class AccountTransaction {
     /// The payee for display. Transfers name the other account, so renaming an account updates them.
     var displayPayee: String {
         guard kind == .transfer else { return payee }
-        let otherName = transferCounterpart?.account?.name ?? ""
+        // Deleting an account keeps the other account's half, so its balance doesn't change.
+        guard let otherName = transferCounterpart?.account?.name else {
+            return amount < 0
+                ? String(localized: "Transfer to a deleted account")
+                : String(localized: "Transfer from a deleted account")
+        }
         return amount < 0
             ? String(localized: "Transfer to \(otherName)")
             : String(localized: "Transfer from \(otherName)")
