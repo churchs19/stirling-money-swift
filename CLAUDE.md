@@ -4,13 +4,16 @@
 **Target:** iOS 27+, iPadOS 27+, macOS 27+ (one multiplatform target; visionOS is also listed but unverified)
 **Plan:** `docs/PLAN.md` — features being re-implemented from the old Windows Phone app, phase status, decisions
 **Architecture:** SwiftUI + SwiftData
-**Swift version:** 6.2
+**Swift version:** 6.2 (app); the widget extension uses the template's Swift 5 mode
+**Targets:** `Stirling Money` (app), `StirlingMoneyWidgetsExtension` (widgets, folder `StirlingMoneyWidgets/`), tests, UI tests
+**App Group:** `group.net.s-church.stirlingmoney` (app + widgets)
 
 ## File Structure
 
 ```
 Stirling Money/
-├── Stirling_MoneyApp.swift              # App entry, model container
+├── Stirling_MoneyApp.swift              # App entry, model container, app lock, widget snapshot on background
+├── Localizable.xcstrings          # String catalog (English); Xcode fills it in when it builds
 ├── Models/
 │   ├── AppSchema.swift            # List of all @Model types for the container
 │   ├── Account.swift              # @Model: balance, posted balance, next check number
@@ -25,9 +28,13 @@ Stirling Money/
 │   ├── Goal.swift                 # @Model: savings target for one account
 │   ├── Reports.swift              # Report calculations (monthly totals, category slices, budget history)
 │   ├── GoalDraft.swift            # Goal form fields + validation + save
-│   └── TransactionDraft.swift     # Transaction form fields + validation (saved by Ledger.save)
+│   ├── TransactionDraft.swift     # Transaction form fields + validation (saved by Ledger.save)
+│   ├── TransactionCSV.swift       # CSV export of every transaction + shareable file
+│   └── WidgetSnapshot.swift       # JSON the widgets read (a copy lives in StirlingMoneyWidgets/; keep in step)
 ├── Views/
-│   ├── RootView.swift             # TabView: Accounts / Budgets / Goals / Reports (sidebar on iPad and Mac)
+│   ├── RootView.swift             # TabView: Accounts / Budgets / Goals / Reports / Settings (sidebar on iPad and Mac)
+│   ├── SettingsView.swift         # Sort, app lock, export, rate; a Settings window on the Mac
+│   ├── LockView.swift             # Covers the app while locked
 │   ├── AccountsView.swift         # Accounts list with total, sort, delete
 │   ├── AccountRegisterView.swift  # One account's transactions, balances, search
 │   ├── NewAccountView.swift       # Add account sheet
@@ -40,13 +47,19 @@ Stirling Money/
 │   ├── PreviewData.swift          # ModelContainer.preview sample data (DEBUG only)
 │   └── Components/                # AmountText, CurrencyField, TransactionRow, BudgetRow, GoalRow, PostedCheckmark (+ .posted toggle style)
 ├── Managers/
-│   └── Ledger.swift               # Create/edit/delete transactions and transfers; categories
+│   ├── Ledger.swift               # Create/edit/delete transactions and transfers; categories
+│   ├── AppLock.swift              # Face ID / Touch ID / passcode lock (LocalAuthentication)
+│   └── WidgetSnapshotWriter.swift # Writes the snapshot to the App Group and reloads widgets
 └── Extensions/
     ├── Decimal+Money.swift        # .localCurrency format, parsing typed amounts
     ├── Color+Chart.swift          # ChartPalette: validated chart colors; assign slots in order, never cycle
     └── View+Platform.swift        # Touch-only modifiers that do nothing on macOS
 Stirling MoneyTests/               # Swift Testing; in-memory container + UTC calendar in TestSupport.swift
+StirlingMoneyWidgets/              # Widget extension: Balance and Goal widgets, configured with App Intents
 ```
+
+Widgets can't open the SwiftData store; the app writes `WidgetSnapshot.json` to the App Group when it goes to
+the background, and the widgets read it. Change both copies of `WidgetSnapshot` together.
 
 The project uses file-system synchronized folders: new files in these folders are picked up automatically.
 The app target defaults to `MainActor` isolation; mark plain value types `nonisolated` when `@Model` code uses them.
@@ -86,7 +99,9 @@ Structured data means fewer tokens consumed and better error diagnosis.
 
 ## Rules
 
-- NEVER modify .pbxproj or project.xcproj
+- NEVER modify .pbxproj or project.xcproj by hand. Exception (approved for Phase 6): Xcode's own tools
+  (`XcodeNewTarget`, `AddInfoPlist`, `AddEntitlement`) were used to add the widget target, App Group and
+  `NSFaceIDUsageDescription`. Ask before any further project change.
 - NEVER use ObservableObject — use @Observable
 - NEVER use NavigationView — use NavigationStack
 - @Model classes are already Observable — do not add @Observable macro

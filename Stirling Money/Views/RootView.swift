@@ -19,16 +19,25 @@ struct RootView: View {
             Tab("Reports", systemImage: "chart.pie", value: AppTab.reports) {
                 ReportsView()
             }
+            // The Mac has a Settings window (⌘,) instead.
+            #if !os(macOS)
+                Tab("Settings", systemImage: "gear", value: AppTab.settings) {
+                    NavigationStack {
+                        SettingsView()
+                    }
+                }
+            #endif
         }
         .tabViewStyle(.sidebarAdaptable)
     }
 }
 
 enum AppTab: String {
-    case accounts, budgets, goals, reports
+    case accounts, budgets, goals, reports, settings
 }
 
 #Preview {
     RootView()
+        .environment(AppLock())
         .modelContainer(.preview)
 }

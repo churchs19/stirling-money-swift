@@ -1,0 +1,135 @@
+import SwiftUI
+import WidgetKit
+
+struct BalanceEntry: TimelineEntry {
+    let date: Date
+    /// nil when the app hasn't written any data yet.
+    let snapshot: WidgetSnapshot?
+    /// nil means the total of all accounts.
+    let account: WidgetSnapshot.AccountSummary?
+    /// The configured account no longer exists.
+    let isMissing: Bool
+}
+
+struct BalanceProvider: AppIntentTimelineProvider {
+    func placeholder(in context: Context) -> BalanceEntry {
+        BalanceEntry(date: .now, snapshot: .sample, account: WidgetSnapshot.sample.accounts.first, isMissing: false)
+    }
+
+    func snapshot(for configuration: SelectAccountIntent, in context: Context) async -> BalanceEntry {
+        if context.isPreview, WidgetSnapshot.load() == nil {
+            return placeholder(in: context)
+        }
+        return entry(for: configuration)
+    }
+
+    func timeline(for configuration: SelectAccountIntent, in context: Context) async -> Timeline<BalanceEntry> {
+        // The app reloads widgets when it writes new data, so there's nothing to schedule.
+        Timeline(entries: [entry(for: configuration)], policy: .never)
+    }
+
+    private func entry(for configuration: SelectAccountIntent) -> BalanceEntry {
+        let snapshot = WidgetSnapshot.load()
+        guard let wanted = configuration.account else {
+            return BalanceEntry(date: .now, snapshot: snapshot, account: nil, isMissing: false)
+        }
+        let account = snapshot?.accounts.first { $0.id == wanted.id }
+        return BalanceEntry(date: .now, snapshot: snapshot, account: account, isMissing: account == nil)
+    }
+}
+
+struct BalanceWidgetView: View {
+    @Environment(\.widgetFamily) private var family
+    let entry: BalanceEntry
+
+    var body: some View {
+        if let snapshot = entry.snapshot, !entry.isMissing {
+            let name = entry.account?.name ?? String(localized: "All Accounts")
+            let balance = entry.account?.balance ?? snapshot.total
+
+            switch family {
+            #if os(iOS)
+                case .accessoryInline:
+                    Text("\(name) \(balance, format: .localCurrency)")
+                case .accessoryRectangular:
+                    VStack(alignment: .leading) {
+                        Text(name).font(.headline).widgetAccentable()
+                        Text(balance, format: .localCurrency)
+                        if let account = entry.account {
+                            Text("Posted \(account.postedBalance, format: .localCurrency)")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+            #endif
+            default:
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(name)
+                        .font(.headline)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    Text(balance, format: .localCurrency)
+                        .font(.title2.bold())
+                        .monospacedDigit()
+                        .minimumScaleFactor(0.5)
+                        .lineLimit(1)
+                        .foregroundStyle(balance < 0 ? .red : .primary)
+                    if let account = entry.account {
+                        Text("Posted \(account.postedBalance, format: .localCurrency)")
+                            .font(.caption)
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    } else {
+                        Text("^[\(snapshot.accounts.count) account](inflect: true)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            }
+        } else {
+            WidgetMessage(text: entry.isMissing ? "This account was deleted. Edit the widget to choose another." : "Open Stirling Money to see your balances.")
+        }
+    }
+}
+
+struct BalanceWidget: Widget {
+    var body: some WidgetConfiguration {
+        AppIntentConfiguration(kind: "Balance", intent: SelectAccountIntent.self, provider: BalanceProvider()) { entry in
+            BalanceWidgetView(entry: entry)
+                .containerBackground(.fill.tertiary, for: .widget)
+        }
+        .configurationDisplayName("Balance")
+        .description("An account's balance, or the total of all your accounts.")
+        .supportedFamilies(Self.families)
+    }
+
+    private static var families: [WidgetFamily] {
+        #if os(iOS)
+            [.systemSmall, .systemMedium, .accessoryRectangular, .accessoryInline]
+        #else
+            [.systemSmall, .systemMedium]
+        #endif
+    }
+}
+
+/// Shown when there's nothing to display yet.
+struct WidgetMessage: View {
+    let text: LocalizedStringKey
+
+    var body: some View {
+        Text(text)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+    }
+}
+
+#Preview("Account", as: .systemSmall) {
+    BalanceWidget()
+} timeline: {
+    BalanceEntry(date: .now, snapshot: .sample, account: WidgetSnapshot.sample.accounts[0], isMissing: false)
+    BalanceEntry(date: .now, snapshot: .sample, account: nil, isMissing: false)
+    BalanceEntry(date: .now, snapshot: nil, account: nil, isMissing: false)
+}

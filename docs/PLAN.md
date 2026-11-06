@@ -12,8 +12,8 @@ as a SwiftUI + SwiftData app for iOS, iPadOS and macOS.
 | 2 | Accounts list and account register | Done (`fad2bcf`) |
 | 3 | Entering and editing transactions; categories | Done (`a87cf70`) |
 | 4 | Budgets and goals | Done (`368965c`) |
-| 5 | Reports | Done |
-| 6 | Platform features (widgets, app lock, export, sync) | Next |
+| 5 | Reports | Done (`0a38edc`) |
+| 6 | Platform features (widgets, app lock, export, settings) | Done; sync still deferred |
 
 ## Decisions
 
@@ -142,9 +142,24 @@ Choices made:
 - Category reports count spending less refunds, like category budgets. A month where refunds outweigh spending shows a negative bar.
 - The palette (`ChartPalette`) was checked with the data-viz validator against the system list background in light and dark mode. Three light-mode colors are under 3:1 contrast with white, which is why every chart also lists its values as text.
 
-### Phase 6: Platform features
+### Phase 6: Platform features (done, except sync and sharing)
 
-Each item can be done separately.
+- [x] **Widgets**: Balance (one account or the total; small, medium, and Lock Screen on iPhone) and Goal (progress ring, amount to go, days left). Configured with App Intents.
+- [x] **App lock**: "Require Face ID" (or Touch ID / passcode) in Settings. Locks at launch and when the app goes to the background; turning it on asks for Face ID first.
+- [x] **Export**: every transaction as CSV, via the share sheet (Save to Files on iPhone/iPad).
+- [x] **Rate the app**: `RequestReviewAction` in Settings.
+- [x] **Settings**: a tab on iPhone/iPad; the Settings window (⌘,) on the Mac.
+- [x] **String catalog**: `Localizable.xcstrings`, English only for now.
+
+Choices made:
+- **Widgets read a JSON snapshot**, not the SwiftData store: the widget target can't share the model files without per-file membership changes. The app writes it when it goes to the background, so widgets update when you leave the app.
+- Widget configuration refers to accounts and goals by a stable ID, so renaming keeps the widget pointed at the same one; deleting shows "Edit the widget to choose another."
+- **The lock asks once** when the app becomes active; after a cancel you tap Unlock (asking again automatically would loop). If the device's passcode is removed, the lock is skipped rather than shutting you out. On the Mac it locks at launch and when the app is hidden or minimized, not on every app switch.
+- **Export uses the share sheet on the Mac too.** The Mac app is sandboxed with read-only access to chosen files, so a Save dialog would need the "User Selected File" setting changed to read/write (a project change).
+- Exported amounts use "." as the decimal point and text that looks like a spreadsheet formula gets a leading apostrophe.
+- Debug runs with `-UseSampleData` also write the snapshot, so widgets show the sample data until the next normal run goes to the background.
+
+Original → replacement:
 
 | Original | Replacement |
 |---|---|
@@ -161,5 +176,6 @@ Each item can be done separately.
 
 - **Long register rows**: the details line now wraps to two lines instead of being cut off at one. Check it on a narrow iPhone.
 - **visionOS** is listed in the target but hasn't been built. There's no visionOS simulator installed.
+- **Mac signing**: the App Group needs a Mac provisioning profile. Sign in to Xcode (Settings → Accounts) so automatic signing can create it; until then the Mac build fails at signing (it compiles with signing off).
 - **`xcuserdata` is committed to git**: `Stirling Money.xcodeproj/xcuserdata/shane.xcuserdatad/xcschemes/xcschememanagement.plist` is per-user Xcode state and could be untracked.
 - **The register sorts transactions in memory.** That's fine for personal ledgers; switch to a `@Query` with a predicate if large accounts get slow.

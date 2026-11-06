@@ -3,6 +3,9 @@ import SwiftUI
 
 @main
 struct Stirling_MoneyApp: App {
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var appLock = AppLock()
+
     var sharedModelContainer: ModelContainer = {
         #if DEBUG
             // Launch with `-UseSampleData` to review screens with the preview data in memory.
@@ -25,7 +28,33 @@ struct Stirling_MoneyApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
+                .overlay {
+                    if appLock.isLocked {
+                        LockView()
+                    }
+                }
         }
         .modelContainer(sharedModelContainer)
+        .environment(appLock)
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .background:
+                appLock.lockIfEnabled()
+                WidgetSnapshotWriter.update(from: sharedModelContainer.mainContext)
+            case .active:
+                Task { await appLock.promptIfNeeded() }
+            default:
+                break
+            }
+        }
+
+        #if os(macOS)
+            Settings {
+                SettingsView()
+                    .frame(minWidth: 420, minHeight: 380)
+            }
+            .modelContainer(sharedModelContainer)
+            .environment(appLock)
+        #endif
     }
 }
