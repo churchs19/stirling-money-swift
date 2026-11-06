@@ -11,9 +11,9 @@ as a SwiftUI + SwiftData app for iOS, iPadOS and macOS.
 | 1 | Data model and calculations | Done (`b81a15e`) |
 | 2 | Accounts list and account register | Done (`fad2bcf`) |
 | 3 | Entering and editing transactions; categories | Done (`a87cf70`) |
-| 4 | Budgets and goals | Done |
-| 5 | Reports | Next |
-| 6 | Platform features (widgets, app lock, export, sync) | Not started |
+| 4 | Budgets and goals | Done (`368965c`) |
+| 5 | Reports | Done |
+| 6 | Platform features (widgets, app lock, export, sync) | Next |
 
 ## Decisions
 
@@ -125,13 +125,22 @@ Choices made:
 - Goal target dates in the past are allowed; the card shows them as overdue.
 - Amount fields share `CurrencyField`, which shows currency except while editing.
 
-### Phase 5: Reports (Swift Charts)
+### Phase 5: Reports (done)
 
-- [ ] Budget history: last 7 periods, bars with a target line
-- [ ] Spending by category: `SectorMark`, top 9 + Other
-- [ ] One category over time: monthly bars
-- [ ] Net income: income vs. expenses per month
-- [ ] Month-range picker for each
+A Reports tab with four Swift Charts reports. Each has a tap/hover callout and lists its values in a table underneath.
+
+- [x] Budget history: last 7 periods (fewer if the budget is newer), bars with a dashed budget line; the table flags periods over budget
+- [x] Spending by category: donut (`SectorMark`), top 7 + Other, total or selected slice in the middle
+- [x] One category over time: monthly bars
+- [x] Net income: income vs. expenses per month, grouped bars
+- [x] 3 / 6 / 12 month picker, shared by the monthly reports and remembered between launches
+
+Choices made:
+- **Top 7 + Other instead of 9 + Other.** The chart palette has 8 validated colors, ordered so neighboring colors stay distinct for color-blind readers; a 10th slice would need a made-up color.
+- **Category colors don't change with the range.** The 7 named categories are the biggest over all time, so switching 3 → 12 months doesn't repaint the chart. Smaller ones go into Other.
+- Uncategorized spending is a slice of its own, not part of Other.
+- Category reports count spending less refunds, like category budgets. A month where refunds outweigh spending shows a negative bar.
+- The palette (`ChartPalette`) was checked with the data-viz validator against the system list background in light and dark mode. Three light-mode colors are under 3:1 contrast with white, which is why every chart also lists its values as text.
 
 ### Phase 6: Platform features
 

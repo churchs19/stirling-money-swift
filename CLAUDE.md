@@ -23,10 +23,11 @@ Stirling Money/
 │   ├── BudgetDraft.swift          # Budget form fields + validation + save
 │   ├── BudgetPeriod.swift         # Weekly/monthly/yearly/custom period date math
 │   ├── Goal.swift                 # @Model: savings target for one account
+│   ├── Reports.swift              # Report calculations (monthly totals, category slices, budget history)
 │   ├── GoalDraft.swift            # Goal form fields + validation + save
 │   └── TransactionDraft.swift     # Transaction form fields + validation (saved by Ledger.save)
 ├── Views/
-│   ├── RootView.swift             # TabView: Accounts / Budgets / Goals (sidebar on iPad and Mac)
+│   ├── RootView.swift             # TabView: Accounts / Budgets / Goals / Reports (sidebar on iPad and Mac)
 │   ├── AccountsView.swift         # Accounts list with total, sort, delete
 │   ├── AccountRegisterView.swift  # One account's transactions, balances, search
 │   ├── NewAccountView.swift       # Add account sheet
@@ -35,12 +36,14 @@ Stirling Money/
 │   ├── CategoriesView.swift       # Category list: add, rename, delete
 │   ├── BudgetsView.swift / BudgetFormView.swift  # Budget cards; add/edit sheet
 │   ├── GoalsView.swift / GoalFormView.swift      # Goal cards; add/edit sheet
+│   ├── Reports/                   # ReportsView list + one view per Swift Charts report; ReportSupport.swift
 │   ├── PreviewData.swift          # ModelContainer.preview sample data (DEBUG only)
 │   └── Components/                # AmountText, CurrencyField, TransactionRow, BudgetRow, GoalRow, PostedCheckmark (+ .posted toggle style)
 ├── Managers/
 │   └── Ledger.swift               # Create/edit/delete transactions and transfers; categories
 └── Extensions/
     ├── Decimal+Money.swift        # .localCurrency format, parsing typed amounts
+    ├── Color+Chart.swift          # ChartPalette: validated chart colors; assign slots in order, never cycle
     └── View+Platform.swift        # Touch-only modifiers that do nothing on macOS
 Stirling MoneyTests/               # Swift Testing; in-memory container + UTC calendar in TestSupport.swift
 ```
