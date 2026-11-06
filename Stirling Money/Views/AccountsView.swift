@@ -3,6 +3,8 @@ import SwiftUI
 
 struct AccountsView: View {
     @Environment(\.modelContext) private var modelContext
+    /// The accounts open in the stack, so a widget link can open one directly.
+    @Binding var path: [Account]
     @Query private var accounts: [Account]
     @AppStorage("accountSort") private var sort: AccountSort = .name
 
@@ -13,7 +15,7 @@ struct AccountsView: View {
     var body: some View {
         let sortedAccounts = sort.sorted(accounts)
 
-        NavigationStack {
+        NavigationStack(path: $path) {
             List {
                 if !accounts.isEmpty {
                     Section {
@@ -125,11 +127,13 @@ struct AccountsView: View {
 }
 
 #Preview("With Accounts") {
-    AccountsView()
+    @Previewable @State var path: [Account] = []
+    AccountsView(path: $path)
         .modelContainer(.preview)
 }
 
 #Preview("Empty") {
-    AccountsView()
+    @Previewable @State var path: [Account] = []
+    AccountsView(path: $path)
         .modelContainer(for: AppSchema.models, inMemory: true)
 }

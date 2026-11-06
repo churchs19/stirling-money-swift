@@ -44,52 +44,68 @@ struct BalanceWidgetView: View {
 
     var body: some View {
         if let snapshot = entry.snapshot, !entry.isMissing {
-            let name = entry.account?.name ?? String(localized: "All Accounts")
-            let balance = entry.account?.balance ?? snapshot.total
+            content(snapshot: snapshot)
+                // A chosen account opens its transactions; "All Accounts" opens the app as usual.
+                .widgetURL(entry.account.map { Self.url(forAccountID: $0.id) })
+        } else {
+            WidgetMessage(text: entry.isMissing ? "This account was deleted. Edit the widget to choose another." : "Open Stirling Money to see your balances.")
+        }
+    }
 
-            switch family {
-            #if os(iOS)
-                case .accessoryInline:
-                    Text("\(name) \(balance, format: .localCurrency)")
-                case .accessoryRectangular:
-                    VStack(alignment: .leading) {
-                        Text(name).font(.headline).widgetAccentable()
-                        Text(balance, format: .localCurrency)
-                        if let account = entry.account {
-                            Text("Posted \(account.postedBalance, format: .localCurrency)")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-            #endif
-            default:
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(name)
-                        .font(.headline)
-                        .lineLimit(1)
-                    Spacer(minLength: 0)
+    /// The app's link to an account's register. Matches `DeepLink` in the app; keep them in step.
+    static func url(forAccountID id: String) -> URL {
+        var components = URLComponents()
+        components.scheme = "stirlingmoney"
+        components.host = "account"
+        components.queryItems = [URLQueryItem(name: "id", value: id)]
+        return components.url!
+    }
+
+    @ViewBuilder
+    private func content(snapshot: WidgetSnapshot) -> some View {
+        let name = entry.account?.name ?? String(localized: "All Accounts")
+        let balance = entry.account?.balance ?? snapshot.total
+
+        switch family {
+        #if os(iOS)
+            case .accessoryInline:
+                Text("\(name) \(balance, format: .localCurrency)")
+            case .accessoryRectangular:
+                VStack(alignment: .leading) {
+                    Text(name).font(.headline).widgetAccentable()
                     Text(balance, format: .localCurrency)
-                        .font(.title2.bold())
-                        .monospacedDigit()
-                        .minimumScaleFactor(0.5)
-                        .lineLimit(1)
-                        .foregroundStyle(balance < 0 ? .red : .primary)
                     if let account = entry.account {
                         Text("Posted \(account.postedBalance, format: .localCurrency)")
-                            .font(.caption)
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                    } else {
-                        Text("^[\(snapshot.accounts.count) account](inflect: true)")
-                            .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        #endif
+        default:
+            VStack(alignment: .leading, spacing: 4) {
+                Text(name)
+                    .font(.headline)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                Text(balance, format: .localCurrency)
+                    .font(.title2.bold())
+                    .monospacedDigit()
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
+                    .foregroundStyle(balance < 0 ? .red : .primary)
+                if let account = entry.account {
+                    Text("Posted \(account.postedBalance, format: .localCurrency)")
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                } else {
+                    Text("^[\(snapshot.accounts.count) account](inflect: true)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
-        } else {
-            WidgetMessage(text: entry.isMissing ? "This account was deleted. Edit the widget to choose another." : "Open Stirling Money to see your balances.")
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         }
     }
 }

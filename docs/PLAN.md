@@ -153,6 +153,7 @@ Choices made:
 
 Choices made:
 - **Widgets read a JSON snapshot**, not the SwiftData store: the widget target can't share the model files without per-file membership changes. The app writes it when it goes to the background, so widgets update when you leave the app.
+- Tapping a Balance widget set to one account opens that account's register (`widgetURL` → `onOpenURL`, see `DeepLink`); "All Accounts" just opens the app. Confirmed on the simulator; the `stirlingmoney` scheme doesn't need registering in Info.plist for widget links.
 - Widget configuration refers to accounts and goals by a stable ID, so renaming keeps the widget pointed at the same one; deleting shows "Edit the widget to choose another."
 - **The lock asks once** when the app becomes active; after a cancel you tap Unlock (asking again automatically would loop). If the device's passcode is removed, the lock is skipped rather than shutting you out. On the Mac it locks at launch and when the app is hidden or minimized, not on every app switch.
 - **Export uses the share sheet on the Mac too.** The Mac app is sandboxed with read-only access to chosen files, so a Save dialog would need the "User Selected File" setting changed to read/write (a project change).

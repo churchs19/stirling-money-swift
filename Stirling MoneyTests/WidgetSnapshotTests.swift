@@ -59,3 +59,18 @@ struct WidgetSnapshotTests {
         #expect(decoded == snapshot)
     }
 }
+
+struct DeepLinkTests {
+    @Test func accountLinkRoundTripsAnIDWithURLSpecialCharacters() throws {
+        // Widget IDs are base64, which can contain +, / and =.
+        let link = DeepLink.account(id: "eyJh+b/c==")
+        #expect(link.url.scheme == "stirlingmoney")
+        #expect(DeepLink(url: link.url) == link)
+    }
+
+    @Test func otherURLsAreIgnored() throws {
+        #expect(try DeepLink(url: #require(URL(string: "https://example.com/account?id=1"))) == nil)
+        #expect(try DeepLink(url: #require(URL(string: "stirlingmoney://budget?id=1"))) == nil)
+        #expect(try DeepLink(url: #require(URL(string: "stirlingmoney://account"))) == nil)
+    }
+}
