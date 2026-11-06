@@ -19,18 +19,24 @@ Stirling Money/
 │   ├── AccountTransaction+Search.swift  # Register search matching
 │   ├── Category.swift             # @Model
 │   ├── Budget.swift               # @Model: current period, amount spent
+│   ├── Budget+Summary.swift       # Where a budget stands today, for its card
+│   ├── BudgetDraft.swift          # Budget form fields + validation + save
 │   ├── BudgetPeriod.swift         # Weekly/monthly/yearly/custom period date math
 │   ├── Goal.swift                 # @Model: savings target for one account
+│   ├── GoalDraft.swift            # Goal form fields + validation + save
 │   └── TransactionDraft.swift     # Transaction form fields + validation (saved by Ledger.save)
 ├── Views/
-│   ├── AccountsView.swift         # Accounts list with total, sort, delete (root view)
+│   ├── RootView.swift             # TabView: Accounts / Budgets / Goals (sidebar on iPad and Mac)
+│   ├── AccountsView.swift         # Accounts list with total, sort, delete
 │   ├── AccountRegisterView.swift  # One account's transactions, balances, search
 │   ├── NewAccountView.swift       # Add account sheet
 │   ├── EditAccountView.swift      # Edit account sheet (@Bindable)
 │   ├── TransactionFormView.swift  # Add/edit transaction sheet for every kind
 │   ├── CategoriesView.swift       # Category list: add, rename, delete
+│   ├── BudgetsView.swift / BudgetFormView.swift  # Budget cards; add/edit sheet
+│   ├── GoalsView.swift / GoalFormView.swift      # Goal cards; add/edit sheet
 │   ├── PreviewData.swift          # ModelContainer.preview sample data (DEBUG only)
-│   └── Components/                # AmountText, TransactionRow, PostedCheckmark (+ .posted toggle style)
+│   └── Components/                # AmountText, CurrencyField, TransactionRow, BudgetRow, GoalRow, PostedCheckmark (+ .posted toggle style)
 ├── Managers/
 │   └── Ledger.swift               # Create/edit/delete transactions and transfers; categories
 └── Extensions/

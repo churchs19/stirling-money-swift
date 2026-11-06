@@ -10,6 +10,15 @@ nonisolated enum BudgetPeriod: String, Codable, CaseIterable, Identifiable {
         self
     }
 
+    var title: String {
+        switch self {
+        case .weekly: String(localized: "Weekly")
+        case .monthly: String(localized: "Monthly")
+        case .yearly: String(localized: "Yearly")
+        case .custom: String(localized: "Custom")
+        }
+    }
+
     /// The period that contains `date`, shifted by `offset` periods (-1 is the previous period).
     ///
     /// Recurring periods repeat from `start`. Monthly and yearly periods keep the start's day,

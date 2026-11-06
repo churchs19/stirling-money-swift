@@ -24,7 +24,7 @@ struct Stirling_MoneyApp: App {
 
     var body: some Scene {
         WindowGroup {
-            AccountsView()
+            RootView()
         }
         .modelContainer(sharedModelContainer)
     }

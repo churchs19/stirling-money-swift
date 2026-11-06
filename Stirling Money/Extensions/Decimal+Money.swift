@@ -23,6 +23,13 @@ nonisolated extension Decimal {
         self = value
     }
 
+    /// Parses an amount that must be above zero, such as a transaction or budget amount.
+    /// A typed minus sign is ignored; blank, zero or non-numeric text returns nil.
+    init?(positiveUserInput text: String) {
+        guard let value = Decimal(userInput: text), value != 0 else { return nil }
+        self = abs(value)
+    }
+
     /// The amount as plain editable text, without grouping separators ("1250.75").
     var editableText: String {
         formatted(.number.grouping(.never))

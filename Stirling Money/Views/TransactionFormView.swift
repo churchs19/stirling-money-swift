@@ -17,7 +17,6 @@ struct TransactionFormView: View {
     @State private var isAddingCategory = false
     @State private var newCategoryName = ""
     @State private var isConfirmingDelete = false
-    @FocusState private var isAmountFocused: Bool
 
     init(account: Account, transaction: AccountTransaction? = nil) {
         self.account = account
@@ -47,19 +46,7 @@ struct TransactionFormView: View {
                 }
 
                 Section {
-                    LabeledContent("Amount") {
-                        TextField("Amount", text: $draft.amountText, prompt: Text(Decimal.zero.formatted(.localCurrency)))
-                            .labelsHidden()
-                            .multilineTextAlignment(.trailing)
-                            .amountKeyboard()
-                            .focused($isAmountFocused)
-                            // Shown as currency, but edited as a plain number so there's
-                            // no symbol or grouping to type around.
-                            .onChange(of: isAmountFocused) { _, isFocused in
-                                guard let amount = draft.amount else { return }
-                                draft.amountText = isFocused ? amount.editableText : amount.formatted(.localCurrency)
-                            }
-                    }
+                    CurrencyField("Amount", text: $draft.amountText)
 
                     if draft.kind == .transfer {
                         transferAccountPicker

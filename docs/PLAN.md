@@ -10,9 +10,9 @@ as a SwiftUI + SwiftData app for iOS, iPadOS and macOS.
 |---|---|---|
 | 1 | Data model and calculations | Done (`b81a15e`) |
 | 2 | Accounts list and account register | Done (`fad2bcf`) |
-| 3 | Entering and editing transactions; categories | Done |
-| 4 | Budgets and goals | Next |
-| 5 | Reports | Not started |
+| 3 | Entering and editing transactions; categories | Done (`a87cf70`) |
+| 4 | Budgets and goals | Done |
+| 5 | Reports | Next |
 | 6 | Platform features (widgets, app lock, export, sync) | Not started |
 
 ## Decisions
@@ -109,13 +109,21 @@ Choices made:
 - A transfer's direction can't be flipped while editing; delete it and enter it from the other account.
 - A category created from the form stays even if the form is cancelled.
 
-### Phase 4: Budgets and goals
+### Phase 4: Budgets and goals (done)
 
-- [ ] Budget add/edit (custom periods need an end date)
-- [ ] Budget cards: spent vs. amount for the current period
-- [ ] Goal add/edit; the account's balance at creation is the starting point
-- [ ] Goal cards: amount left, days left or overdue, progress
-- [ ] Home becomes a `TabView` (Accounts / Budgets / Goals / Reports). Consider `NavigationSplitView` for iPad and Mac.
+- [x] Budget add/edit: name, amount, category or all spending, weekly/monthly/yearly/custom, start date, optional end date (required for custom)
+- [x] Budget cards: spent vs. amount for the current period, amount left or over, the period's dates; "Starts …" or "Ended" outside its dates
+- [x] Goal add/edit; the account's balance at creation is the starting point
+- [x] Goal cards: amount left or "Reached", days left or overdue, progress
+- [x] Home is a `TabView` (Accounts / Budgets / Goals) with `.sidebarAdaptable`: tab bar on iPhone, sidebar on iPad and Mac. Reports joins in Phase 5.
+
+Choices made:
+- A new budget starts on the first of the current month.
+- When a recurring budget's end date falls mid-period, the last period is cut short at the end date.
+- Moving a goal to a different account restarts its progress from that account's balance today. Renaming or changing the target keeps the starting point.
+- Budgets and goals delete from a swipe or right-click without asking (they don't own any other data); deleting from the form asks first.
+- Goal target dates in the past are allowed; the card shows them as overdue.
+- Amount fields share `CurrencyField`, which shows currency except while editing.
 
 ### Phase 5: Reports (Swift Charts)
 

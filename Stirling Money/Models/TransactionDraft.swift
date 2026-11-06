@@ -53,8 +53,7 @@ struct TransactionDraft {
 
     /// The amount as a positive number, or nil if it's blank, zero or not a number.
     var amount: Decimal? {
-        guard let value = Decimal(userInput: amountText), value != 0 else { return nil }
-        return abs(value)
+        Decimal(positiveUserInput: amountText)
     }
 
     /// True when the amount field has text that can't be used, so the form can say so.

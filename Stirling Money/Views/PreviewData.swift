@@ -32,6 +32,21 @@
             Ledger.addTransaction(.withdrawal, amount: 4.50, to: checking, date: daysAgo(1), payee: "Coffee Cart", category: dining, in: context)
             Ledger.addTransaction(.withdrawal, amount: 61.20, to: creditCard, date: daysAgo(3), payee: "Bistro", category: dining, in: context)
 
+            let monthStart = Calendar.current.dateInterval(of: .month, for: .now)!.start
+            let groceryBudget = Budget(name: "Groceries", amount: 400, startDate: monthStart)
+            let diningBudget = Budget(name: "Eating Out", amount: 50, period: .weekly, startDate: daysAgo(6))
+            let everything = Budget(name: "Everything", amount: 3000, startDate: monthStart)
+            [groceryBudget, diningBudget, everything].forEach(context.insert)
+            groceryBudget.category = groceries
+            diningBudget.category = dining
+
+            let inAYear = Calendar.current.date(byAdding: .year, value: 1, to: .now)!
+            let emergencyFund = Goal(name: "Emergency Fund", targetAmount: 15000, targetDate: inAYear, initialBalance: 8000, startDate: daysAgo(30))
+            let vacation = Goal(name: "Vacation", targetAmount: 8200, targetDate: daysAgo(-60), initialBalance: 6000, startDate: daysAgo(90))
+            [emergencyFund, vacation].forEach(context.insert)
+            emergencyFund.account = savings
+            vacation.account = savings
+
             return container
         }()
     }
