@@ -2,3 +2,6 @@
 buildServer.json
 
 .DS_Store
+
+# Per-user Xcode state (schemes order, breakpoints, UI layout)
+xcuserdata/

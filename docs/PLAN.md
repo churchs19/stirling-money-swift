@@ -178,5 +178,4 @@ Original → replacement:
 - **Long register rows**: the details line now wraps to two lines instead of being cut off at one. Check it on a narrow iPhone.
 - **visionOS** is listed in the target but hasn't been built. There's no visionOS simulator installed.
 - **Mac signing**: the App Group needs a Mac provisioning profile. Sign in to Xcode (Settings → Accounts) so automatic signing can create it; until then the Mac build fails at signing (it compiles with signing off).
-- **`xcuserdata` is committed to git**: `Stirling Money.xcodeproj/xcuserdata/shane.xcuserdatad/xcschemes/xcschememanagement.plist` is per-user Xcode state and could be untracked.
 - **The register sorts transactions in memory.** That's fine for personal ledgers; switch to a `@Query` with a predicate if large accounts get slow.
