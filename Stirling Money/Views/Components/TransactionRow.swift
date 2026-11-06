@@ -23,9 +23,7 @@ struct TransactionRow: View {
             Button {
                 transaction.isPosted.toggle()
             } label: {
-                Image(systemName: transaction.isPosted ? "checkmark.circle.fill" : "circle")
-                    .imageScale(.large)
-                    .foregroundStyle(transaction.isPosted ? Color.green : Color.secondary)
+                PostedCheckmark(isPosted: transaction.isPosted)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(transaction.isPosted ? "Posted" : "Not posted")
@@ -37,7 +35,7 @@ struct TransactionRow: View {
                 Text(details)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .lineLimit(2)
             }
 
             Spacer(minLength: 8)

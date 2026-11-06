@@ -19,10 +19,9 @@ enum Ledger {
         in context: ModelContext
     ) -> AccountTransaction {
         precondition(kind != .transfer, "Use Ledger.addTransfer for transfers")
-        let magnitude = abs(amount)
         let transaction = AccountTransaction(
             kind: kind,
-            amount: kind == .deposit ? magnitude : -magnitude,
+            amount: signedAmount(amount, for: kind),
             date: date,
             payee: payee,
             note: note,
@@ -71,12 +70,130 @@ enum Ledger {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
 
-        let existing = try context.fetch(FetchDescriptor<Category>())
-        if let match = existing.first(where: { $0.name.compare(trimmed, options: .caseInsensitive) == .orderedSame }) {
+        if let match = try existingCategory(named: trimmed, in: context) {
             return match
         }
         let category = Category(name: trimmed)
         context.insert(category)
         return category
+    }
+
+    /// The category with this name, ignoring case and surrounding spaces, other than `excluded`.
+    /// Used to stop a rename from creating two categories with the same name.
+    static func existingCategory(
+        named name: String,
+        excluding excluded: Category? = nil,
+        in context: ModelContext
+    ) throws -> Category? {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return try context.fetch(FetchDescriptor<Category>()).first {
+            $0 !== excluded && $0.name.compare(trimmed, options: .caseInsensitive) == .orderedSame
+        }
+    }
+
+    /// Deposits are positive; everything else takes money out of the account.
+    static func signedAmount(_ amount: Decimal, for kind: TransactionKind) -> Decimal {
+        kind == .deposit ? abs(amount) : -abs(amount)
+    }
+}
+
+// MARK: - Saving the transaction form
+
+extension Ledger {
+    /// Saves the transaction form: adds a new entry to `account`, or updates `existing`.
+    /// Returns the entry shown in `account`'s register, or nil if the draft isn't valid.
+    ///
+    /// Changing a transfer into another kind, or the other way round, changes how many entries
+    /// there are, so the old entry (and its other half) is deleted and a new one is created.
+    @discardableResult
+    static func save(
+        _ draft: TransactionDraft,
+        in account: Account,
+        editing existing: AccountTransaction? = nil,
+        context: ModelContext
+    ) -> AccountTransaction? {
+        guard draft.isValid, let amount = draft.amount else { return nil }
+
+        var existing = existing
+        if let current = existing, (current.kind == .transfer) != (draft.kind == .transfer) {
+            delete(current, in: context)
+            existing = nil
+        }
+
+        if draft.kind == .transfer {
+            guard let other = draft.otherAccount, other !== account else { return nil }
+            if let existing {
+                updateTransfer(existing, amount: amount, otherAccount: other, from: draft, in: context)
+                return existing
+            }
+            if draft.isIncomingTransfer {
+                return addTransfer(
+                    amount: amount, from: other, to: account, date: draft.date,
+                    note: draft.trimmedNote, isPosted: draft.isPosted, in: context
+                ).incoming
+            }
+            return addTransfer(
+                amount: amount, from: account, to: other, date: draft.date,
+                note: draft.trimmedNote, isPosted: draft.isPosted, in: context
+            ).outgoing
+        }
+
+        guard let existing else {
+            return addTransaction(
+                draft.kind, amount: amount, to: account, date: draft.date, payee: draft.trimmedPayee,
+                note: draft.trimmedNote, isPosted: draft.isPosted, checkNumber: draft.checkNumber,
+                category: draft.category, in: context
+            )
+        }
+        existing.kind = draft.kind
+        existing.amount = signedAmount(amount, for: draft.kind)
+        existing.date = draft.date
+        existing.payee = draft.trimmedPayee
+        existing.note = draft.trimmedNote
+        existing.isPosted = draft.isPosted
+        existing.checkNumber = draft.kind == .check ? draft.checkNumber : nil
+        existing.category = draft.category
+        return existing
+    }
+
+    /// Updates one half of a transfer and keeps the other half in step. Posted status stays
+    /// separate, since each bank clears its side on its own schedule.
+    /// If the other half was lost when its account was deleted, a new one is created.
+    private static func updateTransfer(
+        _ half: AccountTransaction,
+        amount: Decimal,
+        otherAccount: Account,
+        from draft: TransactionDraft,
+        in context: ModelContext
+    ) {
+        let isIncoming = half.amount > 0
+        half.amount = isIncoming ? amount : -amount
+        half.date = draft.date
+        half.note = draft.trimmedNote
+        half.isPosted = draft.isPosted
+        half.payee = ""
+        half.checkNumber = nil
+        half.category = nil
+
+        if let counterpart = half.transferCounterpart {
+            counterpart.amount = -half.amount
+            counterpart.date = draft.date
+            counterpart.note = draft.trimmedNote
+            counterpart.account = otherAccount
+            return
+        }
+
+        let counterpart = AccountTransaction(
+            kind: .transfer, amount: -half.amount, date: draft.date,
+            note: draft.trimmedNote, isPosted: draft.isPosted
+        )
+        context.insert(counterpart)
+        counterpart.account = otherAccount
+        if isIncoming {
+            counterpart.incomingHalf = half
+        } else {
+            half.incomingHalf = counterpart
+        }
     }
 }

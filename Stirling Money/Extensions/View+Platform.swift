@@ -21,6 +21,15 @@ extension View {
         #endif
     }
 
+    /// Shows a keyboard with digits only, for whole numbers such as check numbers.
+    func numberKeyboard() -> some View {
+        #if os(macOS)
+            self
+        #else
+            keyboardType(.numberPad)
+        #endif
+    }
+
     /// A small centered title, for sheets. macOS sheets have no navigation bar title to size.
     func inlineNavigationTitle() -> some View {
         #if os(macOS)

@@ -78,6 +78,10 @@ struct AccountRegisterTests {
         #expect(Decimal(userInput: "-342.18") == Decimal(string: "-342.18"))
         #expect(Decimal(userInput: "  ") == 0)
         #expect(Decimal(userInput: "abc") == nil)
+
+        // Text shown with the currency format parses back, whatever the test machine's locale.
+        let amount = Decimal(string: "-1250.75")!
+        #expect(Decimal(userInput: amount.formatted(.localCurrency)) == amount)
         #expect(Decimal(string: "1250.75")?.editableText == "1250.75")
     }
 }

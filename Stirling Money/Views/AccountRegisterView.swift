@@ -8,6 +8,8 @@ struct AccountRegisterView: View {
 
     @State private var searchText = ""
     @State private var isEditingAccount = false
+    @State private var isAddingTransaction = false
+    @State private var editingTransaction: AccountTransaction?
 
     private var visibleTransactions: [AccountTransaction] {
         (account.transactions ?? [])
@@ -33,13 +35,22 @@ struct AccountRegisterView: View {
                     ContentUnavailableView(
                         "No Transactions",
                         systemImage: "list.bullet.rectangle",
-                        description: Text("Transactions you add to this account will appear here.")
+                        description: Text("Tap + to add a transaction.")
                     )
                 } else if transactions.isEmpty {
                     ContentUnavailableView.search(text: searchText)
                 } else {
                     ForEach(transactions) { transaction in
                         TransactionRow(transaction: transaction)
+                            // The posted toggle inside the row is a button of its own,
+                            // so a tap gesture (not a row button) opens the editor.
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                editingTransaction = transaction
+                            }
+                            .accessibilityAction(named: "Edit") {
+                                editingTransaction = transaction
+                            }
                             .swipeActions(edge: .leading) {
                                 Button(
                                     transaction.isPosted ? "Mark Unposted" : "Mark Posted",
@@ -56,6 +67,9 @@ struct AccountRegisterView: View {
                             }
                             // Swipes are awkward with a mouse; Mac and iPad pointer users right-click instead.
                             .contextMenu {
+                                Button("Edit…", systemImage: "pencil") {
+                                    editingTransaction = transaction
+                                }
                                 Button(
                                     transaction.isPosted ? "Mark Unposted" : "Mark Posted",
                                     systemImage: transaction.isPosted ? "circle" : "checkmark.circle"
@@ -74,6 +88,11 @@ struct AccountRegisterView: View {
         .navigationTitle(account.name)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
+                Button("Add Transaction", systemImage: "plus") {
+                    isAddingTransaction = true
+                }
+            }
+            ToolbarItem(placement: .secondaryAction) {
                 Button("Edit Account", systemImage: "pencil") {
                     isEditingAccount = true
                 }
@@ -81,6 +100,12 @@ struct AccountRegisterView: View {
         }
         .sheet(isPresented: $isEditingAccount) {
             EditAccountView(account: account)
+        }
+        .sheet(isPresented: $isAddingTransaction) {
+            TransactionFormView(account: account)
+        }
+        .sheet(item: $editingTransaction) { transaction in
+            TransactionFormView(account: account, transaction: transaction)
         }
     }
 

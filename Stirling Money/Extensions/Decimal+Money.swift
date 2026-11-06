@@ -1,6 +1,6 @@
 import Foundation
 
-extension FormatStyle where Self == Decimal.FormatStyle.Currency {
+nonisolated extension FormatStyle where Self == Decimal.FormatStyle.Currency {
     /// Currency in the user's locale, falling back to US dollars.
     static var localCurrency: Self {
         .currency(code: Locale.current.currency?.identifier ?? "USD")
@@ -8,7 +8,8 @@ extension FormatStyle where Self == Decimal.FormatStyle.Currency {
 }
 
 nonisolated extension Decimal {
-    /// Parses an amount typed by the user in their locale's number format.
+    /// Parses an amount typed by the user in their locale's number format, with or without
+    /// the currency symbol ("1250.75" or "$1,250.75"), so text shown with `.localCurrency` parses back.
     /// Blank text means zero; returns nil when the text isn't a number.
     init?(userInput text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespaces)
@@ -16,7 +17,9 @@ nonisolated extension Decimal {
             self = 0
             return
         }
-        guard let value = try? Decimal(trimmed, format: .number) else { return nil }
+        // The currency style also reads plain numbers. The plain number style can't be tried
+        // first: it reads "-$1,250.75" as 0 instead of failing.
+        guard let value = try? Decimal(trimmed, format: .localCurrency) else { return nil }
         self = value
     }
 

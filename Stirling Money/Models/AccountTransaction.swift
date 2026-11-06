@@ -10,6 +10,15 @@ nonisolated enum TransactionKind: String, Codable, CaseIterable, Identifiable {
     var id: Self {
         self
     }
+
+    var title: String {
+        switch self {
+        case .withdrawal: String(localized: "Withdrawal")
+        case .deposit: String(localized: "Deposit")
+        case .check: String(localized: "Check")
+        case .transfer: String(localized: "Transfer")
+        }
+    }
 }
 
 /// A single register entry. Named `AccountTransaction` to avoid clashing with `SwiftUI.Transaction`.

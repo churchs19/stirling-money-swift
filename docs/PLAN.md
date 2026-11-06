@@ -10,8 +10,8 @@ as a SwiftUI + SwiftData app for iOS, iPadOS and macOS.
 |---|---|---|
 | 1 | Data model and calculations | Done (`b81a15e`) |
 | 2 | Accounts list and account register | Done (`fad2bcf`) |
-| 3 | Entering and editing transactions; categories | Next |
-| 4 | Budgets and goals | Not started |
+| 3 | Entering and editing transactions; categories | Done |
+| 4 | Budgets and goals | Next |
 | 5 | Reports | Not started |
 | 6 | Platform features (widgets, app lock, export, sync) | Not started |
 
@@ -89,15 +89,25 @@ Choices made that differ from the old app:
 - [x] Transfers whose other account was deleted read "Transfer from a deleted account"; the remaining account's balance is unchanged
 - [x] Builds for macOS: touch-only modifiers go through `View+Platform.swift`; right-click menus for mouse users
 
-### Phase 3: Transaction entry (next)
+### Phase 3: Transaction entry (done)
 
-- [ ] One form that adapts to the kind: withdrawal, deposit, check or transfer
-- [ ] Check number defaults to the account's next check number
-- [ ] Category picker that can add a new category inline
-- [ ] Transfers: choose the other account; editing one half updates the other
-- [ ] Validation: payee required, or destination account for a transfer
-- [ ] Tap a register row to edit it
-- [ ] Categories screen: list, add, rename, delete
+- [x] One form (`TransactionFormView`) that adapts to the kind: withdrawal, deposit, check or transfer
+- [x] Check number defaults to the account's next check number
+- [x] Category picker with "New Category…", which reuses an existing category with the same name
+- [x] Transfers: choose the other account; editing one half updates the other's amount, date, note and account
+- [x] Validation: amount above zero, payee required (or the other account for a transfer), check number optional but a whole number
+- [x] Tap a register row (or right-click → Edit) to edit it; delete from the form with confirmation
+- [x] Categories screen (Accounts → ⋯ → Categories): list with usage counts, add, rename (no duplicate names), delete with confirmation
+
+Choices made:
+- The form keeps typed text in a `TransactionDraft` and nothing changes until Save, unlike Edit Account, which applies as you type.
+- Amounts are typed without a sign; the kind decides it. The amount shows as currency ("$1,450.00") except while it's being edited.
+- The Posted control in the form uses the same green check circle as the register (`PostedCheckmark`).
+- Changing a transfer to another kind, or the other way round, deletes the old entry (and its other half) and creates a new one.
+- Posted status stays separate for each half of a transfer, since each bank clears its side on its own schedule. A new transfer starts with both halves the same.
+- Editing a transfer whose other account was deleted, and choosing an account, creates a new other half.
+- A transfer's direction can't be flipped while editing; delete it and enter it from the other account.
+- A category created from the form stays even if the form is cancelled.
 
 ### Phase 4: Budgets and goals
 
@@ -132,7 +142,7 @@ Each item can be done separately.
 
 ## Open items
 
-- **Long register rows are cut off**, e.g. "Check 1001 · …" when there's a category too. Revisit when rows become tappable in Phase 3.
+- **Long register rows**: the details line now wraps to two lines instead of being cut off at one. Check it on a narrow iPhone.
 - **visionOS** is listed in the target but hasn't been built. There's no visionOS simulator installed.
 - **`xcuserdata` is committed to git**: `Stirling Money.xcodeproj/xcuserdata/shane.xcuserdatad/xcschemes/xcschememanagement.plist` is per-user Xcode state and could be untracked.
 - **The register sorts transactions in memory.** That's fine for personal ledgers; switch to a `@Query` with a predicate if large accounts get slow.

@@ -20,16 +20,19 @@ Stirling Money/
 │   ├── Category.swift             # @Model
 │   ├── Budget.swift               # @Model: current period, amount spent
 │   ├── BudgetPeriod.swift         # Weekly/monthly/yearly/custom period date math
-│   └── Goal.swift                 # @Model: savings target for one account
+│   ├── Goal.swift                 # @Model: savings target for one account
+│   └── TransactionDraft.swift     # Transaction form fields + validation (saved by Ledger.save)
 ├── Views/
 │   ├── AccountsView.swift         # Accounts list with total, sort, delete (root view)
 │   ├── AccountRegisterView.swift  # One account's transactions, balances, search
 │   ├── NewAccountView.swift       # Add account sheet
 │   ├── EditAccountView.swift      # Edit account sheet (@Bindable)
+│   ├── TransactionFormView.swift  # Add/edit transaction sheet for every kind
+│   ├── CategoriesView.swift       # Category list: add, rename, delete
 │   ├── PreviewData.swift          # ModelContainer.preview sample data (DEBUG only)
-│   └── Components/                # AmountText, TransactionRow
+│   └── Components/                # AmountText, TransactionRow, PostedCheckmark (+ .posted toggle style)
 ├── Managers/
-│   └── Ledger.swift               # Create/delete transactions and transfers
+│   └── Ledger.swift               # Create/edit/delete transactions and transfers; categories
 └── Extensions/
     ├── Decimal+Money.swift        # .localCurrency format, parsing typed amounts
     └── View+Platform.swift        # Touch-only modifiers that do nothing on macOS

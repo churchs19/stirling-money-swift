@@ -7,6 +7,7 @@ struct AccountsView: View {
     @AppStorage("accountSort") private var sort: AccountSort = .name
 
     @State private var isAddingAccount = false
+    @State private var isShowingCategories = false
     @State private var accountPendingDeletion: Account?
 
     var body: some View {
@@ -61,6 +62,11 @@ struct AccountsView: View {
                     }
                 }
                 ToolbarItem(placement: .secondaryAction) {
+                    Button("Categories", systemImage: "tag") {
+                        isShowingCategories = true
+                    }
+                }
+                ToolbarItem(placement: .secondaryAction) {
                     Picker("Sort By", systemImage: "arrow.up.arrow.down", selection: $sort) {
                         ForEach(AccountSort.allCases) { option in
                             Text(option.title).tag(option)
@@ -70,6 +76,19 @@ struct AccountsView: View {
             }
             .sheet(isPresented: $isAddingAccount) {
                 NewAccountView()
+            }
+            .sheet(isPresented: $isShowingCategories) {
+                NavigationStack {
+                    CategoriesView()
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Done") { isShowingCategories = false }
+                            }
+                        }
+                }
+                #if os(macOS)
+                .frame(minWidth: 400, minHeight: 400)
+                #endif
             }
             .confirmationDialog(
                 accountPendingDeletion.map { "Delete \($0.name)?" } ?? "",
