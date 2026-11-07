@@ -60,5 +60,6 @@ enum AppTab: String {
 #Preview {
     RootView()
         .environment(AppLock())
+        .environment(SyncMonitor(context: ModelContainer.preview.mainContext, isCloudBacked: false))
         .modelContainer(.preview)
 }

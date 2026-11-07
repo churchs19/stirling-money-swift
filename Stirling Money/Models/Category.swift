@@ -4,6 +4,9 @@ import SwiftData
 @Model
 final class Category {
     var name: String = ""
+    /// When the category was created. Synced with the record, so every device agrees on which of two
+    /// same-named categories is older when merging duplicates.
+    var createdAt: Date = Date.now
 
     @Relationship(deleteRule: .nullify, inverse: \AccountTransaction.category)
     var transactions: [AccountTransaction]? = []

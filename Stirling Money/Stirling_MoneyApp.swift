@@ -6,27 +6,43 @@ struct Stirling_MoneyApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @State private var appLock = AppLock()
 
-    var sharedModelContainer: ModelContainer = {
+    @State private var syncMonitor: SyncMonitor
+    private let sharedModelContainer: ModelContainer
+
+    init() {
+        let (container, isCloudBacked) = Self.makeContainer()
+        sharedModelContainer = container
+        _syncMonitor = State(initialValue: SyncMonitor(context: container.mainContext, isCloudBacked: isCloudBacked))
+        WidgetSnapshotWriter.startObserving(container.mainContext)
+    }
+
+    /// The data store, synced with the private iCloud database when possible.
+    /// Returns whether it's iCloud-backed. If CloudKit can't be set up (for example, the build's
+    /// provisioning profile lacks the iCloud container), the same store opens on this device only.
+    private static func makeContainer() -> (ModelContainer, isCloudBacked: Bool) {
         #if DEBUG
             // Launch with `-UseSampleData` to review screens with the preview data in memory.
-            // The real store on disk is left untouched.
+            // The real store on disk is left untouched, and nothing syncs.
             if ProcessInfo.processInfo.arguments.contains("-UseSampleData") {
-                return .preview
+                return (.preview, false)
             }
         #endif
 
         let schema = Schema(AppSchema.models)
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
+        if SyncMonitor.isEnabled {
+            do {
+                let cloud = ModelConfiguration(schema: schema, cloudKitDatabase: .private(SyncMonitor.containerIdentifier))
+                return try (ModelContainer(for: schema, configurations: [cloud]), true)
+            } catch {
+                print("iCloud sync unavailable, using this device's store only: \(error)")
+            }
+        }
         do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+            let local = ModelConfiguration(schema: schema, cloudKitDatabase: .none)
+            return try (ModelContainer(for: schema, configurations: [local]), false)
         } catch {
             fatalError("Could not create ModelContainer: \(error)")
         }
-    }()
-
-    init() {
-        WidgetSnapshotWriter.startObserving(sharedModelContainer.mainContext)
     }
 
     var body: some Scene {
@@ -40,9 +56,15 @@ struct Stirling_MoneyApp: App {
                 // Widget links go to a window that's already open instead of opening another one
                 // (on the Mac, and on iPad with several windows). With no window open, one is created.
                 .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
+                .task {
+                    // Duplicates can also arrive while the app isn't running.
+                    _ = try? CategoryMerger.mergeDuplicates(in: sharedModelContainer.mainContext)
+                    await syncMonitor.refreshStatus()
+                }
         }
         .modelContainer(sharedModelContainer)
         .environment(appLock)
+        .environment(syncMonitor)
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .background:
@@ -62,6 +84,7 @@ struct Stirling_MoneyApp: App {
             }
             .modelContainer(sharedModelContainer)
             .environment(appLock)
+            .environment(syncMonitor)
         #endif
     }
 }

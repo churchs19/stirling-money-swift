@@ -13,14 +13,14 @@ as a SwiftUI + SwiftData app for iOS, iPadOS and macOS.
 | 3 | Entering and editing transactions; categories | Done (`a87cf70`) |
 | 4 | Budgets and goals | Done (`368965c`) |
 | 5 | Reports | Done (`0a38edc`) |
-| 6 | Platform features (widgets, app lock, export, settings) | Done; sync still deferred |
+| 6 | Platform features (widgets, app lock, export, settings) | Done |
 
 ## Decisions
 
 | Question | Decision |
 |---|---|
 | Platforms | iOS, iPadOS and macOS from one multiplatform target. visionOS is also listed in the target but hasn't been built or tested. |
-| CloudKit sync | **Deferred.** Models are kept CloudKit-compatible (every property has a default or is optional, every relationship is optional, no unique constraints) so sync can be turned on later without a migration. |
+| CloudKit sync | **Built, switched off** until the project uses a paid Apple Developer Program team (personal teams can't have iCloud or push; see README → iCloud). When on: always on, private database, container `iCloud.net.s-church.stirlingmoney`. Same-named categories from different devices are merged (oldest wins). App settings stay per device. Falls back to a device-only store if CloudKit can't be set up. The production schema can only grow once deployed; see `CLAUDE.md`. |
 | Sharing data with other people | **Deferred.** The old app's "authorized users" would need CloudKit sharing (`CKShare`), which SwiftData doesn't support well. |
 | Importing old app data | **Not needed.** No importer will be built. |
 | Ads, analytics, trial licensing | Dropped. |
@@ -167,7 +167,7 @@ Original → replacement:
 | Live Tiles per account and goal | WidgetKit widgets, using an App Group to share the data store |
 | App password | Face ID / passcode via `LocalAuthentication` |
 | SkyDrive backup | CSV/JSON export via `ShareLink` or `.fileExporter`; iCloud if sync is turned on |
-| Azure sync | SwiftData CloudKit sync (deferred, see Decisions) |
+| Azure sync | SwiftData CloudKit sync (done, see Decisions) |
 | Authorized users | CloudKit sharing (deferred, see Decisions) |
 | Rate the app | `RequestReviewAction` |
 | 44-language strings | String Catalog, English first |

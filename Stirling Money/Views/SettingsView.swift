@@ -5,6 +5,7 @@ import SwiftUI
 /// App settings. A tab on iPhone and iPad; the Settings window (⌘,) on the Mac.
 struct SettingsView: View {
     @Environment(AppLock.self) private var appLock
+    @Environment(SyncMonitor.self) private var syncMonitor
     @Environment(\.requestReview) private var requestReview
     @AppStorage("accountSort") private var sort: AccountSort = .name
     @AppStorage(AppLock.enabledKey) private var requiresUnlock = false
@@ -41,6 +42,14 @@ struct SettingsView: View {
             }
 
             Section {
+                LabeledContent("iCloud Sync") {
+                    Text(syncStatusText)
+                }
+                if let lastImport = syncMonitor.lastImport {
+                    LabeledContent("Last Received") {
+                        Text(lastImport, format: .relative(presentation: .named))
+                    }
+                }
                 ShareLink(
                     item: CSVExportFile(text: TransactionCSV.make(transactions), filename: exportFilename),
                     preview: SharePreview("Stirling Money Transactions", image: Image(systemName: "tablecells"))
@@ -51,7 +60,7 @@ struct SettingsView: View {
             } header: {
                 Text("Data")
             } footer: {
-                Text("A CSV file of every transaction, for a spreadsheet or a backup.")
+                Text("\(syncFooterText) Export makes a CSV file of every transaction, for a spreadsheet or a backup.")
             }
 
             Section("About") {
@@ -63,6 +72,30 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .navigationTitle("Settings")
+    }
+
+    private var syncStatusText: String {
+        switch syncMonitor.status {
+        case .off: String(localized: "Off")
+        case .checking: String(localized: "Checking…")
+        case .available: String(localized: "On")
+        case .noAccount: String(localized: "Not Signed In")
+        case .restricted: String(localized: "Restricted")
+        case .unavailable: String(localized: "Unavailable")
+        }
+    }
+
+    private var syncFooterText: String {
+        switch syncMonitor.status {
+        case .off:
+            String(localized: "iCloud sync isn't set up in this version. Your data stays on this device.")
+        case .checking, .available:
+            String(localized: "Accounts, transactions, budgets and goals sync with your other devices through iCloud.")
+        case .noAccount:
+            String(localized: "Sign in to iCloud to sync with your other devices. Your data stays on this device until then.")
+        case .restricted, .unavailable:
+            String(localized: "iCloud isn't available right now. Your data stays on this device.")
+        }
     }
 
     private var exportFilename: String {
@@ -92,5 +125,6 @@ struct SettingsView: View {
         SettingsView()
     }
     .environment(AppLock())
+    .environment(SyncMonitor(context: ModelContainer.preview.mainContext, isCloudBacked: false))
     .modelContainer(.preview)
 }

@@ -7,6 +7,7 @@
 **Swift version:** 6.2 (app); the widget extension uses the template's Swift 5 mode
 **Targets:** `Stirling Money` (app), `StirlingMoneyWidgetsExtension` (widgets, folder `StirlingMoneyWidgets/`), tests, UI tests
 **App Group:** `group.net.s-church.stirlingmoney` (app + widgets)
+**iCloud:** CloudKit container `iCloud.net.s-church.stirlingmoney`, private database; SwiftData syncs the whole store (see below). **Currently off**: the signing team is a free personal team, which can't have iCloud/push, so the entitlements are removed and `SyncMonitor.isEnabled` is `false`. Turn both on together (README → iCloud); requesting a CloudKit container without the entitlement can crash.
 
 ## File Structure
 
@@ -49,6 +50,8 @@ Stirling Money/
 ├── Managers/
 │   ├── Ledger.swift               # Create/edit/delete transactions and transfers; categories
 │   ├── AppLock.swift              # Face ID / Touch ID / passcode lock (LocalAuthentication)
+│   ├── SyncMonitor.swift          # iCloud account status; after imports, merges duplicate categories, refreshes widgets
+│   ├── CategoryMerger.swift       # Combines same-named categories (oldest createdAt wins)
 │   └── WidgetSnapshotWriter.swift # Writes the snapshot to the App Group and reloads widgets
 └── Extensions/
     ├── Decimal+Money.swift        # .localCurrency format, parsing typed amounts
@@ -89,7 +92,8 @@ Structured data means fewer tokens consumed and better error diagnosis.
 | Category.budgets | Budget.category | cascade (a budget without its category would silently become "all spending") |
 | AccountTransaction.incomingHalf | AccountTransaction.outgoingHalf | nullify (transfer pair) |
 
-- Keep models CloudKit-compatible so sync can be turned on later without a migration: every stored property has a default or is optional, every relationship is optional, no `@Attribute(.unique)`.
+- Models must stay CloudKit-compatible or the store won't open with sync: every stored property has a default or is optional, every relationship is optional, no `@Attribute(.unique)`.
+- Uniqueness can't be enforced, so duplicates arrive from other devices. `CategoryMerger` merges same-named categories after each import; anything else that must be unique needs the same treatment.
 - Declare `inverse:` on one side only.
 - A property can't be its own inverse (circular macro error), which is why transfers use two properties. Read `transferCounterpart`.
 - Money is `Decimal`, never `Double`. `AccountTransaction.amount` is signed: negative leaves the account.
@@ -97,11 +101,23 @@ Structured data means fewer tokens consumed and better error diagnosis.
 - Create and delete transactions through `Ledger`, not directly, so signs stay right and transfer pairs are created and deleted together.
 - Insert a model into the context before setting its relationships.
 
+## CloudKit Sync — Schema Rules
+
+The store syncs to CloudKit, whose **production schema can only grow** once deployed.
+
+- After the first App Store / TestFlight release, change models only by **adding** stored properties, each optional or with a default, or adding new `@Model` types (also add them to `AppSchema`).
+- **Never** rename or remove a stored property, change its type, rename a model, or change `@Relationship` inverses. Add a new property and stop using the old one instead. (`@Attribute(originalName:)` doesn't help: CloudKit still sees a new field.)
+- Computed properties and anything not stored are free to change.
+- Debug builds create schema changes in the CloudKit **development** environment automatically. Before releasing a build that adds fields, deploy the schema to **production** in the CloudKit Console, or sync silently stops for users. Say so in the summary whenever a change adds or alters a stored property.
+- Sample-data runs (`-UseSampleData`) are in memory and never sync.
+
 ## Rules
 
 - NEVER modify .pbxproj or project.xcproj by hand. Exception (approved for Phase 6): Xcode's own tools
   (`XcodeNewTarget`, `AddInfoPlist`, `AddEntitlement`) were used to add the widget target, App Group and
-  `NSFaceIDUsageDescription`. Ask before any further project change.
+  `NSFaceIDUsageDescription`, and later the remote-notification background mode (`Stirling-Money-Info.plist`) for
+  CloudKit sync. The iCloud and push entitlements were added and then removed again (personal team). Ask before any
+  further project change.
 - NEVER use ObservableObject — use @Observable
 - NEVER use NavigationView — use NavigationStack
 - @Model classes are already Observable — do not add @Observable macro
