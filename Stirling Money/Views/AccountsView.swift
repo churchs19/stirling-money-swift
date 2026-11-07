@@ -20,14 +20,14 @@ struct AccountsView: View {
                 if !accounts.isEmpty {
                     Section {
                         ForEach(sortedAccounts) { account in
-                            NavigationLink(value: account) {
+                            NavigationRow(value: account, path: $path) {
                                 LabeledContent(account.name) {
                                     AmountText(account.balance)
                                 }
                             }
                             .contextMenu {
                                 Button("Delete Account…", systemImage: "trash", role: .destructive) {
-                                    accountPendingDeletion = account
+                                    afterMenuCloses { accountPendingDeletion = account }
                                 }
                             }
                         }

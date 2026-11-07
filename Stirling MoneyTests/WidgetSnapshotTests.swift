@@ -68,6 +68,11 @@ struct DeepLinkTests {
         #expect(DeepLink(url: link.url) == link)
     }
 
+    @Test func goalsLinkRoundTrips() throws {
+        #expect(DeepLink.goals.url.absoluteString == "stirlingmoney://goals")
+        #expect(DeepLink(url: DeepLink.goals.url) == .goals)
+    }
+
     @Test func otherURLsAreIgnored() throws {
         #expect(try DeepLink(url: #require(URL(string: "https://example.com/account?id=1"))) == nil)
         #expect(try DeepLink(url: #require(URL(string: "stirlingmoney://budget?id=1"))) == nil)

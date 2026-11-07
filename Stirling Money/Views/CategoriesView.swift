@@ -44,10 +44,10 @@ struct CategoriesView: View {
                 }
                 .contextMenu {
                     Button("Rename…", systemImage: "pencil") {
-                        startRenaming(category)
+                        afterMenuCloses { startRenaming(category) }
                     }
                     Button("Delete…", systemImage: "trash", role: .destructive) {
-                        pendingDeletion = category
+                        afterMenuCloses { pendingDeletion = category }
                     }
                 }
             }

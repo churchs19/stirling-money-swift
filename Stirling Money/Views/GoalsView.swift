@@ -28,7 +28,7 @@ struct GoalsView: View {
                     }
                     .contextMenu {
                         Button("Edit…", systemImage: "pencil") {
-                            editingGoal = goal
+                            afterMenuCloses { editingGoal = goal }
                         }
                         Button("Delete", systemImage: "trash", role: .destructive) {
                             delete(goal)

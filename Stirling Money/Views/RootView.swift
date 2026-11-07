@@ -36,13 +36,19 @@ struct RootView: View {
 
     /// Opens a link from a widget. Links to accounts that no longer exist open the accounts list.
     private func open(_ url: URL) {
-        guard case let .account(id) = DeepLink(url: url) else { return }
-        selectedTab = .accounts
-        let accounts = (try? modelContext.fetch(FetchDescriptor<Account>())) ?? []
-        if let account = accounts.first(where: { WidgetSnapshot.widgetID(for: $0) == id }) {
-            accountPath = [account]
-        } else {
-            accountPath = []
+        switch DeepLink(url: url) {
+        case let .account(id):
+            selectedTab = .accounts
+            let accounts = (try? modelContext.fetch(FetchDescriptor<Account>())) ?? []
+            if let account = accounts.first(where: { WidgetSnapshot.widgetID(for: $0) == id }) {
+                accountPath = [account]
+            } else {
+                accountPath = []
+            }
+        case .goals:
+            selectedTab = .goals
+        case nil:
+            break
         }
     }
 }

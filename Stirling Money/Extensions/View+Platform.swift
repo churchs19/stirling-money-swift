@@ -50,3 +50,20 @@ extension View {
         #endif
     }
 }
+
+/// Runs a context-menu action that shows a sheet, alert or confirmation once the menu has closed.
+///
+/// On the Mac, a presentation started while the context menu is still closing is dropped. A `Task`
+/// isn't late enough: the main queue keeps running during menu tracking. So the action waits until
+/// the run loop is back in its default mode, which only happens once menu tracking has ended.
+/// Elsewhere it runs straight away.
+@MainActor
+func afterMenuCloses(_ action: @escaping @MainActor () -> Void) {
+    #if os(macOS)
+        RunLoop.main.perform(inModes: [.default]) {
+            MainActor.assumeIsolated { action() }
+        }
+    #else
+        action()
+    #endif
+}

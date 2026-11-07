@@ -68,7 +68,7 @@ struct AccountRegisterView: View {
                             // Swipes are awkward with a mouse; Mac and iPad pointer users right-click instead.
                             .contextMenu {
                                 Button("Edit…", systemImage: "pencil") {
-                                    editingTransaction = transaction
+                                    afterMenuCloses { editingTransaction = transaction }
                                 }
                                 Button(
                                     transaction.isPosted ? "Mark Unposted" : "Mark Posted",

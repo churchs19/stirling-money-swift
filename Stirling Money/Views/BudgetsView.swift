@@ -29,7 +29,7 @@ struct BudgetsView: View {
                     }
                     .contextMenu {
                         Button("Edit…", systemImage: "pencil") {
-                            editingBudget = budget
+                            afterMenuCloses { editingBudget = budget }
                         }
                         Button("Delete", systemImage: "trash", role: .destructive) {
                             delete(budget)

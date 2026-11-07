@@ -58,8 +58,8 @@ Stirling MoneyTests/               # Swift Testing; in-memory container + UTC ca
 StirlingMoneyWidgets/              # Widget extension: Balance and Goal widgets, configured with App Intents
 ```
 
-Widgets can't open the SwiftData store; the app writes `WidgetSnapshot.json` to the App Group when it goes to
-the background, and the widgets read it. Change both copies of `WidgetSnapshot` together.
+Widgets can't open the SwiftData store; the app writes `WidgetSnapshot.json` to the App Group shortly after each
+save (plus on going to the background and on quitting the Mac app), and the widgets read it. Change both copies of `WidgetSnapshot` together.
 
 The project uses file-system synchronized folders: new files in these folders are picked up automatically.
 The app target defaults to `MainActor` isolation; mark plain value types `nonisolated` when `@Model` code uses them.
@@ -106,6 +106,6 @@ Structured data means fewer tokens consumed and better error diagnosis.
 - NEVER use NavigationView — use NavigationStack
 - @Model classes are already Observable — do not add @Observable macro
 - Use @Bindable for form bindings to model properties
-- Code must build for macOS as well as iOS. Don't call iOS-only modifiers (`textInputAutocapitalization`, `keyboardType`, `navigationBarTitleDisplayMode`) directly; use the helpers in `View+Platform.swift` or `#if os(macOS)`. Give swipe actions a matching `.contextMenu` for mouse users.
+- Code must build for macOS as well as iOS. Don't call iOS-only modifiers (`textInputAutocapitalization`, `keyboardType`, `navigationBarTitleDisplayMode`) directly; use the helpers in `View+Platform.swift` or `#if os(macOS)`. Give swipe actions a matching `.contextMenu` for mouse users. Wrap context-menu actions that show a sheet, alert or dialog in `afterMenuCloses { }` (the Mac drops presentations started while the menu closes), and use `NavigationRow` for list rows that push onto a `NavigationStack(path:)`.
 - Debug builds launched with `-UseSampleData` use the in-memory preview data instead of the real store.
 

@@ -3,31 +3,37 @@ import SwiftUI
 
 /// The list of reports. Every report leaves out transfers between your own accounts.
 struct ReportsView: View {
+    @State private var path: [Report] = []
+
+    enum Report: Hashable {
+        case netIncome, categorySpending, categoryTrend, budgetHistory
+    }
+
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             List {
-                NavigationLink {
-                    NetIncomeReportView()
-                } label: {
+                NavigationRow(value: Report.netIncome, path: $path) {
                     reportLabel("Net Income", systemImage: "chart.bar.xaxis", detail: "Income vs. expenses each month")
                 }
-                NavigationLink {
-                    CategorySpendingReportView()
-                } label: {
+                NavigationRow(value: Report.categorySpending, path: $path) {
                     reportLabel("Spending by Category", systemImage: "chart.pie", detail: "Where the money went")
                 }
-                NavigationLink {
-                    CategoryTrendReportView()
-                } label: {
+                NavigationRow(value: Report.categoryTrend, path: $path) {
                     reportLabel("Category Over Time", systemImage: "chart.line.uptrend.xyaxis", detail: "One category, month by month")
                 }
-                NavigationLink {
-                    BudgetHistoryReportView()
-                } label: {
+                NavigationRow(value: Report.budgetHistory, path: $path) {
                     reportLabel("Budget History", systemImage: "chart.bar", detail: "Spending vs. budget for recent periods")
                 }
             }
             .navigationTitle("Reports")
+            .navigationDestination(for: Report.self) { report in
+                switch report {
+                case .netIncome: NetIncomeReportView()
+                case .categorySpending: CategorySpendingReportView()
+                case .categoryTrend: CategoryTrendReportView()
+                case .budgetHistory: BudgetHistoryReportView()
+                }
+            }
         }
     }
 

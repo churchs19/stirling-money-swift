@@ -104,6 +104,8 @@ struct GoalWidget: Widget {
         AppIntentConfiguration(kind: "Goal", intent: SelectGoalIntent.self, provider: GoalProvider()) { entry in
             GoalWidgetView(entry: entry)
                 .containerBackground(.fill.tertiary, for: .widget)
+                // Opens the app's Goals tab. Matches `DeepLink.goals` in the app; keep them in step.
+                .widgetURL(URL(string: "stirlingmoney://goals"))
         }
         .configurationDisplayName("Goal")
         .description("Progress toward a savings goal.")

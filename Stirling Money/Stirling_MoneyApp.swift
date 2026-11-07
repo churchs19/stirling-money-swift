@@ -25,6 +25,10 @@ struct Stirling_MoneyApp: App {
         }
     }()
 
+    init() {
+        WidgetSnapshotWriter.startObserving(sharedModelContainer.mainContext)
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()
@@ -33,6 +37,9 @@ struct Stirling_MoneyApp: App {
                         LockView()
                     }
                 }
+                // Widget links go to a window that's already open instead of opening another one
+                // (on the Mac, and on iPad with several windows). With no window open, one is created.
+                .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
         }
         .modelContainer(sharedModelContainer)
         .environment(appLock)
@@ -40,7 +47,7 @@ struct Stirling_MoneyApp: App {
             switch phase {
             case .background:
                 appLock.lockIfEnabled()
-                WidgetSnapshotWriter.update(from: sharedModelContainer.mainContext)
+                WidgetSnapshotWriter.updateNow()
             case .active:
                 Task { await appLock.promptIfNeeded() }
             default:
