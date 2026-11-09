@@ -1,7 +1,7 @@
 import SwiftData
 import SwiftUI
 
-/// The app's top level: Accounts, Budgets, Goals and Reports. A tab bar on iPhone; a sidebar on iPad and Mac.
+/// The app's top level: Accounts, Budgets, Goals and Reports. Settings opens from the Accounts ⋯ menu. A tab bar on iPhone; a sidebar on iPad and Mac.
 struct RootView: View {
     @Environment(\.modelContext) private var modelContext
     @SceneStorage("selectedTab") private var selectedTab: AppTab = .accounts
@@ -21,14 +21,6 @@ struct RootView: View {
             Tab("Reports", systemImage: "chart.pie", value: AppTab.reports) {
                 ReportsView()
             }
-            // The Mac has a Settings window (⌘,) instead.
-            #if !os(macOS)
-                Tab("Settings", systemImage: "gear", value: AppTab.settings) {
-                    NavigationStack {
-                        SettingsView()
-                    }
-                }
-            #endif
         }
         .tabViewStyle(.sidebarAdaptable)
         .onOpenURL(perform: open)
@@ -54,7 +46,7 @@ struct RootView: View {
 }
 
 enum AppTab: String {
-    case accounts, budgets, goals, reports, settings
+    case accounts, budgets, goals, reports
 }
 
 #Preview {

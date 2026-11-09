@@ -67,3 +67,26 @@ func afterMenuCloses(_ action: @escaping @MainActor () -> Void) {
         action()
     #endif
 }
+
+extension Color {
+    /// The page behind a grouped list: light gray on iPhone and iPad, the list background on the Mac.
+    /// Use it behind custom layouts (like account tiles) that sit beside a `List`, so switching between
+    /// them doesn't change the colors.
+    static var groupedPageBackground: Color {
+        #if os(macOS)
+            Color(nsColor: .controlBackgroundColor)
+        #else
+            Color(uiColor: .systemGroupedBackground)
+        #endif
+    }
+
+    /// A card or row on `groupedPageBackground`: white rows on iPhone and iPad (dark gray in dark mode).
+    /// Mac lists have no row background, so a subtle fill marks the card instead.
+    static var groupedItemBackground: Color {
+        #if os(macOS)
+            Color(nsColor: .quaternaryLabelColor).opacity(0.5)
+        #else
+            Color(uiColor: .secondarySystemGroupedBackground)
+        #endif
+    }
+}

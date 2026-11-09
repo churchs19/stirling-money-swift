@@ -7,6 +7,7 @@ struct NewAccountView: View {
 
     @State private var name = ""
     @State private var balanceText = ""
+    @State private var iconName: String?
     @FocusState private var focusedField: Field?
 
     private enum Field {
@@ -56,6 +57,14 @@ struct NewAccountView: View {
                         Text("Use a negative amount for money owed, such as a credit card balance.")
                     }
                 }
+
+                Section {
+                    AccountIconPicker(iconName: $iconName)
+                } header: {
+                    Text("Icon")
+                } footer: {
+                    Text("Shown on the account's tile.")
+                }
             }
             .sheetForm()
             .navigationTitle("New Account")
@@ -75,7 +84,7 @@ struct NewAccountView: View {
 
     private func save() {
         guard canSave, let balance = parsedBalance else { return }
-        modelContext.insert(Account(name: trimmedName, initialBalance: balance))
+        modelContext.insert(Account(name: trimmedName, initialBalance: balance, iconName: iconName))
         dismiss()
     }
 }

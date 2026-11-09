@@ -12,9 +12,9 @@
             )
             let context = container.mainContext
 
-            let checking = Account(name: "Checking", initialBalance: 1250.75)
-            let savings = Account(name: "Savings", initialBalance: 8000)
-            let creditCard = Account(name: "Credit Card", initialBalance: -342.18)
+            let checking = Account(name: "Checking", initialBalance: 1250.75, iconName: "building.columns")
+            let savings = Account(name: "Savings", initialBalance: 8000, iconName: "banknote")
+            let creditCard = Account(name: "Credit Card", initialBalance: -342.18, iconName: "pf-visa")
             [checking, savings, creditCard].forEach(context.insert)
 
             let groceries = try! Ledger.category(named: "Groceries", in: context)

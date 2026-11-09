@@ -14,9 +14,12 @@
 Stirling Money/
 ├── Stirling_MoneyApp.swift              # App entry, model container, app lock, widget snapshot on background
 ├── Localizable.xcstrings          # String catalog (English); Xcode fills it in when it builds
+├── Resources/Fonts/               # paymentfont-webfont.ttf + its MIT license (registered at run time, no Info.plist entry)
 ├── Models/
 │   ├── AppSchema.swift            # List of all @Model types for the container
-│   ├── Account.swift              # @Model: balance, posted balance, next check number
+│   ├── Account.swift              # @Model: balance, posted balance, next check number, optional icon (+ icon choices)
+│   ├── AccountLayout.swift        # Tiles (default) / list layout for the accounts screen
+│   ├── PaymentFont.swift          # 116 PaymentFont glyphs (generated from its CSS); "pf-…" icon names; registers the font
 │   ├── AccountSort.swift          # Name / most-used ordering for the accounts list
 │   ├── AccountTransaction.swift   # @Model: register entry + TransactionKind
 │   ├── AccountTransaction+Search.swift  # Register search matching
@@ -32,10 +35,10 @@ Stirling Money/
 │   ├── TransactionCSV.swift       # CSV export of every transaction + shareable file
 │   └── WidgetSnapshot.swift       # JSON the widgets read (a copy lives in StirlingMoneyWidgets/; keep in step)
 ├── Views/
-│   ├── RootView.swift             # TabView: Accounts / Budgets / Goals / Reports / Settings (sidebar on iPad and Mac)
-│   ├── SettingsView.swift         # Sort, app lock, export, rate; a Settings window on the Mac
+│   ├── RootView.swift             # TabView: Accounts / Budgets / Goals / Reports (sidebar on iPad and Mac)
+│   ├── SettingsView.swift         # Sort, app lock, export, rate; a sheet from the Accounts ⋯ menu, a Settings window (⌘,) on the Mac
 │   ├── LockView.swift             # Covers the app while locked
-│   ├── AccountsView.swift         # Accounts list with total, sort, delete
+│   ├── AccountsView.swift         # Accounts as tiles or a list (toolbar toggle), total, sort, delete
 │   ├── AccountRegisterView.swift  # One account's transactions, balances, search
 │   ├── NewAccountView.swift       # Add account sheet
 │   ├── EditAccountView.swift      # Edit account sheet (@Bindable)
@@ -45,7 +48,7 @@ Stirling Money/
 │   ├── GoalsView.swift / GoalFormView.swift      # Goal cards; add/edit sheet
 │   ├── Reports/                   # ReportsView list + one view per Swift Charts report; ReportSupport.swift
 │   ├── PreviewData.swift          # ModelContainer.preview sample data (DEBUG only)
-│   └── Components/                # AmountText, CurrencyField, TransactionRow, BudgetRow, GoalRow, PostedCheckmark (+ .posted toggle style)
+│   └── Components/                # AmountText, CurrencyField, TransactionRow, BudgetRow, GoalRow, PostedCheckmark (+ .posted toggle style), AccountTile, AccountIconPicker, AccountIconView (SF Symbol or PaymentFont glyph), NavigationRow
 ├── Managers/
 │   ├── Ledger.swift               # Create/edit/delete transactions and transfers; categories
 │   ├── AppLock.swift              # Face ID / Touch ID / passcode lock (LocalAuthentication)

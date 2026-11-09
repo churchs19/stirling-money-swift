@@ -6,6 +6,8 @@ final class Account {
     var name: String = ""
     var initialBalance: Decimal = 0
     var createdAt: Date = Date.now
+    /// An SF Symbol name shown on the account's tile, or nil for none. See `Account.iconChoices`.
+    var iconName: String?
 
     @Relationship(deleteRule: .cascade, inverse: \AccountTransaction.account)
     var transactions: [AccountTransaction]? = []
@@ -13,10 +15,19 @@ final class Account {
     @Relationship(deleteRule: .cascade, inverse: \Goal.account)
     var goals: [Goal]? = []
 
-    init(name: String, initialBalance: Decimal = 0) {
+    init(name: String, initialBalance: Decimal = 0, iconName: String? = nil) {
         self.name = name
         self.initialBalance = initialBalance
+        self.iconName = iconName
     }
+
+    /// The icons offered in the account forms, as SF Symbol names.
+    static let iconChoices = [
+        "banknote", "creditcard", "building.columns", "dollarsign.circle",
+        "wallet.pass", "chart.line.uptrend.xyaxis", "briefcase", "house",
+        "car", "cart", "gift", "airplane",
+        "graduationcap", "heart", "bag", "star",
+    ]
 
     /// Initial balance plus every transaction, posted or not.
     var balance: Decimal {
