@@ -10,6 +10,10 @@ nonisolated struct WidgetSnapshot: Codable, Equatable {
         var name: String
         var balance: Decimal
         var postedBalance: Decimal
+        /// The account's icon when it's an SF Symbol name.
+        var iconSymbol: String? = nil
+        /// The account's icon when it's a PaymentFont glyph: the glyph's character in that font.
+        var iconGlyph: String? = nil
     }
 
     struct GoalSummary: Codable, Equatable, Identifiable {
@@ -39,8 +43,20 @@ nonisolated struct WidgetSnapshot: Codable, Equatable {
 extension WidgetSnapshot {
     /// A snapshot of the given accounts and goals, sorted by name.
     init(accounts: [Account], goals: [Goal], now: Date = .now) {
-        self.accounts = AccountSort.name.sorted(accounts).map {
-            AccountSummary(id: Self.widgetID(for: $0), name: $0.name, balance: $0.balance, postedBalance: $0.postedBalance)
+        self.accounts = AccountSort.name.sorted(accounts).map { account in
+            var summary = AccountSummary(
+                id: Self.widgetID(for: account), name: account.name,
+                balance: account.balance, postedBalance: account.postedBalance
+            )
+            // The widget has the font but not the glyph table, so it gets the character itself.
+            if let iconName = account.iconName {
+                if let glyph = PaymentFont.glyph(forIconName: iconName) {
+                    summary.iconGlyph = glyph.character
+                } else {
+                    summary.iconSymbol = iconName
+                }
+            }
+            return summary
         }
         self.goals = goals
             .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }

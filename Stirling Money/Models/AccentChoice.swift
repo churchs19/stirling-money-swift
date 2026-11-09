@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// Which accent color the app uses: its own purple, the system's, or one the person picks.
-/// Stored per device in user defaults.
+/// Stored per device in the App Group's user defaults (`store`), so the widgets use it too.
+/// `StirlingMoneyWidgets/WidgetAccent.swift` reads the same keys; **keep the two in step.**
 nonisolated enum AccentChoice: String, CaseIterable, Identifiable {
     /// The app's AccentColor asset (#7B2CBF; #9D4EDD in dark mode).
     case standard
@@ -13,6 +14,8 @@ nonisolated enum AccentChoice: String, CaseIterable, Identifiable {
 
     static let key = "accentChoice"
     static let customColorKey = "accentCustomColor"
+    /// Shared with the widget extension.
+    @MainActor static let store = UserDefaults(suiteName: WidgetSnapshot.appGroup) ?? .standard
 
     var id: Self { self }
 

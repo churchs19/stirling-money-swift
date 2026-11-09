@@ -15,8 +15,8 @@ extension View {
 }
 
 private struct AppAccentModifier: ViewModifier {
-    @AppStorage(AccentChoice.key) private var choice: AccentChoice = .standard
-    @AppStorage(AccentChoice.customColorKey) private var customColor = ""
+    @AppStorage(AccentChoice.key, store: AccentChoice.store) private var choice: AccentChoice = .standard
+    @AppStorage(AccentChoice.customColorKey, store: AccentChoice.store) private var customColor = ""
 
     func body(content: Content) -> some View {
         let color = choice.color(customColor: customColor)

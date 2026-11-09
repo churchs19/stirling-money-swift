@@ -1,6 +1,7 @@
 import StoreKit
 import SwiftData
 import SwiftUI
+import WidgetKit
 
 /// App settings. A sheet from the Accounts ⋯ menu on iPhone and iPad; the Settings window (⌘,) on the Mac.
 struct SettingsView: View {
@@ -8,8 +9,8 @@ struct SettingsView: View {
     @Environment(\.requestReview) private var requestReview
     @AppStorage("accountSort") private var sort: AccountSort = .name
     @AppStorage(AppLock.enabledKey) private var requiresUnlock = false
-    @AppStorage(AccentChoice.key) private var accentChoice: AccentChoice = .standard
-    @AppStorage(AccentChoice.customColorKey) private var customAccent = ""
+    @AppStorage(AccentChoice.key, store: AccentChoice.store) private var accentChoice: AccentChoice = .standard
+    @AppStorage(AccentChoice.customColorKey, store: AccentChoice.store) private var customAccent = ""
     @Environment(\.self) private var environment
     @Query private var transactions: [AccountTransaction]
 
@@ -87,6 +88,9 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+        // The Goal widget's gauge uses the accent color too.
+        .onChange(of: accentChoice) { WidgetCenter.shared.reloadAllTimelines() }
+        .onChange(of: customAccent) { WidgetCenter.shared.reloadAllTimelines() }
         .navigationTitle("Settings")
     }
 
