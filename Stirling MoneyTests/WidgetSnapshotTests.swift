@@ -33,6 +33,31 @@ struct WidgetSnapshotTests {
         ])
     }
 
+    @Test func snapshotCarriesAccountIcons() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let card = Account(name: "Card", iconName: "pf-visa")
+        let bank = Account(name: "Bank", iconName: "building.columns")
+        let plain = Account(name: "Plain")
+        [card, bank, plain].forEach { context.insert($0) }
+        try context.save()
+
+        let accounts = WidgetSnapshot(accounts: [card, bank, plain], goals: []).accounts
+        let byName = Dictionary(uniqueKeysWithValues: accounts.map { ($0.name, $0) })
+        // The widget gets a glyph's character, since it doesn't have PaymentFont's name table.
+        #expect(byName["Card"]?.iconGlyph == PaymentFont.glyph(forIconName: "pf-visa")?.character)
+        #expect(byName["Card"]?.iconSymbol == nil)
+        #expect(byName["Bank"]?.iconSymbol == "building.columns")
+        #expect(byName["Bank"]?.iconGlyph == nil)
+        #expect(byName["Plain"]?.iconSymbol == nil && byName["Plain"]?.iconGlyph == nil)
+    }
+
+    @Test func snapshotFromBeforeIconsStillDecodes() throws {
+        let json = #"{"accounts":[{"id":"a","name":"Checking","balance":10,"postedBalance":10}],"goals":[],"updatedAt":0}"#
+        let snapshot = try JSONDecoder().decode(WidgetSnapshot.self, from: Data(json.utf8))
+        #expect(snapshot.accounts.first?.iconSymbol == nil)
+    }
+
     @Test func idsAreStableAndDistinct() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext

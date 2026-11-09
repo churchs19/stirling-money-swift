@@ -18,7 +18,7 @@ Stirling Money/
 ├── Models/
 │   ├── AppSchema.swift            # List of all @Model types for the container
 │   ├── Account.swift              # @Model: balance, posted balance, next check number, optional icon (+ icon choices)
-│   ├── AccentChoice.swift         # Accent color setting: default purple (#7B2CBF, #9D4EDD in dark mode), system (Mac only), or custom
+│   ├── AccentChoice.swift         # Accent color setting: default purple (#7B2CBF, #9D4EDD in dark mode), system (Mac only), or custom; stored in the App Group defaults (StirlingMoneyWidgets/WidgetAccent.swift reads it; keep in step)
 │   ├── AccountLayout.swift        # Tiles (default) / list layout for the accounts screen
 │   ├── PaymentFont.swift          # 116 PaymentFont glyphs (generated from its CSS); "pf-…" icon names; registers the font
 │   ├── AccountSort.swift          # Name / most-used ordering for the accounts list
@@ -60,7 +60,7 @@ Stirling Money/
     ├── View+Accent.swift          # .appAccent() tint for each scene + \.appAccent environment value
     └── View+Platform.swift        # Touch-only modifiers that do nothing on macOS
 Stirling MoneyTests/               # Swift Testing; in-memory container + UTC calendar in TestSupport.swift
-StirlingMoneyWidgets/              # Widget extension: Balance and Goal widgets, configured with App Intents
+StirlingMoneyWidgets/              # Widget extension: Balance and Goal widgets, configured with App Intents; Fonts/ has a copy of PaymentFont for account icons
 ```
 
 Widgets can't open the SwiftData store; the app writes `WidgetSnapshot.json` to the App Group shortly after each

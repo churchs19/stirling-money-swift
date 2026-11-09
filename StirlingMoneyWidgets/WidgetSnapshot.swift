@@ -8,6 +8,10 @@ struct WidgetSnapshot: Codable, Equatable {
         var name: String
         var balance: Decimal
         var postedBalance: Decimal
+        /// The account's icon when it's an SF Symbol name.
+        var iconSymbol: String? = nil
+        /// The account's icon when it's a PaymentFont glyph: the glyph's character in that font.
+        var iconGlyph: String? = nil
     }
 
     struct GoalSummary: Codable, Equatable, Identifiable {
@@ -45,7 +49,7 @@ struct WidgetSnapshot: Codable, Equatable {
 
     static let sample = WidgetSnapshot(
         accounts: [
-            AccountSummary(id: "checking", name: "Checking", balance: 1250.75, postedBalance: 1180.25),
+            AccountSummary(id: "checking", name: "Checking", balance: 1250.75, postedBalance: 1180.25, iconSymbol: "building.columns"),
             AccountSummary(id: "savings", name: "Savings", balance: 8500, postedBalance: 8500),
         ],
         goals: [

@@ -1,3 +1,4 @@
+import CoreText
 import SwiftUI
 import WidgetKit
 
@@ -9,11 +10,13 @@ struct BalanceEntry: TimelineEntry {
     let account: WidgetSnapshot.AccountSummary?
     /// The configured account no longer exists.
     let isMissing: Bool
+    /// The accent color chosen in the app, for the account's icon.
+    var accent: Color = WidgetAccent.standard
 }
 
 struct BalanceProvider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> BalanceEntry {
-        BalanceEntry(date: .now, snapshot: .sample, account: WidgetSnapshot.sample.accounts.first, isMissing: false)
+        BalanceEntry(date: .now, snapshot: .sample, account: WidgetSnapshot.sample.accounts.first, isMissing: false, accent: WidgetAccent.current)
     }
 
     func snapshot(for configuration: SelectAccountIntent, in context: Context) async -> BalanceEntry {
@@ -31,10 +34,10 @@ struct BalanceProvider: AppIntentTimelineProvider {
     private func entry(for configuration: SelectAccountIntent) -> BalanceEntry {
         let snapshot = WidgetSnapshot.load()
         guard let wanted = configuration.account else {
-            return BalanceEntry(date: .now, snapshot: snapshot, account: nil, isMissing: false)
+            return BalanceEntry(date: .now, snapshot: snapshot, account: nil, isMissing: false, accent: WidgetAccent.current)
         }
         let account = snapshot?.accounts.first { $0.id == wanted.id }
-        return BalanceEntry(date: .now, snapshot: snapshot, account: account, isMissing: account == nil)
+        return BalanceEntry(date: .now, snapshot: snapshot, account: account, isMissing: account == nil, accent: WidgetAccent.current)
     }
 }
 
@@ -85,7 +88,15 @@ struct BalanceWidgetView: View {
                 Text(name)
                     .font(.headline)
                     .lineLimit(1)
-                Spacer(minLength: 0)
+                if let account = entry.account, account.iconSymbol != nil || account.iconGlyph != nil {
+                    WidgetAccountIcon(account: account)
+                        .foregroundStyle(entry.accent)
+                        // In tinted and clear Home Screen styles, the icon takes the system's tint instead.
+                        .widgetAccentable()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    Spacer(minLength: 0)
+                }
                 Text(balance, format: .localCurrency)
                     .font(.title2.bold())
                     .monospacedDigit()
@@ -130,6 +141,37 @@ struct BalanceWidget: Widget {
     }
 }
 
+/// An account's icon, large: an SF Symbol, or a PaymentFont glyph drawn with the bundled font
+/// (`Fonts/paymentfont-webfont.ttf`, a copy of the app's).
+struct WidgetAccountIcon: View {
+    let account: WidgetSnapshot.AccountSummary
+
+    var body: some View {
+        if let glyph = account.iconGlyph, Self.isFontRegistered {
+            Text(glyph)
+                // PaymentFont's logos sit small in the em square, so they need a larger size than a symbol.
+                .font(.custom(Self.fontName, size: 56))
+                .lineLimit(1)
+                .minimumScaleFactor(0.3)
+        } else if let symbol = account.iconSymbol {
+            Image(systemName: symbol)
+                .font(.system(size: 34))
+        }
+    }
+
+    private static let fontName = "paymentfont-webfont"
+
+    /// Registers the bundled font with the widget's process, once.
+    private static let isFontRegistered: Bool = {
+        guard let url = Bundle.main.url(forResource: fontName, withExtension: "ttf") else { return false }
+        if CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil) {
+            return true
+        }
+        // Already registered also means it's usable.
+        return (CTFontCopyPostScriptName(CTFontCreateWithName(fontName as CFString, 12, nil)) as String) == fontName
+    }()
+}
+
 /// Shown when there's nothing to display yet.
 struct WidgetMessage: View {
     let text: LocalizedStringKey
@@ -146,6 +188,11 @@ struct WidgetMessage: View {
     BalanceWidget()
 } timeline: {
     BalanceEntry(date: .now, snapshot: .sample, account: WidgetSnapshot.sample.accounts[0], isMissing: false)
+    BalanceEntry(
+        date: .now, snapshot: .sample,
+        account: .init(id: "card", name: "Credit Card", balance: -1068.38, postedBalance: -900, iconGlyph: "\u{F045}"),
+        isMissing: false
+    )
     BalanceEntry(date: .now, snapshot: .sample, account: nil, isMissing: false)
     BalanceEntry(date: .now, snapshot: nil, account: nil, isMissing: false)
 }
