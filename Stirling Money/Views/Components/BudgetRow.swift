@@ -5,6 +5,7 @@ import SwiftUI
 struct BudgetRow: View {
     let budget: Budget
     let summary: BudgetSummary
+    @Environment(\.appAccent) private var accent
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -20,7 +21,7 @@ struct BudgetRow: View {
             switch summary.state {
             case let .active(period):
                 ProgressView(value: summary.progress)
-                    .tint(summary.isOverBudget ? .red : .accentColor)
+                    .tint(summary.isOverBudget ? .red : accent)
                     .accessibilityHidden(true)
                 HStack(alignment: .firstTextBaseline) {
                     Text("\(summary.spent, format: .localCurrency) of \(summary.amount, format: .localCurrency)")

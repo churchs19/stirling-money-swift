@@ -2,12 +2,15 @@ import StoreKit
 import SwiftData
 import SwiftUI
 
-/// App settings. A tab on iPhone and iPad; the Settings window (⌘,) on the Mac.
+/// App settings. A sheet from the Accounts ⋯ menu on iPhone and iPad; the Settings window (⌘,) on the Mac.
 struct SettingsView: View {
     @Environment(AppLock.self) private var appLock
     @Environment(\.requestReview) private var requestReview
     @AppStorage("accountSort") private var sort: AccountSort = .name
     @AppStorage(AppLock.enabledKey) private var requiresUnlock = false
+    @AppStorage(AccentChoice.key) private var accentChoice: AccentChoice = .standard
+    @AppStorage(AccentChoice.customColorKey) private var customAccent = ""
+    @Environment(\.self) private var environment
     @Query private var transactions: [AccountTransaction]
 
     private var version: String {
@@ -24,6 +27,28 @@ struct SettingsView: View {
                     ForEach(AccountSort.allCases) { option in
                         Text(option.title).tag(option)
                     }
+                }
+            }
+
+            Section {
+                Picker("Accent Color", selection: $accentChoice) {
+                    ForEach(AccentChoice.available) { choice in
+                        Text(choice.title).tag(choice)
+                    }
+                }
+                if accentChoice == .custom {
+                    ColorPicker("Custom Color", selection: customAccentBinding, supportsOpacity: false)
+                }
+            } header: {
+                Text("Appearance")
+            } footer: {
+                switch accentChoice {
+                case .standard:
+                    Text("Stirling Money's purple.")
+                case .system:
+                    Text("The accent color chosen in System Settings → Appearance.")
+                case .custom:
+                    Text("A color you choose.")
                 }
             }
 
@@ -67,6 +92,15 @@ struct SettingsView: View {
 
     private var exportFilename: String {
         "Stirling Money Transactions \(Date.now.formatted(.iso8601.year().month().day())).csv"
+    }
+
+    /// The custom accent color; it starts from the default until one is picked.
+    private var customAccentBinding: Binding<Color> {
+        Binding {
+            AccentChoice.custom.color(customColor: customAccent)
+        } set: { newColor in
+            customAccent = AccentChoice.encode(newColor.resolve(in: environment))
+        }
     }
 
     /// Turning the lock on asks for Face ID first, so it's known to work before the app relies on it.

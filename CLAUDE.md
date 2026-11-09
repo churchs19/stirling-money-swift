@@ -18,6 +18,7 @@ Stirling Money/
 ├── Models/
 │   ├── AppSchema.swift            # List of all @Model types for the container
 │   ├── Account.swift              # @Model: balance, posted balance, next check number, optional icon (+ icon choices)
+│   ├── AccentChoice.swift         # Accent color setting: default purple (#7B2CBF, #9D4EDD in dark mode), system (Mac only), or custom
 │   ├── AccountLayout.swift        # Tiles (default) / list layout for the accounts screen
 │   ├── PaymentFont.swift          # 116 PaymentFont glyphs (generated from its CSS); "pf-…" icon names; registers the font
 │   ├── AccountSort.swift          # Name / most-used ordering for the accounts list
@@ -36,7 +37,7 @@ Stirling Money/
 │   └── WidgetSnapshot.swift       # JSON the widgets read (a copy lives in StirlingMoneyWidgets/; keep in step)
 ├── Views/
 │   ├── RootView.swift             # TabView: Accounts / Budgets / Goals / Reports (sidebar on iPad and Mac)
-│   ├── SettingsView.swift         # Sort, app lock, export, rate; a sheet from the Accounts ⋯ menu, a Settings window (⌘,) on the Mac
+│   ├── SettingsView.swift         # Sort, accent color, app lock, export, rate; a sheet from the Accounts ⋯ menu, a Settings window (⌘,) on the Mac
 │   ├── LockView.swift             # Covers the app while locked
 │   ├── AccountsView.swift         # Accounts as tiles or a list (toolbar toggle), total, sort, delete
 │   ├── AccountRegisterView.swift  # One account's transactions, balances, search
@@ -56,6 +57,7 @@ Stirling Money/
 └── Extensions/
     ├── Decimal+Money.swift        # .localCurrency format, parsing typed amounts
     ├── Color+Chart.swift          # ChartPalette: validated chart colors; assign slots in order, never cycle
+    ├── View+Accent.swift          # .appAccent() tint for each scene + \.appAccent environment value
     └── View+Platform.swift        # Touch-only modifiers that do nothing on macOS
 Stirling MoneyTests/               # Swift Testing; in-memory container + UTC calendar in TestSupport.swift
 StirlingMoneyWidgets/              # Widget extension: Balance and Goal widgets, configured with App Intents
@@ -110,5 +112,6 @@ Structured data means fewer tokens consumed and better error diagnosis.
 - @Model classes are already Observable — do not add @Observable macro
 - Use @Bindable for form bindings to model properties
 - Code must build for macOS as well as iOS. Don't call iOS-only modifiers (`textInputAutocapitalization`, `keyboardType`, `navigationBarTitleDisplayMode`) directly; use the helpers in `View+Platform.swift` or `#if os(macOS)`. Give swipe actions a matching `.contextMenu` for mouse users. Wrap context-menu actions that show a sheet, alert or dialog in `afterMenuCloses { }` (the Mac drops presentations started while the menu closes), and use `NavigationRow` for list rows that push onto a `NavigationStack(path:)`.
+- Don't name `Color.accentColor` in views: it's always the default purple. Use `.tint` styles or `@Environment(\.appAccent)`, which follow the accent color chosen in Settings.
 - Debug builds launched with `-UseSampleData` use the in-memory preview data instead of the real store.
 
