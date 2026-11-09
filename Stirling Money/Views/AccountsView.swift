@@ -131,6 +131,18 @@ struct AccountsView: View {
 
     private func tiles(_ accounts: [Account]) -> some View {
         ScrollView {
+            if !accounts.isEmpty {
+                LabeledContent("Total") {
+                    AmountText(accounts.reduce(0) { $0 + $1.balance })
+                }
+                .bold()
+                // A card like the list layout's Total row.
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(Color.groupedItemBackground, in: RoundedRectangle(cornerRadius: 20))
+                .padding(.bottom, 12)
+            }
+
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
                 ForEach(accounts) { account in
                     // A button rather than a NavigationLink, which also works on the Mac (see NavigationRow).
@@ -147,18 +159,6 @@ struct AccountsView: View {
                     }
                 }
             }
-
-            if !accounts.isEmpty {
-                LabeledContent("Total") {
-                    AmountText(accounts.reduce(0) { $0 + $1.balance })
-                }
-                .bold()
-                // A card like the list layout's Total row.
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(Color.groupedItemBackground, in: RoundedRectangle(cornerRadius: 16))
-                .padding(.top, 12)
-            }
         }
         .contentMargins(16, for: .scrollContent)
         // Matches the list layout's page.
@@ -168,6 +168,13 @@ struct AccountsView: View {
     private func list(_ sortedAccounts: [Account]) -> some View {
         List {
             if !sortedAccounts.isEmpty {
+                Section {
+                    LabeledContent("Total") {
+                        AmountText(sortedAccounts.reduce(0) { $0 + $1.balance })
+                    }
+                    .bold()
+                }
+
                 Section {
                     ForEach(sortedAccounts) { account in
                         NavigationRow(value: account, path: $path) {
@@ -192,13 +199,6 @@ struct AccountsView: View {
                     .onDelete { offsets in
                         accountPendingDeletion = offsets.first.map { sortedAccounts[$0] }
                     }
-                }
-
-                Section {
-                    LabeledContent("Total") {
-                        AmountText(sortedAccounts.reduce(0) { $0 + $1.balance })
-                    }
-                    .bold()
                 }
             }
         }

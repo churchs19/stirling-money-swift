@@ -1,14 +1,19 @@
 import SwiftData
 import SwiftUI
 
-/// A square tile for one account: its icon (if any), name and balance.
+/// A square tile for one account, laid out like the Balance widget: the name, the icon (if any)
+/// large and centered, then the balance and the posted balance.
 struct AccountTile: View {
     let account: Account
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            // Fills the space above the name and balance, with the icon centered in it.
-            // Without an icon, the name and balance still sit at the bottom.
+            Text(account.name)
+                .font(.headline)
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+            // Fills the space between the name and the balance, with the icon centered in it.
+            // Without an icon, the name stays at the top and the balances at the bottom.
             Group {
                 if let iconName = account.iconName {
                     AccountIconView(iconName: iconName, textStyle: .largeTitle, isLarge: true)
@@ -17,22 +22,23 @@ struct AccountTile: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            Text(account.name)
-                .font(.headline)
-                .foregroundStyle(.primary)
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
             AmountText(account.balance)
-                .font(.title3.bold())
+                .font(.title2.bold())
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
+            Text("Posted \(account.postedBalance, format: .localCurrency)")
+                .font(.caption)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
-        .padding(14)
+        .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .aspectRatio(1, contentMode: .fit)
         // The same colors as the list's rows, so switching layouts doesn't change the color scheme.
-        .background(Color.groupedItemBackground, in: RoundedRectangle(cornerRadius: 16))
-        .contentShape(RoundedRectangle(cornerRadius: 16))
+        .background(Color.groupedItemBackground, in: RoundedRectangle(cornerRadius: 20))
+        .contentShape(RoundedRectangle(cornerRadius: 20))
         .accessibilityElement(children: .combine)
     }
 }
