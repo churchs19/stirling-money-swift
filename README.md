@@ -15,6 +15,7 @@ It's a re-implementation of [Stirling Money for Windows Phone](https://github.co
 - **Reports** (Swift Charts): net income, spending by category, one category over time, budget history
 - **Widgets**: an account's balance (or the total) and a goal's progress; tapping an account's widget opens its transactions
 - **App lock**: Face ID, Touch ID or the device passcode
+- **Account tiles** (or a list) with an optional icon: an SF Symbol or one of 116 payment logos and currency signs
 - **CSV export** of every transaction
 
 Not yet: iCloud sync and sharing data with other people. Both are deferred; the data model is kept CloudKit-compatible so sync can be added without a migration.
@@ -55,3 +56,7 @@ Tests use an in-memory store and a fixed UTC calendar, so they don't depend on t
 | `docs` | The re-implementation plan |
 
 [`CLAUDE.md`](CLAUDE.md) has the conventions for working in the code: relationship and delete rules, money as `Decimal`, the macOS rules, and how the widgets get their data.
+
+## Acknowledgements
+
+Account icons include the payment and currency glyphs of [PaymentFont](https://github.com/AlexanderPoellmann/PaymentFont) by Alexander Manfred Pöllmann, used under the MIT License (included at `Stirling Money/Resources/Fonts/PaymentFont-LICENSE.txt`). Brand logos are trademarks of their owners.

@@ -7,41 +7,21 @@ struct AccountsView: View {
     @Binding var path: [Account]
     @Query private var accounts: [Account]
     @AppStorage("accountSort") private var sort: AccountSort = .name
+    @AppStorage("accountLayout") private var layout: AccountLayout = .tiles
 
     @State private var isAddingAccount = false
     @State private var isShowingCategories = false
+    @State private var isShowingSettings = false
     @State private var accountPendingDeletion: Account?
 
     var body: some View {
         let sortedAccounts = sort.sorted(accounts)
 
         NavigationStack(path: $path) {
-            List {
-                if !accounts.isEmpty {
-                    Section {
-                        ForEach(sortedAccounts) { account in
-                            NavigationRow(value: account, path: $path) {
-                                LabeledContent(account.name) {
-                                    AmountText(account.balance)
-                                }
-                            }
-                            .contextMenu {
-                                Button("Delete Account…", systemImage: "trash", role: .destructive) {
-                                    afterMenuCloses { accountPendingDeletion = account }
-                                }
-                            }
-                        }
-                        .onDelete { offsets in
-                            accountPendingDeletion = offsets.first.map { sortedAccounts[$0] }
-                        }
-                    }
-
-                    Section {
-                        LabeledContent("Total") {
-                            AmountText(accounts.reduce(0) { $0 + $1.balance })
-                        }
-                        .bold()
-                    }
+            Group {
+                switch layout {
+                case .tiles: tiles(sortedAccounts)
+                case .list: list(sortedAccounts)
                 }
             }
             .overlay {
@@ -63,6 +43,15 @@ struct AccountsView: View {
                         isAddingAccount = true
                     }
                 }
+                ToolbarItem(placement: .primaryAction) {
+                    // Shows the layout it switches to.
+                    Button(layout.toggled.switchTitle, systemImage: layout.toggled.systemImage) {
+                        withAnimation {
+                            layout = layout.toggled
+                        }
+                    }
+                    .help(layout.toggled.switchTitle)
+                }
                 ToolbarItem(placement: .secondaryAction) {
                     Button("Categories", systemImage: "tag") {
                         isShowingCategories = true
@@ -75,9 +64,31 @@ struct AccountsView: View {
                         }
                     }
                 }
+                ToolbarItem(placement: .secondaryAction) {
+                    #if os(macOS)
+                        // Opens the app's Settings window, the same as ⌘,.
+                        SettingsLink {
+                            Label("Settings", systemImage: "gear")
+                        }
+                    #else
+                        Button("Settings", systemImage: "gear") {
+                            isShowingSettings = true
+                        }
+                    #endif
+                }
             }
             .sheet(isPresented: $isAddingAccount) {
                 NewAccountView()
+            }
+            .sheet(isPresented: $isShowingSettings) {
+                NavigationStack {
+                    SettingsView()
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Done") { isShowingSettings = false }
+                            }
+                        }
+                }
             }
             .sheet(isPresented: $isShowingCategories) {
                 NavigationStack {
@@ -116,6 +127,83 @@ struct AccountsView: View {
         }
     }
 
+    // MARK: Layouts
+
+    private func tiles(_ accounts: [Account]) -> some View {
+        ScrollView {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
+                ForEach(accounts) { account in
+                    // A button rather than a NavigationLink, which also works on the Mac (see NavigationRow).
+                    Button {
+                        path.append(account)
+                    } label: {
+                        AccountTile(account: account)
+                    }
+                    .buttonStyle(.plain)
+                    .contextMenu {
+                        Button("Delete Account…", systemImage: "trash", role: .destructive) {
+                            afterMenuCloses { accountPendingDeletion = account }
+                        }
+                    }
+                }
+            }
+
+            if !accounts.isEmpty {
+                LabeledContent("Total") {
+                    AmountText(accounts.reduce(0) { $0 + $1.balance })
+                }
+                .bold()
+                // A card like the list layout's Total row.
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(Color.groupedItemBackground, in: RoundedRectangle(cornerRadius: 16))
+                .padding(.top, 12)
+            }
+        }
+        .contentMargins(16, for: .scrollContent)
+        // Matches the list layout's page.
+        .background(Color.groupedPageBackground)
+    }
+
+    private func list(_ sortedAccounts: [Account]) -> some View {
+        List {
+            if !sortedAccounts.isEmpty {
+                Section {
+                    ForEach(sortedAccounts) { account in
+                        NavigationRow(value: account, path: $path) {
+                            LabeledContent {
+                                AmountText(account.balance)
+                            } label: {
+                                Label {
+                                    Text(account.name)
+                                } icon: {
+                                    if let iconName = account.iconName {
+                                        AccountIconView(iconName: iconName)
+                                    }
+                                }
+                            }
+                        }
+                        .contextMenu {
+                            Button("Delete Account…", systemImage: "trash", role: .destructive) {
+                                afterMenuCloses { accountPendingDeletion = account }
+                            }
+                        }
+                    }
+                    .onDelete { offsets in
+                        accountPendingDeletion = offsets.first.map { sortedAccounts[$0] }
+                    }
+                }
+
+                Section {
+                    LabeledContent("Total") {
+                        AmountText(sortedAccounts.reduce(0) { $0 + $1.balance })
+                    }
+                    .bold()
+                }
+            }
+        }
+    }
+
     private func deletionMessage(for account: Account) -> Text {
         let transactions = account.transactionCount
         let goals = account.goals?.count ?? 0
@@ -129,6 +217,7 @@ struct AccountsView: View {
 #Preview("With Accounts") {
     @Previewable @State var path: [Account] = []
     AccountsView(path: $path)
+        .environment(AppLock())
         .modelContainer(.preview)
 }
 

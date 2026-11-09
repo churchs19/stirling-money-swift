@@ -60,6 +60,14 @@ struct EditAccountView: View {
                         Text("The balance before any transactions in this app. Use a negative amount for money owed.")
                     }
                 }
+
+                Section {
+                    AccountIconPicker(iconName: $account.iconName)
+                } header: {
+                    Text("Icon")
+                } footer: {
+                    Text("Shown on the account's tile.")
+                }
             }
             .sheetForm()
             .navigationTitle("Edit Account")
