@@ -3,6 +3,7 @@ import SwiftUI
 /// Icons to choose from for an account: "None", SF Symbols, then PaymentFont's payment logos.
 struct AccountIconPicker: View {
     @Binding var iconName: String?
+    @Environment(\.appAccent) private var accent
 
     private let columns = [GridItem(.adaptive(minimum: 44), spacing: 8)]
 
@@ -45,11 +46,11 @@ struct AccountIconPicker: View {
             .help(label)
             .background(
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(isSelected ? Color.accentColor.opacity(0.2) : Color.clear)
+                    .fill(isSelected ? accent.opacity(0.2) : Color.clear)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(isSelected ? Color.accentColor : Color.secondary.opacity(0.3), lineWidth: isSelected ? 2 : 1)
+                    .strokeBorder(isSelected ? accent : Color.secondary.opacity(0.3), lineWidth: isSelected ? 2 : 1)
             )
             .contentShape(Rectangle())
         }

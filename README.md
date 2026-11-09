@@ -16,6 +16,7 @@ It's a re-implementation of [Stirling Money for Windows Phone](https://github.co
 - **Widgets**: an account's balance (or the total) and a goal's progress; tapping an account's widget opens its transactions
 - **App lock**: Face ID, Touch ID or the device passcode
 - **Account tiles** (or a list) with an optional icon: an SF Symbol or one of 116 payment logos and currency signs
+- **Accent color**: Stirling Money's purple, one you pick, or (on the Mac) the system's
 - **CSV export** of every transaction
 
 Not yet: iCloud sync and sharing data with other people. Both are deferred; the data model is kept CloudKit-compatible so sync can be added without a migration.

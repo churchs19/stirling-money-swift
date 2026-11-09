@@ -4,6 +4,7 @@ import SwiftUI
 /// A goal card: the account, progress toward the target, and days left or overdue.
 struct GoalRow: View {
     let goal: Goal
+    @Environment(\.appAccent) private var accent
 
     private var isReached: Bool {
         goal.amountRemaining == 0
@@ -23,7 +24,7 @@ struct GoalRow: View {
             }
 
             ProgressView(value: goal.progress)
-                .tint(isReached ? .green : .accentColor)
+                .tint(isReached ? .green : accent)
                 .accessibilityHidden(true)
 
             HStack(alignment: .firstTextBaseline) {

@@ -40,6 +40,7 @@ struct Stirling_MoneyApp: App {
                 // Widget links go to a window that's already open instead of opening another one
                 // (on the Mac, and on iPad with several windows). With no window open, one is created.
                 .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
+                .appAccent()
         }
         .modelContainer(sharedModelContainer)
         .environment(appLock)
@@ -59,6 +60,7 @@ struct Stirling_MoneyApp: App {
             Settings {
                 SettingsView()
                     .frame(minWidth: 420, minHeight: 380)
+                    .appAccent()
             }
             .modelContainer(sharedModelContainer)
             .environment(appLock)
