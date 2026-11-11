@@ -53,6 +53,13 @@ nonisolated enum AccentChoice: String, CaseIterable, Identifiable {
         }
     }
 
+    /// The custom color to send to the Watch, or nil when Stirling Money's purple is in use.
+    /// (The Mac's System choice has no Watch to send to.)
+    @MainActor static var sharedCustomColor: Color.Resolved? {
+        guard store.string(forKey: key) == AccentChoice.custom.rawValue else { return nil }
+        return decode(store.string(forKey: customColorKey) ?? "")
+    }
+
     // MARK: Storing the custom color
 
     /// The custom color as text for user defaults (`Color.Resolved` is Codable).

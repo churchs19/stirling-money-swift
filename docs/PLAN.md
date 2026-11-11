@@ -239,12 +239,24 @@ everywhere. This replaces the current widget copies and the "keep in step" rule.
    Targets: `StirlingMoney Watch App` (`net.s-church.stirlingmoney.watchkitapp`) and
    `StirlingMoneyWatchWidgetsExtension`. The Watch app's dependency and embed phase are filtered to iOS, since a Mac
    app can't contain watchOS content.
-2. [ ] Add budgets and accent to the summary; tests for the new fields and for decoding old snapshots.
-3. [ ] `WatchSync` on the iPhone: a `WCSession` delegate. It sends the application context after each
+2. [x] Add budgets and accent to the summary; tests for the new fields and for decoding old snapshots.
+   Changing the accent color in Settings rewrites the summary too.
+3. [x] `WatchSync` on the iPhone: a `WCSession` delegate. It sends the application context after each
    snapshot write and answers the Watch's refresh request from the main context.
-4. [ ] `WatchStore` on the Watch: an `@Observable` that receives the context, saves it to the App Group,
+   It replies with the summary file on disk (no hop to the main actor from the session's queue), then refreshes the
+   file, which sends again if anything changed. It also sends the file when the session activates or a Watch app is
+   installed. Confirmed on the paired simulators: "Sent a summary of 3394 bytes to the Watch".
+4. [x] `WatchStore` on the Watch: an `@Observable` that receives the context, saves it to the App Group,
    loads it at launch and reloads complications. Tests for decoding and the "ended period" state.
-5. [ ] Watch screens: Accounts, Budgets, Goals, with previews using sample data.
+   It ignores a summary older than the one it has (a reply and a context can arrive in either order), and
+   asks the iPhone for a fresh one whenever the app comes to the front. The iPhone only rewrites the summary
+   when something changes, so the Watch also notes when it last heard from the iPhone (`asOf`) for the
+   "Updated …" footer. WatchConnectivity calls its handlers on its own queue, so they must be `@Sendable`, not
+   main-actor closures (a main-actor reply handler crashed the app). Confirmed on the paired simulators.
+5. [x] Watch screens: Accounts, Budgets, Goals, with previews using sample data.
+   PaymentFont (font, license and glyph table), `.localCurrency` and the summary's icon view moved to `Shared/`, so
+   there's one copy of each for the app, both widget extensions and the Watch. A budget whose period has ended shows
+   "Open Stirling Money on your iPhone to update" instead of last period's figures.
 6. [ ] Complications; check them in the Watch simulator's Smart Stack and on a watch face.
 7. [ ] Paired iPhone + Watch simulators: change a balance on the iPhone and check that it reaches the Watch.
    Repeat with the Watch app closed and with the iPhone app in the background. Then a real Watch.

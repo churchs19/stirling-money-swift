@@ -1,9 +1,19 @@
 import Foundation
 import SwiftData
+import SwiftUI
 
 extension WidgetSnapshot {
-    /// A snapshot of the given accounts and goals, sorted by name.
-    init(accounts: [Account], goals: [Goal], now: Date = .now) {
+    /// A snapshot of the given accounts, goals and budgets, each sorted by name.
+    /// `transactions` is only read for all-spending budgets. Budgets outside an active period are left out.
+    init(
+        accounts: [Account],
+        goals: [Goal],
+        budgets: [Budget] = [],
+        transactions: [AccountTransaction] = [],
+        accentColor: Color.Resolved? = nil,
+        now: Date = .now,
+        calendar: Calendar = .current
+    ) {
         self.accounts = AccountSort.name.sorted(accounts).map { account in
             var summary = AccountSummary(
                 id: Self.widgetID(for: account), name: account.name,
@@ -32,6 +42,22 @@ extension WidgetSnapshot {
                     targetDate: $0.targetDate
                 )
             }
+        self.budgets = budgets
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+            .compactMap { budget in
+                let summary = budget.summary(on: now, allTransactions: transactions, calendar: calendar)
+                guard case let .active(period) = summary.state else { return nil }
+                return BudgetSummary(
+                    id: Self.widgetID(for: budget),
+                    name: budget.name,
+                    categoryName: budget.category?.name,
+                    amount: summary.amount,
+                    spent: summary.spent,
+                    periodStart: period.start,
+                    periodEnd: period.end
+                )
+            }
+        self.accentColor = accentColor
         updatedAt = now
     }
 

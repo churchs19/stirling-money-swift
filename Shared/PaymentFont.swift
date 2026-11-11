@@ -4,7 +4,8 @@ import Foundation
 /// PaymentFont: payment-brand and currency glyphs, offered as account icons.
 ///
 /// Font and names from https://github.com/AlexanderPoellmann/PaymentFont (MIT License,
-/// © 2017 Alexander Manfred Pöllmann; see `Resources/Fonts/PaymentFont-LICENSE.txt`).
+/// © 2017 Alexander Manfred Pöllmann; see `Shared/Fonts/PaymentFont-LICENSE.txt`). Shared by the app, the widgets
+/// and the Watch, which each bundle the font from `Shared/Fonts/`.
 /// The table below was generated from that repository's `css/paymentfont.css`.
 /// An account stores a glyph as its CSS class name, such as "pf-visa", in `Account.iconName`.
 nonisolated enum PaymentFont {

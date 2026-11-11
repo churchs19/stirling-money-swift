@@ -16,13 +16,11 @@
 Stirling Money/
 ├── Stirling_MoneyApp.swift              # App entry, model container, app lock, widget snapshot on background
 ├── Localizable.xcstrings          # String catalog (English); Xcode fills it in when it builds
-├── Resources/Fonts/               # paymentfont-webfont.ttf + its MIT license (registered at run time, no Info.plist entry)
 ├── Models/
 │   ├── AppSchema.swift            # List of all @Model types for the container
 │   ├── Account.swift              # @Model: balance, posted balance, next check number, optional icon (+ icon choices)
 │   ├── AccentChoice.swift         # Accent color setting: default purple (#7B2CBF, #9D4EDD in dark mode), system (Mac only), or custom; stored in the App Group defaults (StirlingMoneyWidgets/WidgetAccent.swift reads it; keep in step)
 │   ├── AccountLayout.swift        # Tiles (default) / list layout for the accounts screen
-│   ├── PaymentFont.swift          # 116 PaymentFont glyphs (generated from its CSS); "pf-…" icon names; registers the font
 │   ├── AccountSort.swift          # Name / most-used ordering for the accounts list
 │   ├── AccountTransaction.swift   # @Model: register entry + TransactionKind
 │   ├── AccountTransaction+Search.swift  # Register search matching
@@ -55,17 +53,23 @@ Stirling Money/
 ├── Managers/
 │   ├── Ledger.swift               # Create/edit/delete transactions and transfers; categories
 │   ├── AppLock.swift              # Face ID / Touch ID / passcode lock (LocalAuthentication)
-│   └── WidgetSnapshotWriter.swift # Writes the snapshot to the App Group and reloads widgets
+│   ├── WidgetSnapshotWriter.swift # Writes the snapshot to the App Group, reloads widgets, sends it to the Watch
+│   └── WatchSync.swift            # iPhone only: WCSession; sends the snapshot as application context, answers Watch requests
 └── Extensions/
-    ├── Decimal+Money.swift        # .localCurrency format, parsing typed amounts
+    ├── Decimal+Money.swift        # Parsing typed amounts (.localCurrency itself is in Shared/)
     ├── Color+Chart.swift          # ChartPalette: validated chart colors; assign slots in order, never cycle
     ├── View+Accent.swift          # .appAccent() tint for each scene + \.appAccent environment value
     └── View+Platform.swift        # Touch-only modifiers that do nothing on macOS
 Stirling MoneyTests/               # Swift Testing; in-memory container + UTC calendar in TestSupport.swift
-StirlingMoney Watch App/           # watchOS app (Phase 7, in progress; see docs/PLAN.md)
+StirlingMoney Watch App/           # watchOS app (Phase 7, in progress; see docs/PLAN.md): Accounts / Budgets / Goals pages; WatchStore receives the iPhone's summary
+StirlingMoney Watch AppTests/      # Swift Testing for WatchStore (run on a Watch simulator)
 StirlingMoneyWatchWidgets/         # Watch complications (Phase 7, in progress)
-Shared/                            # In the app, the widgets, the Watch app and the complications: WidgetSnapshot (the JSON summary)
-StirlingMoneyWidgets/              # Widget extension: Balance and Goal widgets, configured with App Intents; Fonts/ has a copy of PaymentFont for account icons
+Shared/                            # In the app, the widgets, the Watch app and the complications:
+│                                  #   WidgetSnapshot (the JSON summary), WatchMessage (WatchConnectivity keys), .localCurrency,
+│                                  #   PaymentFont (116 glyphs generated from its CSS; "pf-…" icon names; registers the font at run time),
+│                                  #   SummaryAccountIcon (a summary account's icon, for widgets and the Watch),
+│                                  #   Fonts/ (paymentfont-webfont.ttf + its MIT license, bundled into all four)
+StirlingMoneyWidgets/              # Widget extension: Balance and Goal widgets, configured with App Intents
 ```
 
 Widgets can't open the SwiftData store; the app writes `WidgetSnapshot.json` to the App Group shortly after each

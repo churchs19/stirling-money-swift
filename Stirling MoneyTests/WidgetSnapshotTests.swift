@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import SwiftUI
 import Testing
 @testable import Stirling_Money
 
@@ -56,6 +57,71 @@ struct WidgetSnapshotTests {
         let json = #"{"accounts":[{"id":"a","name":"Checking","balance":10,"postedBalance":10}],"goals":[],"updatedAt":0}"#
         let snapshot = try JSONDecoder().decode(WidgetSnapshot.self, from: Data(json.utf8))
         #expect(snapshot.accounts.first?.iconSymbol == nil)
+        #expect(snapshot.budgets.isEmpty)
+        #expect(snapshot.accentColor == nil)
+    }
+
+    @Test func snapshotSummarizesBudgetsInAnActivePeriod() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let checking = Account(name: "Checking")
+        context.insert(checking)
+        let groceries = try #require(try Ledger.category(named: "Groceries", in: context))
+        Ledger.addTransaction(.withdrawal, amount: 300, to: checking, date: day(2026, 11, 3), payee: "Grocer", category: groceries, in: context)
+        Ledger.addTransaction(.withdrawal, amount: 50, to: checking, date: day(2026, 11, 4), payee: "Cinema", in: context)
+        Ledger.addTransaction(.withdrawal, amount: 999, to: checking, date: day(2026, 10, 20), payee: "Grocer", category: groceries, in: context)
+
+        let food = Budget(name: "Food", amount: 250, startDate: day(2026, 1, 1))
+        let everything = Budget(name: "Everything", amount: 1000, startDate: day(2026, 1, 1))
+        let ended = Budget(name: "Old", amount: 100, period: .custom, startDate: day(2026, 6, 1), endDate: day(2026, 6, 30))
+        let future = Budget(name: "Next Year", amount: 100, startDate: day(2027, 1, 1))
+        [food, everything, ended, future].forEach { context.insert($0) }
+        food.category = groceries
+        try context.save()
+
+        let snapshot = try WidgetSnapshot(
+            accounts: [checking], goals: [],
+            budgets: [food, everything, ended, future],
+            transactions: context.fetch(FetchDescriptor<AccountTransaction>()),
+            now: day(2026, 11, 25), calendar: utc
+        )
+
+        #expect(snapshot.budgets.map(\.name) == ["Everything", "Food"], "sorted by name; ended and not-started budgets left out")
+        let everythingSummary = try #require(snapshot.budgets.first)
+        #expect(everythingSummary.categoryName == nil)
+        #expect(everythingSummary.spent == 350)
+        #expect(everythingSummary.periodStart == day(2026, 11, 1))
+        #expect(everythingSummary.periodEnd == day(2026, 12, 1))
+        let foodSummary = snapshot.budgets[1]
+        #expect(foodSummary.categoryName == "Groceries")
+        #expect(foodSummary.spent == 300)
+        #expect(foodSummary.remaining == -50)
+        #expect(foodSummary.isOverBudget)
+        #expect(foodSummary.progress == 1)
+        #expect(foodSummary.id == WidgetSnapshot.widgetID(for: food))
+    }
+
+    @Test func budgetSummaryKnowsWhenItsPeriodIsOver() {
+        let budget = WidgetSnapshot.BudgetSummary(
+            id: "b", name: "Food", amount: 400, spent: 100,
+            periodStart: day(2026, 11, 1), periodEnd: day(2026, 12, 1)
+        )
+        #expect(budget.isCurrent(on: day(2026, 11, 30)))
+        #expect(!budget.isCurrent(on: day(2026, 12, 1)), "the figures are last period's once the next one starts")
+        #expect(!budget.isCurrent(on: day(2026, 10, 31)))
+        #expect(budget.progress == 0.25)
+        #expect(!budget.isOverBudget)
+    }
+
+    @Test func accentColorSurvivesJSONRoundTrip() throws {
+        let accent = Color.Resolved(red: 0.1, green: 0.5, blue: 0.3)
+        let snapshot = WidgetSnapshot(accounts: [], goals: [], accentColor: accent, updatedAt: day(2026, 11, 6))
+        let decoded = try JSONDecoder().decode(WidgetSnapshot.self, from: JSONEncoder().encode(snapshot))
+        let color = try #require(decoded.accentColor)
+        // JSON can lose the last bit of a Float, so compare closely rather than exactly.
+        #expect(abs(color.red - accent.red) < 0.0001)
+        #expect(abs(color.green - accent.green) < 0.0001)
+        #expect(abs(color.blue - accent.blue) < 0.0001)
     }
 
     @Test func idsAreStableAndDistinct() throws {

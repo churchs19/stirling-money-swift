@@ -1,4 +1,3 @@
-import CoreText
 import SwiftUI
 import WidgetKit
 
@@ -88,8 +87,8 @@ struct BalanceWidgetView: View {
                 Text(name)
                     .font(.headline)
                     .lineLimit(1)
-                if let account = entry.account, account.iconSymbol != nil || account.iconGlyph != nil {
-                    WidgetAccountIcon(account: account)
+                if let account = entry.account, SummaryAccountIcon.hasIcon(account) {
+                    SummaryAccountIcon(account: account)
                         .foregroundStyle(entry.accent)
                         // In tinted and clear Home Screen styles, the icon takes the system's tint instead.
                         .widgetAccentable()
@@ -139,37 +138,6 @@ struct BalanceWidget: Widget {
             [.systemSmall, .systemMedium]
         #endif
     }
-}
-
-/// An account's icon, large: an SF Symbol, or a PaymentFont glyph drawn with the bundled font
-/// (`Fonts/paymentfont-webfont.ttf`, a copy of the app's).
-struct WidgetAccountIcon: View {
-    let account: WidgetSnapshot.AccountSummary
-
-    var body: some View {
-        if let glyph = account.iconGlyph, Self.isFontRegistered {
-            Text(glyph)
-                // PaymentFont's logos sit small in the em square, so they need a larger size than a symbol.
-                .font(.custom(Self.fontName, size: 56))
-                .lineLimit(1)
-                .minimumScaleFactor(0.3)
-        } else if let symbol = account.iconSymbol {
-            Image(systemName: symbol)
-                .font(.system(size: 34))
-        }
-    }
-
-    private static let fontName = "paymentfont-webfont"
-
-    /// Registers the bundled font with the widget's process, once.
-    private static let isFontRegistered: Bool = {
-        guard let url = Bundle.main.url(forResource: fontName, withExtension: "ttf") else { return false }
-        if CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil) {
-            return true
-        }
-        // Already registered also means it's usable.
-        return (CTFontCopyPostScriptName(CTFontCreateWithName(fontName as CFString, 12, nil)) as String) == fontName
-    }()
 }
 
 /// Shown when there's nothing to display yet.

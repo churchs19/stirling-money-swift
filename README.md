@@ -52,7 +52,7 @@ Tests use an in-memory store and a fixed UTC calendar, so they don't depend on t
 | `Stirling Money/Managers` | `Ledger` (creating and editing transactions and transfers), the app lock, the widget snapshot writer |
 | `Stirling Money/Views` | Screens, `Reports/` and `Components/` |
 | `Stirling Money/Extensions` | Money formatting and parsing, chart colors, macOS-safe view helpers |
-| `Shared` | Code used by the app, the widgets and the Watch targets (the widget summary) |
+| `Shared` | Code and resources used by the app, the widgets and the Watch targets: the summary, the currency format, PaymentFont |
 | `StirlingMoneyWidgets` | The widget extension |
 | `StirlingMoney Watch App`, `StirlingMoneyWatchWidgets` | The Apple Watch app and its complications (in progress) |
 | `Stirling MoneyTests` | Unit tests |
@@ -62,4 +62,4 @@ Tests use an in-memory store and a fixed UTC calendar, so they don't depend on t
 
 ## Acknowledgements
 
-Account icons include the payment and currency glyphs of [PaymentFont](https://github.com/AlexanderPoellmann/PaymentFont) by Alexander Manfred Pöllmann, used under the MIT License (included at `Stirling Money/Resources/Fonts/PaymentFont-LICENSE.txt`). Brand logos are trademarks of their owners.
+Account icons include the payment and currency glyphs of [PaymentFont](https://github.com/AlexanderPoellmann/PaymentFont) by Alexander Manfred Pöllmann, used under the MIT License (included at `Shared/Fonts/PaymentFont-LICENSE.txt`). Brand logos are trademarks of their owners.

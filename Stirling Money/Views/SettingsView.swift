@@ -88,9 +88,15 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        // The Goal widget's gauge uses the accent color too.
-        .onChange(of: accentChoice) { WidgetCenter.shared.reloadAllTimelines() }
-        .onChange(of: customAccent) { WidgetCenter.shared.reloadAllTimelines() }
+        // The widgets read the accent color directly; the summary (for the Watch) carries it too.
+        .onChange(of: accentChoice) {
+            WidgetCenter.shared.reloadAllTimelines()
+            WidgetSnapshotWriter.scheduleUpdate()
+        }
+        .onChange(of: customAccent) {
+            WidgetCenter.shared.reloadAllTimelines()
+            WidgetSnapshotWriter.scheduleUpdate()
+        }
         .navigationTitle("Settings")
     }
 

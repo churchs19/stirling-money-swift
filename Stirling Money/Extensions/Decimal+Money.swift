@@ -1,11 +1,6 @@
 import Foundation
 
-nonisolated extension FormatStyle where Self == Decimal.FormatStyle.Currency {
-    /// Currency in the user's locale, falling back to US dollars.
-    static var localCurrency: Self {
-        .currency(code: Locale.current.currency?.identifier ?? "USD")
-    }
-}
+// `.localCurrency` is in Shared/Decimal+Currency.swift, so the widgets and the Watch format money the same way.
 
 nonisolated extension Decimal {
     /// Parses an amount typed by the user in their locale's number format, with or without
