@@ -1,45 +1,6 @@
 import Foundation
 import SwiftData
 
-/// What the widgets show, written by the app to the shared App Group folder as JSON.
-/// The widget extension reads it with its own copy of this type, because it can't open the
-/// SwiftData store. **Keep `StirlingMoneyWidgets/WidgetSnapshot.swift` in step with this file.**
-nonisolated struct WidgetSnapshot: Codable, Equatable {
-    struct AccountSummary: Codable, Equatable, Identifiable {
-        var id: String
-        var name: String
-        var balance: Decimal
-        var postedBalance: Decimal
-        /// The account's icon when it's an SF Symbol name.
-        var iconSymbol: String? = nil
-        /// The account's icon when it's a PaymentFont glyph: the glyph's character in that font.
-        var iconGlyph: String? = nil
-    }
-
-    struct GoalSummary: Codable, Equatable, Identifiable {
-        var id: String
-        var name: String
-        var accountName: String
-        var currentAmount: Decimal
-        var targetAmount: Decimal
-        var progress: Double
-        var targetDate: Date
-    }
-
-    var accounts: [AccountSummary]
-    var goals: [GoalSummary]
-    var updatedAt: Date
-
-    static let appGroup = "group.net.s-church.stirlingmoney"
-    static let fileName = "WidgetSnapshot.json"
-
-    static var fileURL: URL? {
-        FileManager.default
-            .containerURL(forSecurityApplicationGroupIdentifier: appGroup)?
-            .appending(path: fileName)
-    }
-}
-
 extension WidgetSnapshot {
     /// A snapshot of the given accounts and goals, sorted by name.
     init(accounts: [Account], goals: [Goal], now: Date = .now) {

@@ -5,8 +5,10 @@
 **Plan:** `docs/PLAN.md` — features being re-implemented from the old Windows Phone app, phase status, decisions
 **Architecture:** SwiftUI + SwiftData
 **Swift version:** 6.2 (app); the widget extension uses the template's Swift 5 mode
-**Targets:** `Stirling Money` (app), `StirlingMoneyWidgetsExtension` (widgets, folder `StirlingMoneyWidgets/`), tests, UI tests
-**App Group:** `group.net.s-church.stirlingmoney` (app + widgets)
+**Targets:** `Stirling Money` (app), `StirlingMoneyWidgetsExtension` (widgets, folder `StirlingMoneyWidgets/`), tests, UI tests;
+`StirlingMoney Watch App` (watchOS, embedded in the iPhone app only: its dependency and embed phase are filtered to iOS),
+`StirlingMoneyWatchWidgetsExtension` (Watch complications, folder `StirlingMoneyWatchWidgets/`), Watch tests and UI tests
+**App Group:** `group.net.s-church.stirlingmoney` (app + widgets; on the Watch, Watch app + complications)
 
 ## File Structure
 
@@ -34,7 +36,7 @@ Stirling Money/
 │   ├── GoalDraft.swift            # Goal form fields + validation + save
 │   ├── TransactionDraft.swift     # Transaction form fields + validation (saved by Ledger.save)
 │   ├── TransactionCSV.swift       # CSV export of every transaction + shareable file
-│   └── WidgetSnapshot.swift       # JSON the widgets read (a copy lives in StirlingMoneyWidgets/; keep in step)
+│   └── WidgetSnapshot+Models.swift  # Builds the widget summary from the models (the type itself is in Shared/)
 ├── Views/
 │   ├── RootView.swift             # TabView: Accounts / Budgets / Goals / Reports (sidebar on iPad and Mac)
 │   ├── SettingsView.swift         # Sort, accent color, app lock, export, rate; a sheet from the Accounts ⋯ menu, a Settings window (⌘,) on the Mac
@@ -60,11 +62,15 @@ Stirling Money/
     ├── View+Accent.swift          # .appAccent() tint for each scene + \.appAccent environment value
     └── View+Platform.swift        # Touch-only modifiers that do nothing on macOS
 Stirling MoneyTests/               # Swift Testing; in-memory container + UTC calendar in TestSupport.swift
+StirlingMoney Watch App/           # watchOS app (Phase 7, in progress; see docs/PLAN.md)
+StirlingMoneyWatchWidgets/         # Watch complications (Phase 7, in progress)
+Shared/                            # In the app, the widgets, the Watch app and the complications: WidgetSnapshot (the JSON summary)
 StirlingMoneyWidgets/              # Widget extension: Balance and Goal widgets, configured with App Intents; Fonts/ has a copy of PaymentFont for account icons
 ```
 
 Widgets can't open the SwiftData store; the app writes `WidgetSnapshot.json` to the App Group shortly after each
-save (plus on going to the background and on quitting the Mac app), and the widgets read it. Change both copies of `WidgetSnapshot` together.
+save (plus on going to the background and on quitting the Mac app), and the widgets read it. `WidgetSnapshot` lives in `Shared/`,
+which belongs to all four app and widget targets; code there must compile for each of them (no SwiftData models, no app-only helpers).
 
 The project uses file-system synchronized folders: new files in these folders are picked up automatically.
 The app target defaults to `MainActor` isolation; mark plain value types `nonisolated` when `@Model` code uses them.
@@ -106,7 +112,9 @@ Structured data means fewer tokens consumed and better error diagnosis.
 
 - NEVER modify .pbxproj or project.xcproj by hand. Exception (approved for Phase 6): Xcode's own tools
   (`XcodeNewTarget`, `AddInfoPlist`, `AddEntitlement`) were used to add the widget target, App Group and
-  `NSFaceIDUsageDescription`. Ask before any further project change.
+  `NSFaceIDUsageDescription`. Approved for Phase 7: the Watch app and complications targets, their App Group, display
+  names and Swift version, and (made by hand in Xcode) the `Shared/` folder membership and the Watch app's iOS platform
+  filters. Ask before any further project change.
 - NEVER use ObservableObject — use @Observable
 - NEVER use NavigationView — use NavigationStack
 - @Model classes are already Observable — do not add @Observable macro

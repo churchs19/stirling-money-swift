@@ -52,7 +52,9 @@ Tests use an in-memory store and a fixed UTC calendar, so they don't depend on t
 | `Stirling Money/Managers` | `Ledger` (creating and editing transactions and transfers), the app lock, the widget snapshot writer |
 | `Stirling Money/Views` | Screens, `Reports/` and `Components/` |
 | `Stirling Money/Extensions` | Money formatting and parsing, chart colors, macOS-safe view helpers |
+| `Shared` | Code used by the app, the widgets and the Watch targets (the widget summary) |
 | `StirlingMoneyWidgets` | The widget extension |
+| `StirlingMoney Watch App`, `StirlingMoneyWatchWidgets` | The Apple Watch app and its complications (in progress) |
 | `Stirling MoneyTests` | Unit tests |
 | `docs` | The re-implementation plan |
 

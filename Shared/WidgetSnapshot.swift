@@ -1,8 +1,9 @@
 import Foundation
 
-/// The data the app writes for the widgets. A copy of `Stirling Money/Models/WidgetSnapshot.swift`
-/// (the widget can't open the app's SwiftData store). **Keep the two in step.**
-struct WidgetSnapshot: Codable, Equatable {
+/// What the widgets (and, later, the Watch) show: a summary the app writes to the App Group folder
+/// as JSON, because they can't open the SwiftData store. Shared by the app and the widget targets
+/// (the `Shared/` folder). The app builds it from its models in `WidgetSnapshot+Models.swift`.
+nonisolated struct WidgetSnapshot: Codable, Equatable {
     struct AccountSummary: Codable, Equatable, Identifiable {
         var id: String
         var name: String
@@ -60,11 +61,4 @@ struct WidgetSnapshot: Codable, Equatable {
         ],
         updatedAt: .now
     )
-}
-
-extension FormatStyle where Self == Decimal.FormatStyle.Currency {
-    /// Matches the app's currency format: the user's locale, falling back to US dollars.
-    static var localCurrency: Self {
-        .currency(code: Locale.current.currency?.identifier ?? "USD")
-    }
 }

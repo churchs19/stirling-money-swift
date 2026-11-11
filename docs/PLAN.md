@@ -235,7 +235,10 @@ everywhere. This replaces the current widget copies and the "keep in step" rule.
 4. The `Shared/` folder's membership in all four targets, then deleting the two `WidgetSnapshot` copies.
 
 **Order of work**
-1. [ ] Project changes 1–4. The build stays green, and the iPhone widgets read `WidgetSnapshot` from `Shared/`.
+1. [x] Project changes 1–4. The build stays green, and the iPhone widgets read `WidgetSnapshot` from `Shared/`.
+   Targets: `StirlingMoney Watch App` (`net.s-church.stirlingmoney.watchkitapp`) and
+   `StirlingMoneyWatchWidgetsExtension`. The Watch app's dependency and embed phase are filtered to iOS, since a Mac
+   app can't contain watchOS content.
 2. [ ] Add budgets and accent to the summary; tests for the new fields and for decoding old snapshots.
 3. [ ] `WatchSync` on the iPhone: a `WCSession` delegate. It sends the application context after each
    snapshot write and answers the Watch's refresh request from the main context.
