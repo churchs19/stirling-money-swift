@@ -257,7 +257,11 @@ everywhere. This replaces the current widget copies and the "keep in step" rule.
    PaymentFont (font, license and glyph table), `.localCurrency` and the summary's icon view moved to `Shared/`, so
    there's one copy of each for the app, both widget extensions and the Watch. A budget whose period has ended shows
    "Open Stirling Money on your iPhone to update" instead of last period's figures.
-6. [ ] Complications; check them in the Watch simulator's Smart Stack and on a watch face.
+6. [x] Complications; check them in the Watch simulator's Smart Stack and on a watch face.
+   Balance and Goal, each in circular, rectangular, inline and corner. The watch face editor lists the total and each
+   account (or each goal) through `recommendations()`. The account and goal pickers (`WidgetIntents.swift`) moved to
+   `Shared/`. Checked with Xcode previews on the Watch simulator, including a corner and a tinted face; not yet added
+   to a real watch face.
 7. [ ] Paired iPhone + Watch simulators: change a balance on the iPhone and check that it reaches the Watch.
    Repeat with the Watch app closed and with the iPhone app in the background. Then a real Watch.
 8. [ ] README, CLAUDE.md (targets, `Shared/`, the WatchConnectivity flow), and this plan.

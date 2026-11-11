@@ -1,0 +1,155 @@
+import SwiftUI
+import WidgetKit
+
+struct GoalComplicationEntry: TimelineEntry {
+    let date: Date
+    /// nil when there's no summary yet, no goals, or the chosen goal was deleted.
+    let goal: WidgetSnapshot.GoalSummary?
+    var accent: Color = Color("AccentColor")
+}
+
+struct GoalComplicationProvider: AppIntentTimelineProvider {
+    func placeholder(in context: Context) -> GoalComplicationEntry {
+        GoalComplicationEntry(date: .now, goal: WidgetSnapshot.sample.goals.first)
+    }
+
+    func snapshot(for configuration: SelectGoalIntent, in context: Context) async -> GoalComplicationEntry {
+        entry(for: configuration, snapshot: WidgetSnapshot.load() ?? (context.isPreview ? .sample : nil), on: .now)
+    }
+
+    func timeline(for configuration: SelectGoalIntent, in context: Context) async -> Timeline<GoalComplicationEntry> {
+        // Days left changes at midnight; amounts change when the Watch app receives a new summary.
+        let midnight = Calendar.current.startOfDay(for: .now.addingTimeInterval(86400))
+        return Timeline(entries: [entry(for: configuration, snapshot: WidgetSnapshot.load(), on: .now)], policy: .after(midnight))
+    }
+
+    /// The watch face editor lists each goal.
+    func recommendations() -> [AppIntentRecommendation<SelectGoalIntent>] {
+        (WidgetSnapshot.load()?.goals ?? []).map { goal in
+            let intent = SelectGoalIntent()
+            intent.goal = GoalEntity(id: goal.id, name: goal.name)
+            return AppIntentRecommendation(intent: intent, description: Text(goal.name))
+        }
+    }
+
+    private func entry(for configuration: SelectGoalIntent, snapshot: WidgetSnapshot?, on date: Date) -> GoalComplicationEntry {
+        let accent = complicationAccent(snapshot)
+        // Not configured yet: the first goal.
+        let goal = configuration.goal.map { wanted in snapshot?.goals.first { $0.id == wanted.id } } ?? snapshot?.goals.first
+        return GoalComplicationEntry(date: date, goal: goal, accent: accent)
+    }
+}
+
+struct GoalComplicationView: View {
+    @Environment(\.widgetFamily) private var family
+    let entry: GoalComplicationEntry
+
+    var body: some View {
+        if let goal = entry.goal {
+            let remaining = max(goal.targetAmount - goal.currentAmount, 0)
+            // Reached goals are green whatever the accent color.
+            let tint = remaining == 0 ? Color.green : entry.accent
+            switch family {
+            case .accessoryCircular:
+                Gauge(value: goal.progress) {
+                    Image(systemName: "flag.fill")
+                } currentValueLabel: {
+                    Text(goal.progress, format: .percent.precision(.fractionLength(0)))
+                }
+                .gaugeStyle(.accessoryCircularCapacity)
+                .tint(tint)
+                .widgetAccentable()
+            case .accessoryCorner:
+                Text(goal.progress, format: .percent.precision(.fractionLength(0)))
+                    .font(.system(size: 14, weight: .semibold))
+                    .widgetLabel {
+                        Gauge(value: goal.progress) {
+                            Text(goal.name)
+                        }
+                        .tint(tint)
+                    }
+            case .accessoryInline:
+                Text("\(goal.name) \(goal.progress, format: .percent.precision(.fractionLength(0)))")
+            default:
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(goal.name)
+                        .font(.headline)
+                        .foregroundStyle(entry.accent)
+                        .widgetAccentable()
+                        .lineLimit(1)
+                    Gauge(value: goal.progress) {
+                        EmptyView()
+                    }
+                    .gaugeStyle(.accessoryLinearCapacity)
+                    .tint(tint)
+                    .widgetAccentable()
+                    if remaining == 0 {
+                        Text("Reached")
+                            .font(.caption)
+                    } else {
+                        Text("\(remaining, format: .localCurrency) to go · \(daysLeft(goal, on: entry.date))")
+                            .font(.caption)
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        } else {
+            switch family {
+            case .accessoryInline:
+                Text("No goals")
+            case .accessoryRectangular:
+                Text("Add a goal in Stirling Money on your iPhone.")
+                    .font(.footnote)
+            default:
+                Image(systemName: "flag")
+                    .font(.title3)
+                    .widgetAccentable()
+            }
+        }
+    }
+
+    /// "12 days left", "Due today" or "3 days overdue".
+    /// A `Text`, not a `String`: only `Text` applies the `inflect` plural markup.
+    private func daysLeft(_ goal: WidgetSnapshot.GoalSummary, on date: Date) -> Text {
+        let calendar = Calendar.current
+        let days = calendar.dateComponents(
+            [.day], from: calendar.startOfDay(for: date), to: calendar.startOfDay(for: goal.targetDate)
+        ).day ?? 0
+        if days > 0 {
+            return Text("^[\(days) day](inflect: true) left")
+        } else if days == 0 {
+            return Text("Due today")
+        } else {
+            return Text("^[\(-days) day](inflect: true) overdue")
+        }
+    }
+}
+
+struct GoalComplication: Widget {
+    var body: some WidgetConfiguration {
+        AppIntentConfiguration(kind: "WatchGoal", intent: SelectGoalIntent.self, provider: GoalComplicationProvider()) { entry in
+            GoalComplicationView(entry: entry)
+                .containerBackground(.fill.tertiary, for: .widget)
+        }
+        .configurationDisplayName("Goal")
+        .description("Progress toward a savings goal.")
+        .supportedFamilies([.accessoryCircular, .accessoryRectangular, .accessoryInline, .accessoryCorner])
+    }
+}
+
+#Preview("Rectangular", as: .accessoryRectangular) {
+    GoalComplication()
+} timeline: {
+    GoalComplicationEntry(date: .now, goal: WidgetSnapshot.sample.goals[0])
+    GoalComplicationEntry(date: .now, goal: nil)
+}
+
+#Preview("Circular", as: .accessoryCircular) {
+    GoalComplication()
+} timeline: {
+    GoalComplicationEntry(date: .now, goal: WidgetSnapshot.sample.goals[0])
+}

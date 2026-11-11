@@ -63,11 +63,12 @@ Stirling Money/
 Stirling MoneyTests/               # Swift Testing; in-memory container + UTC calendar in TestSupport.swift
 StirlingMoney Watch App/           # watchOS app (Phase 7, in progress; see docs/PLAN.md): Accounts / Budgets / Goals pages; WatchStore receives the iPhone's summary
 StirlingMoney Watch AppTests/      # Swift Testing for WatchStore (run on a Watch simulator)
-StirlingMoneyWatchWidgets/         # Watch complications (Phase 7, in progress)
+StirlingMoneyWatchWidgets/         # Watch complications: Balance and Goal (circular, rectangular, inline, corner); read the summary the Watch app saves
 Shared/                            # In the app, the widgets, the Watch app and the complications:
 │                                  #   WidgetSnapshot (the JSON summary), WatchMessage (WatchConnectivity keys), .localCurrency,
 │                                  #   PaymentFont (116 glyphs generated from its CSS; "pf-…" icon names; registers the font at run time),
 │                                  #   SummaryAccountIcon (a summary account's icon, for widgets and the Watch),
+│                                  #   WidgetIntents (account and goal pickers for the iPhone widgets and the complications),
 │                                  #   Fonts/ (paymentfont-webfont.ttf + its MIT license, bundled into all four)
 StirlingMoneyWidgets/              # Widget extension: Balance and Goal widgets, configured with App Intents
 ```
