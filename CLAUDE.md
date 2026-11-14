@@ -63,7 +63,7 @@ Stirling Money/
 Stirling MoneyTests/               # Swift Testing; in-memory container + UTC calendar in TestSupport.swift
 StirlingMoney Watch App/           # watchOS app (read-only): Accounts / Budgets / Goals pages; WatchStore receives the iPhone's summary
 StirlingMoney Watch AppTests/      # Swift Testing for WatchStore (run on a Watch simulator)
-StirlingMoneyWatchWidgets/         # Watch complications: Balance and Goal (circular, rectangular, inline, corner); read the summary the Watch app saves
+StirlingMoneyWatchWidgets/         # Watch complications: Balance and Goal (circular, rectangular, inline, corner); read the summary the Watch app saves; choices come from recommendations()
 Shared/                            # In the app, the widgets, the Watch app and the complications:
 │                                  #   WidgetSnapshot (the JSON summary), WatchMessage (WatchConnectivity keys), .localCurrency,
 │                                  #   PaymentFont (116 glyphs generated from its CSS; "pf-…" icon names; registers the font at run time),
@@ -85,6 +85,11 @@ over WatchConnectivity (`WatchSync`, iPhone only):
   wake the iPhone app in the background to answer with the saved file.
 - `WatchStore` keeps a summary only if it's at least as new as the one it has, saves it to the Watch's own App Group container
   for the complications, and reloads their timelines.
+- On watchOS, complications aren't configured with the intent's parameters: the watch face editor lists the presets from each
+  provider's `recommendations()` (the total, each account, each goal), which the system caches. `WatchStore` calls
+  `invalidateConfigurationRecommendations()` at launch and when accounts or goals change; without it the list stays as first made.
+- The Watch app asks again when its session finishes activating and when the iPhone becomes reachable: the request when the app
+  comes to the front usually runs before activation and is skipped.
 - WatchConnectivity calls delegates and reply handlers on its own queue: keep them `nonisolated`/`@Sendable` and hop to the main
   actor for state (a main-actor closure there crashes).
 
