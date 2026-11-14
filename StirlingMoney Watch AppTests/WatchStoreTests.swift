@@ -57,6 +57,26 @@ struct WatchStoreTests {
         #expect(store.asOf == Date(timeIntervalSince1970: 5000))
     }
 
+    @Test func complicationChoicesChangeWithAccountsAndGoalsOnly() {
+        let sample = WidgetSnapshot.sample
+        // The first summary: the watch face editor's list needs rebuilding.
+        #expect(WatchStore.complicationChoicesChanged(from: nil, to: sample))
+
+        // New balances alone don't change the list.
+        var newBalances = sample
+        newBalances.accounts[0].balance += 10
+        newBalances.goals[0].currentAmount += 10
+        #expect(!WatchStore.complicationChoicesChanged(from: sample, to: newBalances))
+
+        var renamed = sample
+        renamed.accounts[0].name = "Everyday"
+        #expect(WatchStore.complicationChoicesChanged(from: sample, to: renamed))
+
+        var goalRemoved = sample
+        goalRemoved.goals.removeLast()
+        #expect(WatchStore.complicationChoicesChanged(from: sample, to: goalRemoved))
+    }
+
     @Test func ignoresDataThatIsNotASummary() throws {
         let store = try WatchStore(fileURL: temporaryFile())
         #expect(!store.receive(Data("not json".utf8)))
