@@ -8,7 +8,7 @@ import WidgetKit
 /// Keeps the widgets' snapshot current, and asks widgets to refresh (and, on iPhone, sends it to the Watch)
 /// when it changes.
 ///
-/// The snapshot is rewritten shortly after every save of the main context (SwiftData autosaves soon
+/// The snapshot is rewritten at launch, shortly after every save of the main context (SwiftData autosaves soon
 /// after each change), when the app goes to the background, and when the Mac app quits. Going to the
 /// background alone isn't enough on the Mac, where switching apps doesn't count.
 enum WidgetSnapshotWriter {
@@ -36,6 +36,9 @@ enum WidgetSnapshotWriter {
                 }
             )
         #endif
+        // Bring the summary up to date at launch too: budget periods may have rolled over, and the
+        // last run may have used different data (such as `-UseSampleData`). Only writes if it changed.
+        scheduleUpdate()
     }
 
     /// Updates the snapshot a moment from now, so a burst of saves (a transfer, an edit) writes once.

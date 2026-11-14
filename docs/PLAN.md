@@ -264,6 +264,14 @@ everywhere. This replaces the current widget copies and the "keep in step" rule.
    to a real watch face.
 7. [ ] Paired iPhone + Watch simulators: change a balance on the iPhone and check that it reaches the Watch.
    Repeat with the Watch app closed and with the iPhone app in the background. Then a real Watch.
+   - [x] Simulators (Nov 11, 2026), switching the iPhone between `-UseSampleData` and its own empty store as the change:
+     Watch app open (updated within seconds); Watch app closed (the system started it in the background, and it
+     showed the new data); iPhone app not running (opening the Watch app woke the iPhone app in the background, which
+     answered with its current data).
+   - Found and fixed: the iPhone only rewrote the summary after a save or on going to the background, so a launch
+     with different data (or a rolled-over budget period) didn't reach the Watch. It now refreshes the summary at
+     launch too.
+   - [ ] A real iPhone and Apple Watch.
 8. [ ] README, CLAUDE.md (targets, `Shared/`, the WatchConnectivity flow), and this plan.
 
 **Later: iCloud sync.** Once a paid team turns on CloudKit (see the `cloudkit-sync` branch), the Watch can
