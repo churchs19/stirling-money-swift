@@ -280,6 +280,10 @@ everywhere. This replaces the current widget copies and the "keep in step" rule.
      runs before its session has activated, so the request was skipped and never retried. It now asks again when the
      session activates and whenever the iPhone becomes reachable. Both apps log their session state at notice level,
      so it shows in the device console (`devicectl device process launch --console` with `OS_ACTIVITY_DT_MODE=enable`).
+   - Found and fixed: the watch face editor offered only "All Accounts" and no goals, because watchOS caches the
+     complications' `recommendations()` and they were first made before any summary arrived. The Watch app now calls
+     `WidgetCenter.invalidateConfigurationRecommendations()` at launch and whenever a new summary adds, renames or
+     removes an account or goal. Confirmed on the real Watch (Nov 14, 2026): each account and goal can be picked.
 8. [x] README, CLAUDE.md (targets, `Shared/`, the WatchConnectivity flow), and this plan.
 
 **Later: iCloud sync.** Once a paid team turns on CloudKit (see the `cloudkit-sync` branch), the Watch can

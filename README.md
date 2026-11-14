@@ -14,7 +14,7 @@ It's a re-implementation of [Stirling Money for Windows Phone](https://github.co
 - **Goals**: savings targets measured against an account's balance, with days left
 - **Reports** (Swift Charts): net income, spending by category, one category over time, budget history
 - **Widgets**: an account's balance (or the total) and a goal's progress; tapping an account's widget opens its transactions
-- **Apple Watch** (read-only): accounts, budgets and goals, plus Balance and Goal complications. The iPhone sends the Watch a summary whenever something changes
+- **Apple Watch** (read-only): accounts, budgets and goals, plus Balance (the total or one account) and Goal complications, chosen when you edit a watch face. The iPhone sends the Watch a summary whenever something changes
 - **App lock**: Face ID, Touch ID or the device passcode
 - **Account tiles** (or a list) with an optional icon: an SF Symbol or one of 116 payment logos and currency signs
 - **Accent color**: Stirling Money's purple, one you pick, or (on the Mac) the system's
