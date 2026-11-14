@@ -49,6 +49,9 @@ final class WatchStore {
 
     /// Starts listening to the iPhone. Call once, at launch.
     func start() {
+        // Rebuild the watch face editor's choices from the saved summary, in case the system cached
+        // them before any summary arrived (it then offers only "All Accounts" and no goals).
+        WidgetCenter.shared.invalidateConfigurationRecommendations()
         guard WCSession.isSupported(), receiver == nil else { return }
         let receiver = SessionReceiver(
             onSnapshot: { [weak self] data in
@@ -104,6 +107,7 @@ final class WatchStore {
         }
         lastHeardFromPhone = now
         guard Self.isNewer(incoming, than: snapshot) else { return false }
+        let choicesChanged = Self.complicationChoicesChanged(from: snapshot, to: incoming)
         snapshot = incoming
         if let fileURL {
             do {
@@ -113,7 +117,23 @@ final class WatchStore {
             }
         }
         WidgetCenter.shared.reloadAllTimelines()
+        if choicesChanged {
+            // The watch face editor's list of accounts and goals comes from the complications'
+            // `recommendations()`, which the system caches until told otherwise.
+            WidgetCenter.shared.invalidateConfigurationRecommendations()
+        }
         return true
+    }
+
+    /// Whether the accounts or goals a complication can show (their IDs and names) differ.
+    nonisolated static func complicationChoicesChanged(from old: WidgetSnapshot?, to new: WidgetSnapshot) -> Bool {
+        func choices(_ snapshot: WidgetSnapshot?) -> [[String]] {
+            [
+                snapshot?.accounts.flatMap { [$0.id, $0.name] } ?? [],
+                snapshot?.goals.flatMap { [$0.id, $0.name] } ?? [],
+            ]
+        }
+        return choices(old) != choices(new)
     }
 
     /// Whether `incoming` should replace `current`. A reply and an application context can arrive in
