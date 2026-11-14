@@ -14,7 +14,7 @@ as a SwiftUI + SwiftData app for iOS, iPadOS and macOS.
 | 4 | Budgets and goals | Done (`368965c`) |
 | 5 | Reports | Done (`0a38edc`) |
 | 6 | Platform features (widgets, app lock, export, settings) | Done; sync still deferred |
-| 7 | Apple Watch app (read-only) and complications | Planned |
+| 7 | Apple Watch app (read-only) and complications | Built and checked on simulators; real-device check pending |
 
 ## Decisions
 
@@ -174,7 +174,7 @@ Original → replacement:
 | 44-language strings | String Catalog, English first |
 | Settings | A Settings screen; on macOS, a `Settings` scene |
 
-### Phase 7: Apple Watch app (planned)
+### Phase 7: Apple Watch app (done, except the real-device check)
 
 A read-only watchOS companion: accounts with their balances, budgets and goals, plus complications.
 Decisions (Nov 10, 2026): the iPhone sends the Watch a summary now, and the Watch moves to iCloud sync once
@@ -271,8 +271,11 @@ everywhere. This replaces the current widget copies and the "keep in step" rule.
    - Found and fixed: the iPhone only rewrote the summary after a save or on going to the background, so a launch
      with different data (or a rolled-over budget period) didn't reach the Watch. It now refreshes the summary at
      launch too.
-   - [ ] A real iPhone and Apple Watch.
-8. [ ] README, CLAUDE.md (targets, `Shared/`, the WatchConnectivity flow), and this plan.
+   - [ ] A real iPhone and Apple Watch, including a complication on a real watch face. Blocked (Nov 14, 2026): the
+     Watch refuses the app because it isn't registered with the team. The Watch's provisioning profiles list only the
+     iPhones Xcode has seen; Xcode needs to see the Watch (paired, unlocked, Developer Mode on) so automatic signing
+     can add it. The Watch also needs watchOS 27.2 or later.
+8. [x] README, CLAUDE.md (targets, `Shared/`, the WatchConnectivity flow), and this plan.
 
 **Later: iCloud sync.** Once a paid team turns on CloudKit (see the `cloudkit-sync` branch), the Watch can
 open the same SwiftData store with `cloudKitDatabase: .private(...)` and drop the summary. That needs the
@@ -294,5 +297,4 @@ Until then:
 
 - **Long register rows**: the details line now wraps to two lines instead of being cut off at one. Check it on a narrow iPhone.
 - **visionOS** is listed in the target but hasn't been built. There's no visionOS simulator installed.
-- **Mac signing**: the App Group needs a Mac provisioning profile. Sign in to Xcode (Settings → Accounts) so automatic signing can create it; until then the Mac build fails at signing (it compiles with signing off).
 - **The register sorts transactions in memory.** That's fine for personal ledgers; switch to a `@Query` with a predicate if large accounts get slow.

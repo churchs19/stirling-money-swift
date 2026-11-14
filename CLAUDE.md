@@ -1,10 +1,10 @@
 # Stirling Money
 
 **Bundle ID:** net.s-church.stirlingmoney
-**Target:** iOS 27+, iPadOS 27+, macOS 27+ (one multiplatform target; visionOS is also listed but unverified)
+**Target:** iOS 27+, iPadOS 27+, macOS 27+ (one multiplatform target; visionOS is also listed but unverified); watchOS 27.2+ for the Watch app
 **Plan:** `docs/PLAN.md` — features being re-implemented from the old Windows Phone app, phase status, decisions
 **Architecture:** SwiftUI + SwiftData
-**Swift version:** 6.2 (app); the widget extension uses the template's Swift 5 mode
+**Swift version:** 6.2 (app); 6.0 (Watch app, also `MainActor` by default); both widget extensions use the template's Swift 5 mode
 **Targets:** `Stirling Money` (app), `StirlingMoneyWidgetsExtension` (widgets, folder `StirlingMoneyWidgets/`), tests, UI tests;
 `StirlingMoney Watch App` (watchOS, embedded in the iPhone app only: its dependency and embed phase are filtered to iOS),
 `StirlingMoneyWatchWidgetsExtension` (Watch complications, folder `StirlingMoneyWatchWidgets/`), Watch tests and UI tests
@@ -61,7 +61,7 @@ Stirling Money/
     ├── View+Accent.swift          # .appAccent() tint for each scene + \.appAccent environment value
     └── View+Platform.swift        # Touch-only modifiers that do nothing on macOS
 Stirling MoneyTests/               # Swift Testing; in-memory container + UTC calendar in TestSupport.swift
-StirlingMoney Watch App/           # watchOS app (Phase 7, in progress; see docs/PLAN.md): Accounts / Budgets / Goals pages; WatchStore receives the iPhone's summary
+StirlingMoney Watch App/           # watchOS app (read-only): Accounts / Budgets / Goals pages; WatchStore receives the iPhone's summary
 StirlingMoney Watch AppTests/      # Swift Testing for WatchStore (run on a Watch simulator)
 StirlingMoneyWatchWidgets/         # Watch complications: Balance and Goal (circular, rectangular, inline, corner); read the summary the Watch app saves
 Shared/                            # In the app, the widgets, the Watch app and the complications:
@@ -77,6 +77,17 @@ Widgets can't open the SwiftData store; the app writes `WidgetSnapshot.json` to 
 save (plus on going to the background and on quitting the Mac app), and the widgets read it. `WidgetSnapshot` lives in `Shared/`,
 which belongs to all four app and widget targets; code there must compile for each of them (no SwiftData models, no app-only helpers).
 
+The Watch can't read the iPhone's store or App Group either, and there's no iCloud sync yet, so the iPhone sends it the same summary
+over WatchConnectivity (`WatchSync`, iPhone only):
+- Each time `WidgetSnapshotWriter` writes a changed summary (after saves, at launch, on going to the background), it sends it as the
+  application context. The system keeps only the latest and delivers it when the Watch app next runs.
+- When the Watch app comes to the front it asks for a fresh one with `sendMessage` (keys in `Shared/WatchMessage.swift`); iOS can
+  wake the iPhone app in the background to answer with the saved file.
+- `WatchStore` keeps a summary only if it's at least as new as the one it has, saves it to the Watch's own App Group container
+  for the complications, and reloads their timelines.
+- WatchConnectivity calls delegates and reply handlers on its own queue: keep them `nonisolated`/`@Sendable` and hop to the main
+  actor for state (a main-actor closure there crashes).
+
 The project uses file-system synchronized folders: new files in these folders are picked up automatically.
 The app target defaults to `MainActor` isolation; mark plain value types `nonisolated` when `@Model` code uses them.
 
@@ -91,6 +102,10 @@ Prefer MCP tools over raw shell commands for ALL build operations:
 - **Apple docs**: `DocumentationSearch` (NOT WebSearch for Apple APIs)
 - **Swift verification**: `ExecuteSnippet` (NOT `swift` via Bash)
 - **Previews**: `RenderPreview` for headless SwiftUI verification
+
+XcodeBuildMCP only drives iOS simulators. For the Watch targets and their tests, and for Mac builds, use `xcodebuild` with a
+watchOS simulator or `platform=macOS` destination (`-allowProvisioningUpdates` lets automatic signing create the Watch and Mac
+profiles). Debug devices, including a real Watch, must be registered with the team before a development build will install.
 
 MCP returns structured JSON. Bash returns unstructured text.
 Structured data means fewer tokens consumed and better error diagnosis.
