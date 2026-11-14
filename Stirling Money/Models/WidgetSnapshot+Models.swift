@@ -1,48 +1,19 @@
 import Foundation
 import SwiftData
-
-/// What the widgets show, written by the app to the shared App Group folder as JSON.
-/// The widget extension reads it with its own copy of this type, because it can't open the
-/// SwiftData store. **Keep `StirlingMoneyWidgets/WidgetSnapshot.swift` in step with this file.**
-nonisolated struct WidgetSnapshot: Codable, Equatable {
-    struct AccountSummary: Codable, Equatable, Identifiable {
-        var id: String
-        var name: String
-        var balance: Decimal
-        var postedBalance: Decimal
-        /// The account's icon when it's an SF Symbol name.
-        var iconSymbol: String? = nil
-        /// The account's icon when it's a PaymentFont glyph: the glyph's character in that font.
-        var iconGlyph: String? = nil
-    }
-
-    struct GoalSummary: Codable, Equatable, Identifiable {
-        var id: String
-        var name: String
-        var accountName: String
-        var currentAmount: Decimal
-        var targetAmount: Decimal
-        var progress: Double
-        var targetDate: Date
-    }
-
-    var accounts: [AccountSummary]
-    var goals: [GoalSummary]
-    var updatedAt: Date
-
-    static let appGroup = "group.net.s-church.stirlingmoney"
-    static let fileName = "WidgetSnapshot.json"
-
-    static var fileURL: URL? {
-        FileManager.default
-            .containerURL(forSecurityApplicationGroupIdentifier: appGroup)?
-            .appending(path: fileName)
-    }
-}
+import SwiftUI
 
 extension WidgetSnapshot {
-    /// A snapshot of the given accounts and goals, sorted by name.
-    init(accounts: [Account], goals: [Goal], now: Date = .now) {
+    /// A snapshot of the given accounts, goals and budgets, each sorted by name.
+    /// `transactions` is only read for all-spending budgets. Budgets outside an active period are left out.
+    init(
+        accounts: [Account],
+        goals: [Goal],
+        budgets: [Budget] = [],
+        transactions: [AccountTransaction] = [],
+        accentColor: Color.Resolved? = nil,
+        now: Date = .now,
+        calendar: Calendar = .current
+    ) {
         self.accounts = AccountSort.name.sorted(accounts).map { account in
             var summary = AccountSummary(
                 id: Self.widgetID(for: account), name: account.name,
@@ -71,6 +42,22 @@ extension WidgetSnapshot {
                     targetDate: $0.targetDate
                 )
             }
+        self.budgets = budgets
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+            .compactMap { budget in
+                let summary = budget.summary(on: now, allTransactions: transactions, calendar: calendar)
+                guard case let .active(period) = summary.state else { return nil }
+                return BudgetSummary(
+                    id: Self.widgetID(for: budget),
+                    name: budget.name,
+                    categoryName: budget.category?.name,
+                    amount: summary.amount,
+                    spent: summary.spent,
+                    periodStart: period.start,
+                    periodEnd: period.end
+                )
+            }
+        self.accentColor = accentColor
         updatedAt = now
     }
 

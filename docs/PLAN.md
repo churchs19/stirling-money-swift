@@ -14,12 +14,13 @@ as a SwiftUI + SwiftData app for iOS, iPadOS and macOS.
 | 4 | Budgets and goals | Done (`368965c`) |
 | 5 | Reports | Done (`0a38edc`) |
 | 6 | Platform features (widgets, app lock, export, settings) | Done; sync still deferred |
+| 7 | Apple Watch app (read-only) and complications | Done; checked on simulators and a real iPhone and Watch |
 
 ## Decisions
 
 | Question | Decision |
 |---|---|
-| Platforms | iOS, iPadOS and macOS from one multiplatform target. visionOS is also listed in the target but hasn't been built or tested. |
+| Platforms | iOS, iPadOS and macOS from one multiplatform target, plus a watchOS app (Phase 7). visionOS is also listed in the target but hasn't been built or tested. |
 | CloudKit sync | **Deferred.** Models are kept CloudKit-compatible (every property has a default or is optional, every relationship is optional, no unique constraints) so sync can be turned on later without a migration. |
 | Sharing data with other people | **Deferred.** The old app's "authorized users" would need CloudKit sharing (`CKShare`), which SwiftData doesn't support well. |
 | Importing old app data | **Not needed.** No importer will be built. |
@@ -173,9 +174,132 @@ Original → replacement:
 | 44-language strings | String Catalog, English first |
 | Settings | A Settings screen; on macOS, a `Settings` scene |
 
+### Phase 7: Apple Watch app (done)
+
+A read-only watchOS companion: accounts with their balances, budgets and goals, plus complications.
+Decisions (Nov 10, 2026): the iPhone sends the Watch a summary now, and the Watch moves to iCloud sync once
+sync is turned on; read-only first; complications included; targets added with Xcode's own tools.
+
+**How the data gets there.** The Watch can't read the iPhone's store or App Group, and iCloud sync is off
+(the personal team can't use iCloud). So the iPhone sends the same kind of JSON summary the widgets read,
+over WatchConnectivity:
+
+- `WCSession.updateApplicationContext`: the system keeps only the latest one and delivers it when the
+  Watch app next runs, which suits "current balances". It's sent by `WidgetSnapshotWriter` whenever it
+  writes the widget snapshot (after each save, on going to the background), so there's one trigger for both.
+- When the Watch app opens and the iPhone is reachable, it asks for a fresh summary with `sendMessage`;
+  iOS can wake the iPhone app in the background to answer. When it isn't reachable, the Watch shows the
+  last summary with "Updated 2 hours ago".
+- The Watch app saves the summary to its own App Group container, so the Watch complications can read it
+  (the same pattern as the iPhone widgets).
+- Mac and iPad: WatchConnectivity is iPhone-only. The code is in `#if os(iOS)` and checks
+  `WCSession.isSupported()`.
+
+**The summary.** `WidgetSnapshot` gains:
+- `budgets`: name, category name (or "All Spending"), amount, spent, period start/end, and over-budget,
+  worked out on the iPhone by `Budget.summary`.
+- `accent`: the chosen accent color, so the Watch matches the iPhone.
+
+New fields are optional or have defaults, so existing snapshots still decode. The summary is a point in time:
+once a budget's period has ended, the Watch shows "Open Stirling Money on iPhone to update" instead of last
+period's spending.
+
+**Shared code.** There are already two copies of `WidgetSnapshot`; a Watch app and Watch widgets would make
+four. Instead, add a `Shared/` synchronized folder that belongs to all four targets: the app, the iPhone widgets,
+the Watch app and the Watch widgets. It would hold `WidgetSnapshot`, the accent color decoding and
+the account icon view. PaymentFont goes in it too (the font plus the glyph table), so payment logos work
+everywhere. This replaces the current widget copies and the "keep in step" rule.
+
+**Watch app screens** (SwiftUI, `NavigationStack`, vertical-page `TabView`):
+1. **Accounts**: the total at the top, then each account's icon, name and balance (red when negative).
+   Tapping an account shows its balance and posted balance. There's no register in the first version.
+2. **Budgets**: one card per budget: name, a progress bar in the accent color (red when over), "$X left"
+   or "$X over", and the period's dates.
+3. **Goals**: progress ring in the accent color (green when reached), amount to go, days left.
+- The footer of each page shows when the summary was taken. With no summary yet, the Watch says
+  "Open Stirling Money on your iPhone."
+
+**Complications** (a watchOS WidgetKit extension; Smart Stack and watch faces):
+- Balance: one account or the total. Families: `accessoryCircular` (icon), `accessoryRectangular`
+  (name, balance, posted), `accessoryInline`, `accessoryCorner`.
+- Goal: progress ring (`accessoryCircular`, `accessoryRectangular`).
+- Configured with the same App Intents as the iPhone widgets, which move to `Shared/`. The Watch app
+  reloads complication timelines when a new summary arrives.
+
+**Project changes** (with Xcode's tools, as for the widgets; each one is confirmed before it's made):
+1. A watchOS app target embedded in the iPhone app ("Watch App for Existing iOS App"), bundle ID
+   `net.s-church.stirlingmoney.watchkitapp`, watchOS 27.
+2. A watchOS widget extension target for the complications.
+3. The App Group `group.net.s-church.stirlingmoney` on both Watch targets. On the Watch it only joins
+   the Watch app and its complications; the iPhone's container is separate.
+4. The `Shared/` folder's membership in all four targets, then deleting the two `WidgetSnapshot` copies.
+
+**Order of work**
+1. [x] Project changes 1–4. The build stays green, and the iPhone widgets read `WidgetSnapshot` from `Shared/`.
+   Targets: `StirlingMoney Watch App` (`net.s-church.stirlingmoney.watchkitapp`) and
+   `StirlingMoneyWatchWidgetsExtension`. The Watch app's dependency and embed phase are filtered to iOS, since a Mac
+   app can't contain watchOS content.
+2. [x] Add budgets and accent to the summary; tests for the new fields and for decoding old snapshots.
+   Changing the accent color in Settings rewrites the summary too.
+3. [x] `WatchSync` on the iPhone: a `WCSession` delegate. It sends the application context after each
+   snapshot write and answers the Watch's refresh request from the main context.
+   It replies with the summary file on disk (no hop to the main actor from the session's queue), then refreshes the
+   file, which sends again if anything changed. It also sends the file when the session activates or a Watch app is
+   installed. Confirmed on the paired simulators: "Sent a summary of 3394 bytes to the Watch".
+4. [x] `WatchStore` on the Watch: an `@Observable` that receives the context, saves it to the App Group,
+   loads it at launch and reloads complications. Tests for decoding and the "ended period" state.
+   It ignores a summary older than the one it has (a reply and a context can arrive in either order), and
+   asks the iPhone for a fresh one whenever the app comes to the front. The iPhone only rewrites the summary
+   when something changes, so the Watch also notes when it last heard from the iPhone (`asOf`) for the
+   "Updated …" footer. WatchConnectivity calls its handlers on its own queue, so they must be `@Sendable`, not
+   main-actor closures (a main-actor reply handler crashed the app). Confirmed on the paired simulators.
+5. [x] Watch screens: Accounts, Budgets, Goals, with previews using sample data.
+   PaymentFont (font, license and glyph table), `.localCurrency` and the summary's icon view moved to `Shared/`, so
+   there's one copy of each for the app, both widget extensions and the Watch. A budget whose period has ended shows
+   "Open Stirling Money on your iPhone to update" instead of last period's figures.
+6. [x] Complications; check them in the Watch simulator's Smart Stack and on a watch face.
+   Balance and Goal, each in circular, rectangular, inline and corner. The watch face editor lists the total and each
+   account (or each goal) through `recommendations()`. The account and goal pickers (`WidgetIntents.swift`) moved to
+   `Shared/`. Checked with Xcode previews on the Watch simulator, including a corner and a tinted face, and on a real
+   watch face (step 7).
+7. [x] Paired iPhone + Watch simulators: change a balance on the iPhone and check that it reaches the Watch.
+   Repeat with the Watch app closed and with the iPhone app in the background. Then a real Watch.
+   - [x] Simulators (Nov 11, 2026), switching the iPhone between `-UseSampleData` and its own empty store as the change:
+     Watch app open (updated within seconds); Watch app closed (the system started it in the background, and it
+     showed the new data); iPhone app not running (opening the Watch app woke the iPhone app in the background, which
+     answered with its current data).
+   - Found and fixed: the iPhone only rewrote the summary after a save or on going to the background, so a launch
+     with different data (or a rolled-over budget period) didn't reach the Watch. It now refreshes the summary at
+     launch too.
+   - [x] A real iPhone and Apple Watch (Nov 14, 2026; iPhone on iOS 27.2, Watch on watchOS 27.2.1): a balance changed
+     on the iPhone reaches the Watch app, and the Balance and Goal complications work on a real watch face.
+   - Signing: at first the Watch refused the app because it wasn't registered with the team (its profiles listed only
+     iPhones). Once Xcode could see the Watch (paired, unlocked, Developer Mode on), building the Watch app for it with
+     `-allowProvisioningUpdates -allowProvisioningDeviceRegistration` registered it and remade both Watch profiles.
+   - Found and fixed: the Watch app asked the iPhone for a summary only when it came to the front, and at launch that
+     runs before its session has activated, so the request was skipped and never retried. It now asks again when the
+     session activates and whenever the iPhone becomes reachable. Both apps log their session state at notice level,
+     so it shows in the device console (`devicectl device process launch --console` with `OS_ACTIVITY_DT_MODE=enable`).
+8. [x] README, CLAUDE.md (targets, `Shared/`, the WatchConnectivity flow), and this plan.
+
+**Later: iCloud sync.** Once a paid team turns on CloudKit (see the `cloudkit-sync` branch), the Watch can
+open the same SwiftData store with `cloudKitDatabase: .private(...)` and drop the summary. That needs the
+model files and `Ledger` in `Shared/` too, which also makes it possible to add transactions on the Watch.
+Until then:
+- Read-only: with no sync, a transaction entered on the Watch would have to be sent to the iPhone and
+  could be lost if the iPhone never received it.
+
+**Risks and questions**
+- **Stale data.** The Watch is only as current as the iPhone's last run; the "Updated …" footer makes that
+  visible. Background app refresh on the iPhone isn't planned. It could resend the summary on a schedule.
+- **Privacy.** The iPhone's "Require Face ID" lock doesn't apply on the Watch; balances show whenever the
+  Watch is unlocked (wrist detection plus its passcode). If that's not acceptable, hide amounts until tapped.
+- **Sample data.** Debug runs with `-UseSampleData` send the sample summary to the Watch too, like the widgets.
+- **Signing.** The free personal team can install Watch apps, with the same 7-day expiry as the iPhone app.
+  Each Watch target needs its own App Group profile, which automatic signing creates.
+
 ## Open items
 
 - **Long register rows**: the details line now wraps to two lines instead of being cut off at one. Check it on a narrow iPhone.
 - **visionOS** is listed in the target but hasn't been built. There's no visionOS simulator installed.
-- **Mac signing**: the App Group needs a Mac provisioning profile. Sign in to Xcode (Settings → Accounts) so automatic signing can create it; until then the Mac build fails at signing (it compiles with signing off).
 - **The register sorts transactions in memory.** That's fine for personal ledgers; switch to a `@Query` with a predicate if large accounts get slow.

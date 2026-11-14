@@ -26,6 +26,10 @@ struct Stirling_MoneyApp: App {
     }()
 
     init() {
+        #if os(iOS)
+            // Before the writer starts, so its first summary can go straight to the Watch.
+            WatchSync.start()
+        #endif
         WidgetSnapshotWriter.startObserving(sharedModelContainer.mainContext)
     }
 

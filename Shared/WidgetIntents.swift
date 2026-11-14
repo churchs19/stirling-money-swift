@@ -1,8 +1,11 @@
 import AppIntents
 import WidgetKit
 
+// Widget configuration, shared by the iPhone widgets and the Watch complications (both read the summary).
+// `nonisolated` because the app target, which also compiles Shared/, defaults to the main actor.
+
 /// An account a widget can show, read from the snapshot.
-struct AccountEntity: AppEntity {
+nonisolated struct AccountEntity: AppEntity {
     let id: String
     let name: String
 
@@ -10,14 +13,14 @@ struct AccountEntity: AppEntity {
         "Account"
     }
 
-    static var defaultQuery = AccountQuery()
+    static let defaultQuery = AccountQuery()
 
     var displayRepresentation: DisplayRepresentation {
         DisplayRepresentation(title: "\(name)")
     }
 }
 
-struct AccountQuery: EntityQuery {
+nonisolated struct AccountQuery: EntityQuery {
     func entities(for identifiers: [AccountEntity.ID]) async throws -> [AccountEntity] {
         try await suggestedEntities().filter { identifiers.contains($0.id) }
     }
@@ -28,7 +31,7 @@ struct AccountQuery: EntityQuery {
 }
 
 /// A goal a widget can show, read from the snapshot.
-struct GoalEntity: AppEntity {
+nonisolated struct GoalEntity: AppEntity {
     let id: String
     let name: String
 
@@ -36,14 +39,14 @@ struct GoalEntity: AppEntity {
         "Goal"
     }
 
-    static var defaultQuery = GoalQuery()
+    static let defaultQuery = GoalQuery()
 
     var displayRepresentation: DisplayRepresentation {
         DisplayRepresentation(title: "\(name)")
     }
 }
 
-struct GoalQuery: EntityQuery {
+nonisolated struct GoalQuery: EntityQuery {
     func entities(for identifiers: [GoalEntity.ID]) async throws -> [GoalEntity] {
         try await suggestedEntities().filter { identifiers.contains($0.id) }
     }

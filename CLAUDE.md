@@ -1,12 +1,14 @@
 # Stirling Money
 
 **Bundle ID:** net.s-church.stirlingmoney
-**Target:** iOS 27+, iPadOS 27+, macOS 27+ (one multiplatform target; visionOS is also listed but unverified)
+**Target:** iOS 27+, iPadOS 27+, macOS 27+ (one multiplatform target; visionOS is also listed but unverified); watchOS 27.2+ for the Watch app
 **Plan:** `docs/PLAN.md` — features being re-implemented from the old Windows Phone app, phase status, decisions
 **Architecture:** SwiftUI + SwiftData
-**Swift version:** 6.2 (app); the widget extension uses the template's Swift 5 mode
-**Targets:** `Stirling Money` (app), `StirlingMoneyWidgetsExtension` (widgets, folder `StirlingMoneyWidgets/`), tests, UI tests
-**App Group:** `group.net.s-church.stirlingmoney` (app + widgets)
+**Swift version:** 6.2 (app); 6.0 (Watch app, also `MainActor` by default); both widget extensions use the template's Swift 5 mode
+**Targets:** `Stirling Money` (app), `StirlingMoneyWidgetsExtension` (widgets, folder `StirlingMoneyWidgets/`), tests, UI tests;
+`StirlingMoney Watch App` (watchOS, embedded in the iPhone app only: its dependency and embed phase are filtered to iOS),
+`StirlingMoneyWatchWidgetsExtension` (Watch complications, folder `StirlingMoneyWatchWidgets/`), Watch tests and UI tests
+**App Group:** `group.net.s-church.stirlingmoney` (app + widgets; on the Watch, Watch app + complications)
 
 ## File Structure
 
@@ -14,13 +16,11 @@
 Stirling Money/
 ├── Stirling_MoneyApp.swift              # App entry, model container, app lock, widget snapshot on background
 ├── Localizable.xcstrings          # String catalog (English); Xcode fills it in when it builds
-├── Resources/Fonts/               # paymentfont-webfont.ttf + its MIT license (registered at run time, no Info.plist entry)
 ├── Models/
 │   ├── AppSchema.swift            # List of all @Model types for the container
 │   ├── Account.swift              # @Model: balance, posted balance, next check number, optional icon (+ icon choices)
 │   ├── AccentChoice.swift         # Accent color setting: default purple (#7B2CBF, #9D4EDD in dark mode), system (Mac only), or custom; stored in the App Group defaults (StirlingMoneyWidgets/WidgetAccent.swift reads it; keep in step)
 │   ├── AccountLayout.swift        # Tiles (default) / list layout for the accounts screen
-│   ├── PaymentFont.swift          # 116 PaymentFont glyphs (generated from its CSS); "pf-…" icon names; registers the font
 │   ├── AccountSort.swift          # Name / most-used ordering for the accounts list
 │   ├── AccountTransaction.swift   # @Model: register entry + TransactionKind
 │   ├── AccountTransaction+Search.swift  # Register search matching
@@ -34,7 +34,7 @@ Stirling Money/
 │   ├── GoalDraft.swift            # Goal form fields + validation + save
 │   ├── TransactionDraft.swift     # Transaction form fields + validation (saved by Ledger.save)
 │   ├── TransactionCSV.swift       # CSV export of every transaction + shareable file
-│   └── WidgetSnapshot.swift       # JSON the widgets read (a copy lives in StirlingMoneyWidgets/; keep in step)
+│   └── WidgetSnapshot+Models.swift  # Builds the widget summary from the models (the type itself is in Shared/)
 ├── Views/
 │   ├── RootView.swift             # TabView: Accounts / Budgets / Goals / Reports (sidebar on iPad and Mac)
 │   ├── SettingsView.swift         # Sort, accent color, app lock, export, rate; a sheet from the Accounts ⋯ menu, a Settings window (⌘,) on the Mac
@@ -53,18 +53,40 @@ Stirling Money/
 ├── Managers/
 │   ├── Ledger.swift               # Create/edit/delete transactions and transfers; categories
 │   ├── AppLock.swift              # Face ID / Touch ID / passcode lock (LocalAuthentication)
-│   └── WidgetSnapshotWriter.swift # Writes the snapshot to the App Group and reloads widgets
+│   ├── WidgetSnapshotWriter.swift # Writes the snapshot to the App Group, reloads widgets, sends it to the Watch
+│   └── WatchSync.swift            # iPhone only: WCSession; sends the snapshot as application context, answers Watch requests
 └── Extensions/
-    ├── Decimal+Money.swift        # .localCurrency format, parsing typed amounts
+    ├── Decimal+Money.swift        # Parsing typed amounts (.localCurrency itself is in Shared/)
     ├── Color+Chart.swift          # ChartPalette: validated chart colors; assign slots in order, never cycle
     ├── View+Accent.swift          # .appAccent() tint for each scene + \.appAccent environment value
     └── View+Platform.swift        # Touch-only modifiers that do nothing on macOS
 Stirling MoneyTests/               # Swift Testing; in-memory container + UTC calendar in TestSupport.swift
-StirlingMoneyWidgets/              # Widget extension: Balance and Goal widgets, configured with App Intents; Fonts/ has a copy of PaymentFont for account icons
+StirlingMoney Watch App/           # watchOS app (read-only): Accounts / Budgets / Goals pages; WatchStore receives the iPhone's summary
+StirlingMoney Watch AppTests/      # Swift Testing for WatchStore (run on a Watch simulator)
+StirlingMoneyWatchWidgets/         # Watch complications: Balance and Goal (circular, rectangular, inline, corner); read the summary the Watch app saves
+Shared/                            # In the app, the widgets, the Watch app and the complications:
+│                                  #   WidgetSnapshot (the JSON summary), WatchMessage (WatchConnectivity keys), .localCurrency,
+│                                  #   PaymentFont (116 glyphs generated from its CSS; "pf-…" icon names; registers the font at run time),
+│                                  #   SummaryAccountIcon (a summary account's icon, for widgets and the Watch),
+│                                  #   WidgetIntents (account and goal pickers for the iPhone widgets and the complications),
+│                                  #   Fonts/ (paymentfont-webfont.ttf + its MIT license, bundled into all four)
+StirlingMoneyWidgets/              # Widget extension: Balance and Goal widgets, configured with App Intents
 ```
 
 Widgets can't open the SwiftData store; the app writes `WidgetSnapshot.json` to the App Group shortly after each
-save (plus on going to the background and on quitting the Mac app), and the widgets read it. Change both copies of `WidgetSnapshot` together.
+save (plus on going to the background and on quitting the Mac app), and the widgets read it. `WidgetSnapshot` lives in `Shared/`,
+which belongs to all four app and widget targets; code there must compile for each of them (no SwiftData models, no app-only helpers).
+
+The Watch can't read the iPhone's store or App Group either, and there's no iCloud sync yet, so the iPhone sends it the same summary
+over WatchConnectivity (`WatchSync`, iPhone only):
+- Each time `WidgetSnapshotWriter` writes a changed summary (after saves, at launch, on going to the background), it sends it as the
+  application context. The system keeps only the latest and delivers it when the Watch app next runs.
+- When the Watch app comes to the front it asks for a fresh one with `sendMessage` (keys in `Shared/WatchMessage.swift`); iOS can
+  wake the iPhone app in the background to answer with the saved file.
+- `WatchStore` keeps a summary only if it's at least as new as the one it has, saves it to the Watch's own App Group container
+  for the complications, and reloads their timelines.
+- WatchConnectivity calls delegates and reply handlers on its own queue: keep them `nonisolated`/`@Sendable` and hop to the main
+  actor for state (a main-actor closure there crashes).
 
 The project uses file-system synchronized folders: new files in these folders are picked up automatically.
 The app target defaults to `MainActor` isolation; mark plain value types `nonisolated` when `@Model` code uses them.
@@ -80,6 +102,10 @@ Prefer MCP tools over raw shell commands for ALL build operations:
 - **Apple docs**: `DocumentationSearch` (NOT WebSearch for Apple APIs)
 - **Swift verification**: `ExecuteSnippet` (NOT `swift` via Bash)
 - **Previews**: `RenderPreview` for headless SwiftUI verification
+
+XcodeBuildMCP only drives iOS simulators. For the Watch targets and their tests, and for Mac builds, use `xcodebuild` with a
+watchOS simulator or `platform=macOS` destination (`-allowProvisioningUpdates` lets automatic signing create the Watch and Mac
+profiles). Debug devices, including a real Watch, must be registered with the team before a development build will install.
 
 MCP returns structured JSON. Bash returns unstructured text.
 Structured data means fewer tokens consumed and better error diagnosis.
@@ -106,7 +132,9 @@ Structured data means fewer tokens consumed and better error diagnosis.
 
 - NEVER modify .pbxproj or project.xcproj by hand. Exception (approved for Phase 6): Xcode's own tools
   (`XcodeNewTarget`, `AddInfoPlist`, `AddEntitlement`) were used to add the widget target, App Group and
-  `NSFaceIDUsageDescription`. Ask before any further project change.
+  `NSFaceIDUsageDescription`. Approved for Phase 7: the Watch app and complications targets, their App Group, display
+  names and Swift version, and (made by hand in Xcode) the `Shared/` folder membership and the Watch app's iOS platform
+  filters. Ask before any further project change.
 - NEVER use ObservableObject — use @Observable
 - NEVER use NavigationView — use NavigationStack
 - @Model classes are already Observable — do not add @Observable macro

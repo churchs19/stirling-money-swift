@@ -5,9 +5,10 @@ import WidgetKit
     import AppKit
 #endif
 
-/// Keeps the widgets' snapshot current, and asks widgets to refresh when it changes.
+/// Keeps the widgets' snapshot current, and asks widgets to refresh (and, on iPhone, sends it to the Watch)
+/// when it changes.
 ///
-/// The snapshot is rewritten shortly after every save of the main context (SwiftData autosaves soon
+/// The snapshot is rewritten at launch, shortly after every save of the main context (SwiftData autosaves soon
 /// after each change), when the app goes to the background, and when the Mac app quits. Going to the
 /// background alone isn't enough on the Mac, where switching apps doesn't count.
 enum WidgetSnapshotWriter {
@@ -35,6 +36,9 @@ enum WidgetSnapshotWriter {
                 }
             )
         #endif
+        // Bring the summary up to date at launch too: budget periods may have rolled over, and the
+        // last run may have used different data (such as `-UseSampleData`). Only writes if it changed.
+        scheduleUpdate()
     }
 
     /// Updates the snapshot a moment from now, so a burst of saves (a transfer, an edit) writes once.
@@ -61,9 +65,17 @@ enum WidgetSnapshotWriter {
             if context.hasChanges {
                 try context.save()
             }
+            let budgets = try context.fetch(FetchDescriptor<Budget>())
+            // Every transaction is only needed for budgets that cover all spending.
+            let transactions = budgets.contains { $0.category == nil }
+                ? try context.fetch(FetchDescriptor<AccountTransaction>())
+                : []
             let snapshot = try WidgetSnapshot(
                 accounts: context.fetch(FetchDescriptor<Account>()),
-                goals: context.fetch(FetchDescriptor<Goal>())
+                goals: context.fetch(FetchDescriptor<Goal>()),
+                budgets: budgets,
+                transactions: transactions,
+                accentColor: AccentChoice.sharedCustomColor
             )
             if let existing = try? Data(contentsOf: url),
                var previous = try? JSONDecoder().decode(WidgetSnapshot.self, from: existing)
@@ -71,8 +83,12 @@ enum WidgetSnapshotWriter {
                 previous.updatedAt = snapshot.updatedAt
                 if previous == snapshot { return }
             }
-            try JSONEncoder().encode(snapshot).write(to: url, options: .atomic)
+            let data = try JSONEncoder().encode(snapshot)
+            try data.write(to: url, options: .atomic)
             WidgetCenter.shared.reloadAllTimelines()
+            #if os(iOS)
+                WatchSync.shared.send(data)
+            #endif
         } catch {
             // Widgets keep showing the last snapshot; nothing else depends on this.
         }
