@@ -30,10 +30,13 @@
         func send(_ snapshot: Data) {
             guard WCSession.isSupported() else { return }
             let session = WCSession.default
-            guard session.activationState == .activated, session.isPaired, session.isWatchAppInstalled else { return }
+            guard session.activationState == .activated, session.isPaired, session.isWatchAppInstalled else {
+                Self.log.notice("Not sending to the Watch: activated \(session.activationState == .activated), paired \(session.isPaired), app installed \(session.isWatchAppInstalled)")
+                return
+            }
             do {
                 try session.updateApplicationContext([WatchMessage.snapshotKey: snapshot])
-                Self.log.debug("Sent a summary of \(snapshot.count) bytes to the Watch")
+                Self.log.notice("Sent a summary of \(snapshot.count) bytes to the Watch")
             } catch {
                 Self.log.error("Couldn't send the summary to the Watch: \(error.localizedDescription)")
             }
@@ -52,13 +55,14 @@
                 Self.log.error("Watch session didn't activate: \(error.localizedDescription)")
                 return
             }
-            Self.log.debug("Watch session activated: paired \(session.isPaired), app installed \(session.isWatchAppInstalled)")
+            Self.log.notice("Watch session activated: paired \(session.isPaired), app installed \(session.isWatchAppInstalled)")
             if activationState == .activated, let snapshot = Self.savedSnapshot() {
                 send(snapshot)
             }
         }
 
         func session(_ session: WCSession, didReceiveMessage message: [String: Any], replyHandler: @escaping ([String: Any]) -> Void) {
+            Self.log.notice("The Watch asked for a summary")
             guard message[WatchMessage.requestKey] != nil else {
                 replyHandler([:])
                 return

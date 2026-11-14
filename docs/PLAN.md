@@ -14,7 +14,7 @@ as a SwiftUI + SwiftData app for iOS, iPadOS and macOS.
 | 4 | Budgets and goals | Done (`368965c`) |
 | 5 | Reports | Done (`0a38edc`) |
 | 6 | Platform features (widgets, app lock, export, settings) | Done; sync still deferred |
-| 7 | Apple Watch app (read-only) and complications | Built and checked on simulators; real-device check pending |
+| 7 | Apple Watch app (read-only) and complications | Done; checked on simulators and a real iPhone and Watch |
 
 ## Decisions
 
@@ -174,7 +174,7 @@ Original → replacement:
 | 44-language strings | String Catalog, English first |
 | Settings | A Settings screen; on macOS, a `Settings` scene |
 
-### Phase 7: Apple Watch app (done, except the real-device check)
+### Phase 7: Apple Watch app (done)
 
 A read-only watchOS companion: accounts with their balances, budgets and goals, plus complications.
 Decisions (Nov 10, 2026): the iPhone sends the Watch a summary now, and the Watch moves to iCloud sync once
@@ -260,9 +260,9 @@ everywhere. This replaces the current widget copies and the "keep in step" rule.
 6. [x] Complications; check them in the Watch simulator's Smart Stack and on a watch face.
    Balance and Goal, each in circular, rectangular, inline and corner. The watch face editor lists the total and each
    account (or each goal) through `recommendations()`. The account and goal pickers (`WidgetIntents.swift`) moved to
-   `Shared/`. Checked with Xcode previews on the Watch simulator, including a corner and a tinted face; not yet added
-   to a real watch face.
-7. [ ] Paired iPhone + Watch simulators: change a balance on the iPhone and check that it reaches the Watch.
+   `Shared/`. Checked with Xcode previews on the Watch simulator, including a corner and a tinted face, and on a real
+   watch face (step 7).
+7. [x] Paired iPhone + Watch simulators: change a balance on the iPhone and check that it reaches the Watch.
    Repeat with the Watch app closed and with the iPhone app in the background. Then a real Watch.
    - [x] Simulators (Nov 11, 2026), switching the iPhone between `-UseSampleData` and its own empty store as the change:
      Watch app open (updated within seconds); Watch app closed (the system started it in the background, and it
@@ -271,10 +271,15 @@ everywhere. This replaces the current widget copies and the "keep in step" rule.
    - Found and fixed: the iPhone only rewrote the summary after a save or on going to the background, so a launch
      with different data (or a rolled-over budget period) didn't reach the Watch. It now refreshes the summary at
      launch too.
-   - [ ] A real iPhone and Apple Watch, including a complication on a real watch face. Blocked (Nov 14, 2026): the
-     Watch refuses the app because it isn't registered with the team. The Watch's provisioning profiles list only the
-     iPhones Xcode has seen; Xcode needs to see the Watch (paired, unlocked, Developer Mode on) so automatic signing
-     can add it. The Watch also needs watchOS 27.2 or later.
+   - [x] A real iPhone and Apple Watch (Nov 14, 2026; iPhone on iOS 27.2, Watch on watchOS 27.2.1): a balance changed
+     on the iPhone reaches the Watch app, and the Balance and Goal complications work on a real watch face.
+   - Signing: at first the Watch refused the app because it wasn't registered with the team (its profiles listed only
+     iPhones). Once Xcode could see the Watch (paired, unlocked, Developer Mode on), building the Watch app for it with
+     `-allowProvisioningUpdates -allowProvisioningDeviceRegistration` registered it and remade both Watch profiles.
+   - Found and fixed: the Watch app asked the iPhone for a summary only when it came to the front, and at launch that
+     runs before its session has activated, so the request was skipped and never retried. It now asks again when the
+     session activates and whenever the iPhone becomes reachable. Both apps log their session state at notice level,
+     so it shows in the device console (`devicectl device process launch --console` with `OS_ACTIVITY_DT_MODE=enable`).
 8. [x] README, CLAUDE.md (targets, `Shared/`, the WatchConnectivity flow), and this plan.
 
 **Later: iCloud sync.** Once a paid team turns on CloudKit (see the `cloudkit-sync` branch), the Watch can

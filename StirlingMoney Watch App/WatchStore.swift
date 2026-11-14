@@ -1,7 +1,7 @@
 import Foundation
 import Observation
-import SwiftUI
 import os
+import SwiftUI
 import WatchConnectivity
 import WidgetKit
 
@@ -37,7 +37,7 @@ final class WatchStore {
     @ObservationIgnored private let fileURL: URL?
     @ObservationIgnored private var receiver: SessionReceiver?
 
-    nonisolated private static let log = Logger(subsystem: "net.s-church.stirlingmoney.watchkitapp", category: "WatchStore")
+    private nonisolated static let log = Logger(subsystem: "net.s-church.stirlingmoney.watchkitapp", category: "WatchStore")
 
     /// - Parameters:
     ///   - fileURL: where the summary is saved; the App Group folder by default. Tests pass a temporary file.
@@ -50,9 +50,16 @@ final class WatchStore {
     /// Starts listening to the iPhone. Call once, at launch.
     func start() {
         guard WCSession.isSupported(), receiver == nil else { return }
-        let receiver = SessionReceiver { [weak self] data in
-            Task { @MainActor in self?.receive(data) }
-        }
+        let receiver = SessionReceiver(
+            onSnapshot: { [weak self] data in
+                Task { @MainActor in self?.receive(data) }
+            },
+            // `refresh()` at launch usually runs before the session has activated, so ask again once
+            // it's ready, and whenever the iPhone comes back in range.
+            onReachable: { [weak self] in
+                Task { @MainActor in self?.refresh() }
+            }
+        )
         self.receiver = receiver
         WCSession.default.delegate = receiver
         WCSession.default.activate()
@@ -62,7 +69,11 @@ final class WatchStore {
     func refresh() {
         guard WCSession.isSupported() else { return }
         let session = WCSession.default
-        guard session.activationState == .activated, session.isReachable, !isRefreshing else { return }
+        guard session.activationState == .activated, session.isReachable, !isRefreshing else {
+            Self.log.notice("Not asking the iPhone: activated \(session.activationState == .activated), reachable \(session.isReachable)")
+            return
+        }
+        Self.log.notice("Asking the iPhone for a summary")
         isRefreshing = true
         session.sendMessage(
             [WatchMessage.requestKey: true],
@@ -118,18 +129,37 @@ final class WatchStore {
 }
 
 /// The WatchConnectivity delegate. Its callbacks arrive on a background queue, so it only hands the
-/// summary's bytes to `onSnapshot`, which hops to the main actor.
+/// summary's bytes to `onSnapshot` and reachability to `onReachable`, which hop to the main actor.
 private final nonisolated class SessionReceiver: NSObject, WCSessionDelegate, Sendable {
     private let onSnapshot: @Sendable (Data) -> Void
+    private let onReachable: @Sendable () -> Void
 
-    init(onSnapshot: @escaping @Sendable (Data) -> Void) {
+    private static let log = Logger(subsystem: "net.s-church.stirlingmoney.watchkitapp", category: "WatchStore")
+
+    init(onSnapshot: @escaping @Sendable (Data) -> Void, onReachable: @escaping @Sendable () -> Void) {
         self.onSnapshot = onSnapshot
+        self.onReachable = onReachable
     }
 
     func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: (any Error)?) {
+        if let error {
+            Self.log.error("Session didn't activate: \(error.localizedDescription)")
+        }
+        let context = session.receivedApplicationContext[WatchMessage.snapshotKey] as? Data
+        Self.log.notice("Session activated: \(activationState == .activated), reachable \(session.isReachable), context \(context?.count ?? 0) bytes")
+        guard activationState == .activated else { return }
         // The newest context the iPhone sent, possibly while this app wasn't running.
-        if activationState == .activated, let data = session.receivedApplicationContext[WatchMessage.snapshotKey] as? Data {
-            onSnapshot(data)
+        if let context {
+            onSnapshot(context)
+        }
+        if session.isReachable {
+            onReachable()
+        }
+    }
+
+    func sessionReachabilityDidChange(_ session: WCSession) {
+        if session.activationState == .activated, session.isReachable {
+            onReachable()
         }
     }
 
