@@ -25,7 +25,8 @@ Stirling Money/
 │   ├── AccountTransaction.swift   # @Model: register entry + TransactionKind
 │   ├── AccountTransaction+Search.swift  # Register search matching
 │   ├── Category.swift             # @Model
-│   ├── DeepLink.swift             # stirlingmoney://account?id=…, goals, budgets: links from widgets (the widgets build the same URLs)
+│   ├── DeepLink.swift             # stirlingmoney://account?id=…, goals, budgets: links from widgets (the widgets build the same URLs); + account(withWidgetID:in:)
+│   ├── LaunchMode.swift           # Hosting unit tests / -UITesting (Debug): which store, settings and side effects the app uses
 │   ├── Budget.swift               # @Model: current period, amount spent
 │   ├── Budget+Summary.swift       # Where a budget stands today, for its card
 │   ├── BudgetDraft.swift          # Budget form fields + validation + save
@@ -62,14 +63,18 @@ Stirling Money/
     ├── View+Accent.swift          # .appAccent() tint for each scene + \.appAccent environment value
     └── View+Platform.swift        # Touch-only modifiers that do nothing on macOS
 Stirling MoneyTests/               # Swift Testing; in-memory container + UTC calendar in TestSupport.swift
+Stirling MoneyUITests/             # XCUITest on the iPhone simulator with -UITesting; finds controls by accessibility identifier
 StirlingMoney Watch App/           # watchOS app (read-only): Accounts / Budgets / Goals pages; WatchStore receives the iPhone's summary
 StirlingMoney Watch AppTests/      # Swift Testing for WatchStore (run on a Watch simulator)
+StirlingMoney Watch AppUITests/    # XCUITest smoke test of the three pages, with the Watch app's -UseSampleData
 StirlingMoneyWatchWidgets/         # Watch complications: Balance, Goal and Budget (circular, rectangular, inline, corner); read the summary the Watch app saves; choices come from recommendations()
 Shared/                            # In the app, the widgets, the Watch app and the complications:
 │                                  #   WidgetSnapshot (the JSON summary), WatchMessage (WatchConnectivity keys), .localCurrency,
 │                                  #   PaymentFont (116 glyphs generated from its CSS; "pf-…" icon names; registers the font at run time),
 │                                  #   SummaryAccountIcon (a summary account's icon, for widgets and the Watch),
 │                                  #   BudgetSummaryCard (a summary budget laid out like BudgetRow: full, dense, compact; + periodText, budgetsToList),
+│                                  #   WidgetChoice / BalanceChoice (which item a widget or complication shows, or why none),
+│                                  #   DateInterval.formattedDays (budget period dates for the app, widgets and Watch),
 │                                  #   WidgetIntents (account, goal and budget pickers for the iPhone widgets and the complications),
 │                                  #   Fonts/ (paymentfont-webfont.ttf + its MIT license, bundled into all four)
 StirlingMoneyWidgets/              # Widget extension: Balance, Goal and Budget (configured with App Intents) and All Budgets (BudgetListWidget, static)
@@ -114,6 +119,17 @@ Prefer MCP tools over raw shell commands for ALL build operations:
 - **Swift verification**: `ExecuteSnippet` (NOT `swift` via Bash)
 - **Previews**: `RenderPreview` for headless SwiftUI verification
 
+## Tests
+
+- **Unit tests** (Swift Testing, `Stirling MoneyTests`) run inside the app; `LaunchMode.isHostingUnitTests` gives it an empty
+  in-memory store, no screens, and no widget summary or Watch. Build models in `makeInMemoryContainer()` and use `utc`/`day(_:_:_:)`.
+  Code that depends on the system takes it as a parameter so tests can replace it: `AppLock(authenticator:)`, the widget pickers'
+  `summary`, `WidgetSnapshot.load(from:)`, `needsWrite(over:)`, and an optional `locale` for money formatting and parsing.
+- **UI tests** launch with `-UITesting` (sample data, settings in a fresh `LaunchMode.settings` store, no widget summary or Watch)
+  and US English. Give controls they drive an `.accessibilityIdentifier` (`addAccount`, `account.<name>`, `save`, …; `CurrencyField`
+  takes `identifier:`). SwiftUI folds amounts into their row's label ("Total, $19,660.73"), so check labels, not text elements.
+- **Watch UI tests** launch the Watch app with `-UseSampleData` (`WidgetSnapshot.sample`, no WatchConnectivity).
+
 XcodeBuildMCP only drives iOS simulators. For the Watch targets and their tests, and for Mac builds, use `xcodebuild` with a
 watchOS simulator or `platform=macOS` destination (`-allowProvisioningUpdates` lets automatic signing create the Watch and Mac
 profiles). Debug devices, including a real Watch, must be registered with the team before a development build will install.
@@ -152,5 +168,7 @@ Structured data means fewer tokens consumed and better error diagnosis.
 - Use @Bindable for form bindings to model properties
 - Code must build for macOS as well as iOS. Don't call iOS-only modifiers (`textInputAutocapitalization`, `keyboardType`, `navigationBarTitleDisplayMode`) directly; use the helpers in `View+Platform.swift` or `#if os(macOS)`. Give swipe actions a matching `.contextMenu` for mouse users. Wrap context-menu actions that show a sheet, alert or dialog in `afterMenuCloses { }` (the Mac drops presentations started while the menu closes), and use `NavigationRow` for list rows that push onto a `NavigationStack(path:)`.
 - Don't name `Color.accentColor` in views: it's always the default purple. Use `.tint` styles or `@Environment(\.appAccent)`, which follow the accent color chosen in Settings.
-- Debug builds launched with `-UseSampleData` use the in-memory preview data instead of the real store.
+- Debug builds launched with `-UseSampleData` use the in-memory preview data instead of the real store; `-UITesting` does too,
+  with fresh settings. Read settings through `@AppStorage` (the app sets `.defaultAppStorage(LaunchMode.settings)`) or
+  `LaunchMode.settings`, never `UserDefaults.standard` directly, so UI tests start clean.
 

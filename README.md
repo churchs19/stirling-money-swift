@@ -43,12 +43,20 @@ To install on a real Apple Watch, Xcode has to see the Watch (paired with a conn
 ### Sample data
 
 In Debug builds, launch with the argument `-UseSampleData` (Product → Scheme → Edit Scheme → Arguments) to use a set of sample accounts, transactions, budgets and goals held in memory. Your real data isn't touched.
+The Watch app takes `-UseSampleData` too: it shows a built-in sample summary and doesn't contact the iPhone.
+`-UITesting` (used by the UI tests) also uses the sample data, and keeps settings in a store of its own that starts empty.
 
 ## Tests
 
-The **Stirling MoneyTests** target uses Swift Testing and covers the money logic: balances, transfers, budget periods and spending, goal progress, report calculations, CSV export, and the widget and Watch summary. Run them with ⌘U.
-**StirlingMoney Watch AppTests** covers how the Watch takes in summaries from the iPhone; run it on a Watch simulator.
-Tests use an in-memory store and a fixed UTC calendar, so they don't depend on the machine's time zone.
+| Target | What it covers | Run on |
+|---|---|---|
+| **Stirling MoneyTests** (Swift Testing, about 140 tests) | The money logic: balances, transfers, budget periods and spending, goals, reports, CSV export, the forms, amounts in other locales, the app lock, the widget and Watch summary, widget pickers and links | An iPhone simulator (⌘U with the **Stirling Money** scheme) |
+| **Stirling MoneyUITests** (11 tests + launch time, about 4 minutes) | End to end with the sample data: accounts and total, adding an account, a withdrawal and a transfer, search, marking posted, adding a budget and a goal, every report, layout, accent color | An iPhone simulator |
+| **StirlingMoney Watch AppTests** | How the Watch takes in summaries from the iPhone | A Watch simulator (**StirlingMoney Watch App** scheme) |
+| **StirlingMoney Watch AppUITests** | The Watch's Accounts, Budgets and Goals pages with sample data | A Watch simulator |
+
+Unit tests use an in-memory store and a fixed UTC calendar, so they don't depend on the machine's time zone. When the app hosts them it uses an empty in-memory store and leaves your data, the widgets and the Watch alone.
+The iPhone UI tests launch the app with `-UITesting`, which uses the sample data and starts with fresh settings without touching yours.
 
 ## Project layout
 
@@ -62,6 +70,7 @@ Tests use an in-memory store and a fixed UTC calendar, so they don't depend on t
 | `StirlingMoneyWidgets` | The widget extension: Balance, Goal, Budget and All Budgets |
 | `StirlingMoney Watch App`, `StirlingMoneyWatchWidgets` | The Apple Watch app and its complications |
 | `Stirling MoneyTests`, `StirlingMoney Watch AppTests` | Unit tests |
+| `Stirling MoneyUITests`, `StirlingMoney Watch AppUITests` | UI tests |
 | `docs` | The re-implementation plan |
 
 [`CLAUDE.md`](CLAUDE.md) has the conventions for working in the code: relationship and delete rules, money as `Decimal`, the macOS rules, and how the widgets and the Watch get their data.

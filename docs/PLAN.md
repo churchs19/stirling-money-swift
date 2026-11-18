@@ -16,7 +16,7 @@ as a SwiftUI + SwiftData app for iOS, iPadOS and macOS.
 | 6 | Platform features (widgets, app lock, export, settings) | Done; sync still deferred |
 | 7 | Apple Watch app (read-only) and complications | Done; checked on simulators and a real iPhone and Watch |
 | 8 | Budget widgets (iPhone, iPad, Mac, Lock Screen, Watch) | Done; checked on simulators and a real iPhone, Watch and Mac |
-| 9 | Test coverage: isolated unit tests, real UI tests, testable widget, lock and writer logic | Planned |
+| 9 | Test coverage: isolated unit tests, real UI tests, testable widget, lock and writer logic | Done |
 
 ## Decisions
 
@@ -389,7 +389,7 @@ so the list is rebuilt when one is added, renamed or removed. A list of budgets 
 - **Widget gallery.** Two budget widgets plus Balance and Goal makes four; the names "Budget" and "All Budgets" with
   descriptions ("One budget's spending this period", "Every budget's spending this period") keep them apart.
 
-### Phase 9: Test coverage (planned)
+### Phase 9: Test coverage (done)
 
 From a review of the tests on Nov 18, 2026. There are 85 iPhone unit tests and 8 Watch unit tests (Swift Testing, all
 passing), and two UI tests in each UI test target, both Xcode's templates that check nothing.
@@ -564,8 +564,19 @@ Code coverage of the unit tests:
       balance, and launch performance, about 1 minute on the Watch simulator.
     - A page's list scrolls to its end before the next page comes in, so the test swipes until the next page's title
       can be tapped.
-11. [ ] **README, CLAUDE.md** (how to run each test target and the `-UITesting` argument) **and this plan**, with the
+11. [x] **README, CLAUDE.md** (how to run each test target and the `-UITesting` argument) **and this plan**, with the
     new coverage figures.
+    - Done (Nov 18, 2026). Where the tests stand:
+      - **iPhone unit tests:** 137 (from 85).
+      - **iPhone UI tests:** 11 plus launch time (from a template).
+      - **Watch unit tests:** 8.
+      - **Watch UI tests:** 2 plus launch time (from a template).
+    - Unit-test coverage of the app is 16.4% of lines, against an honest 14.4% baseline. Models and logic are at 80–100%;
+      screens are left to the UI tests.
+    - Bugs found on the way:
+      - A custom accent color made every update rewrite the widget summary and resend it to the Watch (step 4).
+      - `AppLock.isEnabled` ignored the store it was given (step 5).
+      - The Watch complications showed "Add a goal…" for a deleted goal (step 2).
 
 **Not planned:** unit tests of SwiftUI layout, charts or widget rendering. Previews and checks on the devices suit those
 better.
