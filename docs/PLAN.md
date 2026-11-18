@@ -415,11 +415,18 @@ Code coverage of the unit tests:
 
 **Order of work** (each step keeps every test passing and the iPhone, Watch and Mac builds green)
 
-1. [ ] **Isolate the unit tests from the app.**
+1. [x] **Isolate the unit tests from the app.**
    - When the app starts under tests (`XCTestConfigurationFilePath` in the environment), use an empty in-memory
      container and skip `WatchSync.start()` and `WidgetSnapshotWriter.startObserving`.
    - Delete `Stirling_MoneyTests.example`. Measure coverage again as the baseline for the steps below.
    - A code check, not a project change: making the tests hostless would mean changing the test target's `TEST_HOST`.
+   - Done: `Stirling_MoneyApp.isHostingUnitTests` (tested by `TestHostTests`). When hosting tests the app also draws an
+     empty window, so no screen counts as covered unless a test draws it. The placeholder test is gone.
+   - **Baseline** (unit tests, Nov 18, 2026): 14.4% of the app (1073 of 7471 lines), down from a borrowed 20.3%.
+     - Unchanged: `Ledger` 96%, `TransactionDraft` 100%, `Budget` 98%, `WidgetSnapshot+Models` 98%, `Reports` 81%.
+     - Coverage that came only from the launch went to 0%: `WidgetSnapshotWriter`, `WatchSync`, `AccountsView`,
+       `RootView`, `View+Accent`.
+     - Two models dropped and were added to step 7: `AccountSort` (100% to 61%) and `AccountLayout` (100% to 20%).
 2. [ ] **One rule for which item a widget shows.**
    - Add `WidgetSnapshot` lookups to `Shared/` that return the item to show, or why there isn't one: no summary yet,
      none exist, or the chosen one is gone. "None chosen" means the first item, except for Balance, where it means
@@ -454,6 +461,8 @@ Code coverage of the unit tests:
    - Check that text shown with `.localCurrency` parses back, and that CSV export still writes "." whatever the locale.
 7. [ ] **Fill the smaller gaps.**
    - `ChartPalette.color(slot:)`: slots 0–7, then nil and 8 fall back to "Other".
+   - `AccountSort` and `AccountLayout`: the parts only the app's launch used to cover (titles, icons, sorting edge
+     cases).
    - `GoalDraft.hasInvalidTarget`.
    - `BudgetDraft(editing:)` for a budget with an end date and a custom period.
    - `DateInterval.formattedDays`, or replace it with `BudgetSummary.periodText` so there's one formatter.
