@@ -54,7 +54,8 @@ extension WidgetSnapshot {
                     amount: summary.amount,
                     spent: summary.spent,
                     periodStart: period.start,
-                    periodEnd: period.end
+                    periodEnd: period.end,
+                    periodTitle: budget.period.title
                 )
             }
         self.accentColor = accentColor

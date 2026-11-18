@@ -1,13 +1,16 @@
 import Foundation
 
-/// Links into the app from the widgets: `stirlingmoney://account?id=<widget ID>` and `stirlingmoney://goals`.
-/// The widgets build the same URLs in `StirlingMoneyWidgets/BalanceWidget.swift` and `GoalWidget.swift`;
+/// Links into the app from the widgets: `stirlingmoney://account?id=<widget ID>`, `stirlingmoney://goals` and
+/// `stirlingmoney://budgets`. The widgets build the same URLs in `StirlingMoneyWidgets/BalanceWidget.swift`,
+/// `GoalWidget.swift` and `BudgetWidget.swift`;
 /// keep them in step.
 nonisolated enum DeepLink: Equatable {
     /// An account's register. The ID is `WidgetSnapshot.widgetID(for:)`.
     case account(id: String)
     /// The Goals tab.
     case goals
+    /// The Budgets tab.
+    case budgets
 
     static let scheme = "stirlingmoney"
 
@@ -21,6 +24,8 @@ nonisolated enum DeepLink: Equatable {
             self = .account(id: id)
         case "goals":
             self = .goals
+        case "budgets":
+            self = .budgets
         default:
             return nil
         }
@@ -35,6 +40,8 @@ nonisolated enum DeepLink: Equatable {
             components.queryItems = [URLQueryItem(name: "id", value: id)]
         case .goals:
             components.host = "goals"
+        case .budgets:
+            components.host = "budgets"
         }
         return components.url!
     }

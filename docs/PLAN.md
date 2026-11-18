@@ -15,6 +15,7 @@ as a SwiftUI + SwiftData app for iOS, iPadOS and macOS.
 | 5 | Reports | Done (`0a38edc`) |
 | 6 | Platform features (widgets, app lock, export, settings) | Done; sync still deferred |
 | 7 | Apple Watch app (read-only) and complications | Done; checked on simulators and a real iPhone and Watch |
+| 8 | Budget widgets (iPhone, iPad, Mac, Lock Screen, Watch) | Done; checked on simulators and a real iPhone, Watch and Mac |
 
 ## Decisions
 
@@ -301,6 +302,91 @@ Until then:
 - **Sample data.** Debug runs with `-UseSampleData` send the sample summary to the Watch too, like the widgets.
 - **Signing.** The free personal team can install Watch apps, with the same 7-day expiry as the iPhone app.
   Each Watch target needs its own App Group profile, which automatic signing creates.
+
+### Phase 8: Budget widgets (done)
+
+Widgets that show budgets the way the Budgets screen's cards do (`BudgetRow`): the name and what it covers
+(category or "All Spending"), a bar in the accent color (red when over), "$X of $Y", "$X left" or "$X over", and
+the period with its dates ("Monthly · Nov 1 – 30").
+Decisions (Nov 18, 2026): both a single-budget widget you configure and a list of every budget; on the iPhone and
+iPad home screen, the Mac desktop, the iPhone Lock Screen and the Apple Watch; when a period has ended, show
+"Open Stirling Money to update." instead of last period's figures (as the Watch app does).
+
+**The data is already there.** The summary (`WidgetSnapshot.budgets`) has each budget in an active period, sorted
+by name like the Budgets screen, with spent, limit and period dates. It lacks the period's name ("Monthly"), so:
+- Add `periodTitle: String?` to `BudgetSummary` (worked out on the iPhone from `Budget.period.title`; optional, so
+  older summaries still decode).
+
+**Shared card.** A `BudgetSummaryCard` view in `Shared/` draws one budget from a `BudgetSummary` like `BudgetRow`,
+with a compact layout for small spaces. The iPhone widgets, the Watch app's Budgets page and the complications use
+it. (The app's own `BudgetRow` keeps working from the models; it also handles "Starts …" for budgets not yet started,
+which the summary leaves out.)
+
+**Widgets** (in the existing widget extension, so the iPhone, iPad and Mac all get them):
+1. **Budget** (one budget, configured with a new `SelectBudgetIntent`/`BudgetEntity` in `Shared/WidgetIntents.swift`,
+   like Goal; unconfigured shows the first budget):
+   - Small: name, category, bar, "$X left" or "$X over", period dates.
+   - Medium: the full card, as on the Budgets screen.
+   - Lock Screen (iPhone): rectangular (name, bar, "$X left"), circular (ring of the amount spent, "$X left" below
+     where it fits), inline ("Groceries: $120 left").
+2. **All Budgets** (every budget, no setup; same order as the Budgets screen, as many as fit):
+   - Medium: 2 cards; large: 3; extra large (iPad and Mac): 6 in two columns. "+3 more" when they don't all fit.
+- Both open the app's Budgets tab: add `stirlingmoney://budgets` to `DeepLink`.
+- Timeline: one entry, reloaded when the app writes new data (as now) and at the end of the earliest period shown, so
+  an ended period switches to "Open Stirling Money to update."
+- No budgets: "Add a budget in Stirling Money." A configured budget that was deleted (or whose period ended and the
+  app has since left it out): "This budget isn't available. Edit the widget to choose another."
+
+**Watch:** a **Budget** complication (circular, rectangular, inline, corner), chosen in the watch face editor through
+`recommendations()` (one per budget), like Balance and Goal. `WatchStore.complicationChoicesChanged` includes budgets,
+so the list is rebuilt when one is added, renamed or removed. A list of budgets doesn't fit any Watch family, so the
+"Budgets" list widget is iPhone, iPad and Mac only.
+
+**Project changes:** none expected. New files go in the existing synchronized folders (`StirlingMoneyWidgets/`,
+`StirlingMoneyWatchWidgets/`, `Shared/`), and both widget bundles just list the new widgets.
+
+**Order of work**
+1. [x] `periodTitle` in the summary; tests for it and for decoding a summary without it.
+   It's an optional with a default, so the synthesized decoder reads summaries without it (the iPhone and Watch may
+   briefly run different versions). The sample summary has "Monthly" and "Weekly" for previews.
+2. [x] `BudgetSummaryCard` in `Shared/` (full and compact), with previews; the Watch app's Budgets page uses it.
+   Full matches `BudgetRow` ("$275.00 of $400.00", "Monthly · Nov 8 – Dec 7, 2026"); compact stacks the name over the
+   category and drops "of $Y" and the year. `BudgetSummary.periodText(withYear:)` builds the period line. Callers add
+   their own padding. Checked in previews on the iPhone and the Watch.
+3. [x] `SelectBudgetIntent`/`BudgetEntity`; the Budget widget (small, medium, Lock Screen) and `stirlingmoney://budgets`.
+   Small uses the compact card, medium the full one; Lock Screen rectangular (name, bar, "$X left"), circular (ring of
+   spending, amount left in compact notation, negative when over) and inline. Unconfigured shows the first budget. The
+   timeline reloads at the end of the shown budget's period. Checked in previews (Lock Screen ones only render in
+   interactive mode; static snapshots come out blank).
+4. [x] The Budgets list widget (medium, large, extra large); a test for how many fit and the "+N more" count.
+   Two full cards don't fit a medium widget, so the card gained a `dense` style (the full card without the period
+   line): medium shows 2 dense cards with no heading (and so no "+N more"); large a "Budgets" heading, "+N more" and 3
+   full cards; extra large (iPad and Mac) 6 full cards in two columns. `WidgetSnapshot.budgetsToList` picks them. The
+   timeline reloads when the earliest shown period ends. Checked in previews on the iPhone and the iPad.
+5. [x] The Watch Budget complication and its recommendations; extend the recommendations test to budgets.
+   Rectangular: name in the accent color, a bar (red when over), "$X left" or "$X over". Circular: a ring with the
+   amount left in compact notation (negative when over). Corner: the amount left with a curved bar. Inline:
+   "Food: $125.00 left". After the period ends it asks for the iPhone app instead. Unconfigured shows the first budget;
+   the timeline reloads at the period's end. `complicationChoicesChanged` now includes budgets. Checked in previews.
+6. [x] Check on the iPhone and iPad simulators, the Mac, the Watch simulator, then the real iPhone and Watch.
+   - [x] Simulators and previews (Nov 18, 2026): the iPhone writes `periodTitle` into the summary; every widget size and
+     the four complications checked in previews (iPhone, iPad, Watch); the Watch app's Budgets page shows the iPhone's
+     budgets in the shared card. Adding widgets to the simulator's home screen can't be driven reliably from here (the
+     edit menu ignores injected taps), and `simctl openurl` can't test the link because the scheme isn't registered
+     (widget links don't need it; the Budgets link has a unit test).
+   - [x] On the real iPhone, Watch and Mac (Nov 18, 2026): the Budget, All Budgets and Lock Screen widgets and the
+     Budget complication work. The list widget was renamed "All Budgets" in the gallery to tell it apart from "Budget".
+7. [x] README, CLAUDE.md and this plan.
+
+**Risks and questions**
+- **Ended periods.** Widgets can't work out a new period's spending; they ask for the app to be opened until it
+  writes a new summary. Background refresh on the iPhone would fix this, as noted for the Watch.
+- **All-spending budgets** count every account's transactions, so writing the summary reads all transactions when one
+  exists (as now). Fine for personal ledgers.
+- **Privacy on the Lock Screen.** Budget amounts show on a locked iPhone, as balances already do. Marking amounts
+  `privacySensitive()` would hide them while locked; worth deciding for the Balance widget at the same time.
+- **Widget gallery.** Two budget widgets plus Balance and Goal makes four; the names "Budget" and "All Budgets" with
+  descriptions ("One budget's spending this period", "Every budget's spending this period") keep them apart.
 
 ## Open items
 

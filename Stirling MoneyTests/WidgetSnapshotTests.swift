@@ -92,6 +92,7 @@ struct WidgetSnapshotTests {
         #expect(everythingSummary.spent == 350)
         #expect(everythingSummary.periodStart == day(2026, 11, 1))
         #expect(everythingSummary.periodEnd == day(2026, 12, 1))
+        #expect(everythingSummary.periodTitle == BudgetPeriod.monthly.title)
         let foodSummary = snapshot.budgets[1]
         #expect(foodSummary.categoryName == "Groceries")
         #expect(foodSummary.spent == 300)
@@ -99,6 +100,50 @@ struct WidgetSnapshotTests {
         #expect(foodSummary.isOverBudget)
         #expect(foodSummary.progress == 1)
         #expect(foodSummary.id == WidgetSnapshot.widgetID(for: food))
+    }
+
+    @Test func budgetFromBeforePeriodTitlesStillDecodes() throws {
+        let json = #"""
+        {"accounts":[],"goals":[],"updatedAt":0,
+         "budgets":[{"id":"b","name":"Food","amount":400,"spent":100,"periodStart":0,"periodEnd":86400}]}
+        """#
+        let snapshot = try JSONDecoder().decode(WidgetSnapshot.self, from: Data(json.utf8))
+        let budget = try #require(snapshot.budgets.first)
+        #expect(budget.name == "Food")
+        #expect(budget.periodTitle == nil)
+        #expect(budget.categoryName == nil)
+    }
+
+    @Test func budgetPeriodTextStartsWithThePeriodsNameWhenKnown() {
+        var budget = WidgetSnapshot.BudgetSummary(
+            id: "b", name: "Food", amount: 400, spent: 100,
+            periodStart: day(2026, 11, 1), periodEnd: day(2026, 12, 1), periodTitle: "Monthly"
+        )
+        #expect(budget.periodText(withYear: true).hasPrefix("Monthly · "))
+        #expect(budget.periodText(withYear: true).contains("2026"))
+        #expect(!budget.periodText(withYear: false).contains("2026"))
+
+        // A summary from before period names were added shows just the dates.
+        budget.periodTitle = nil
+        #expect(!budget.periodText(withYear: true).contains("·"))
+    }
+
+    @Test func budgetListShowsWhatFitsAndCountsTheRest() {
+        let budgets = (1 ... 5).map {
+            WidgetSnapshot.BudgetSummary(
+                id: "\($0)", name: "B\($0)", amount: 100, spent: 0,
+                periodStart: day(2026, 11, 1), periodEnd: day(2026, 12, 1)
+            )
+        }
+        let medium = WidgetSnapshot.budgetsToList(budgets, capacity: 2)
+        #expect(medium.shown.map(\.id) == ["1", "2"], "in the summary's order")
+        #expect(medium.more == 3)
+
+        let roomy = WidgetSnapshot.budgetsToList(budgets, capacity: 8)
+        #expect(roomy.shown.count == 5)
+        #expect(roomy.more == 0)
+
+        #expect(WidgetSnapshot.budgetsToList([], capacity: 2).more == 0)
     }
 
     @Test func budgetSummaryKnowsWhenItsPeriodIsOver() {
@@ -152,16 +197,21 @@ struct WidgetSnapshotTests {
 }
 
 struct DeepLinkTests {
-    @Test func accountLinkRoundTripsAnIDWithURLSpecialCharacters() throws {
+    @Test func accountLinkRoundTripsAnIDWithURLSpecialCharacters() {
         // Widget IDs are base64, which can contain +, / and =.
         let link = DeepLink.account(id: "eyJh+b/c==")
         #expect(link.url.scheme == "stirlingmoney")
         #expect(DeepLink(url: link.url) == link)
     }
 
-    @Test func goalsLinkRoundTrips() throws {
+    @Test func goalsLinkRoundTrips() {
         #expect(DeepLink.goals.url.absoluteString == "stirlingmoney://goals")
         #expect(DeepLink(url: DeepLink.goals.url) == .goals)
+    }
+
+    @Test func budgetsLinkRoundTrips() {
+        #expect(DeepLink.budgets.url.absoluteString == "stirlingmoney://budgets")
+        #expect(DeepLink(url: DeepLink.budgets.url) == .budgets)
     }
 
     @Test func otherURLsAreIgnored() throws {

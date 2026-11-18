@@ -39,6 +39,8 @@ struct RootView: View {
             }
         case .goals:
             selectedTab = .goals
+        case .budgets:
+            selectedTab = .budgets
         case nil:
             break
         }

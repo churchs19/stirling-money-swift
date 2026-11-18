@@ -39,6 +39,9 @@ nonisolated struct WidgetSnapshot: Codable, Equatable {
         var periodStart: Date
         /// The start of the day after the period's last day.
         var periodEnd: Date
+        /// How often the budget repeats ("Monthly"), in the iPhone's language; nil in summaries written before it
+        /// was added. Widgets show it before the period's dates, as the Budgets screen does.
+        var periodTitle: String? = nil
 
         /// Money left in the period; negative when over budget.
         var remaining: Decimal {
@@ -104,12 +107,14 @@ nonisolated struct WidgetSnapshot: Codable, Equatable {
             BudgetSummary(
                 id: "food", name: "Food", categoryName: "Groceries", amount: 400, spent: 275,
                 periodStart: Calendar.current.startOfDay(for: .now.addingTimeInterval(-86400 * 10)),
-                periodEnd: Calendar.current.startOfDay(for: .now.addingTimeInterval(86400 * 20))
+                periodEnd: Calendar.current.startOfDay(for: .now.addingTimeInterval(86400 * 20)),
+                periodTitle: "Monthly"
             ),
             BudgetSummary(
                 id: "fun", name: "Fun", categoryName: nil, amount: 150, spent: 180,
                 periodStart: Calendar.current.startOfDay(for: .now.addingTimeInterval(-86400 * 3)),
-                periodEnd: Calendar.current.startOfDay(for: .now.addingTimeInterval(86400 * 4))
+                periodEnd: Calendar.current.startOfDay(for: .now.addingTimeInterval(86400 * 4)),
+                periodTitle: "Weekly"
             ),
         ],
         updatedAt: .now

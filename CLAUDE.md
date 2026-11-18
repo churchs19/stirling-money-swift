@@ -25,6 +25,7 @@ Stirling Money/
 │   ├── AccountTransaction.swift   # @Model: register entry + TransactionKind
 │   ├── AccountTransaction+Search.swift  # Register search matching
 │   ├── Category.swift             # @Model
+│   ├── DeepLink.swift             # stirlingmoney://account?id=…, goals, budgets: links from widgets (the widgets build the same URLs)
 │   ├── Budget.swift               # @Model: current period, amount spent
 │   ├── Budget+Summary.swift       # Where a budget stands today, for its card
 │   ├── BudgetDraft.swift          # Budget form fields + validation + save
@@ -63,19 +64,24 @@ Stirling Money/
 Stirling MoneyTests/               # Swift Testing; in-memory container + UTC calendar in TestSupport.swift
 StirlingMoney Watch App/           # watchOS app (read-only): Accounts / Budgets / Goals pages; WatchStore receives the iPhone's summary
 StirlingMoney Watch AppTests/      # Swift Testing for WatchStore (run on a Watch simulator)
-StirlingMoneyWatchWidgets/         # Watch complications: Balance and Goal (circular, rectangular, inline, corner); read the summary the Watch app saves; choices come from recommendations()
+StirlingMoneyWatchWidgets/         # Watch complications: Balance, Goal and Budget (circular, rectangular, inline, corner); read the summary the Watch app saves; choices come from recommendations()
 Shared/                            # In the app, the widgets, the Watch app and the complications:
 │                                  #   WidgetSnapshot (the JSON summary), WatchMessage (WatchConnectivity keys), .localCurrency,
 │                                  #   PaymentFont (116 glyphs generated from its CSS; "pf-…" icon names; registers the font at run time),
 │                                  #   SummaryAccountIcon (a summary account's icon, for widgets and the Watch),
-│                                  #   WidgetIntents (account and goal pickers for the iPhone widgets and the complications),
+│                                  #   BudgetSummaryCard (a summary budget laid out like BudgetRow: full, dense, compact; + periodText, budgetsToList),
+│                                  #   WidgetIntents (account, goal and budget pickers for the iPhone widgets and the complications),
 │                                  #   Fonts/ (paymentfont-webfont.ttf + its MIT license, bundled into all four)
-StirlingMoneyWidgets/              # Widget extension: Balance and Goal widgets, configured with App Intents
+StirlingMoneyWidgets/              # Widget extension: Balance, Goal and Budget (configured with App Intents) and All Budgets (BudgetListWidget, static)
 ```
 
 Widgets can't open the SwiftData store; the app writes `WidgetSnapshot.json` to the App Group shortly after each
-save (plus on going to the background and on quitting the Mac app), and the widgets read it. `WidgetSnapshot` lives in `Shared/`,
+save (plus at launch, on going to the background and on quitting the Mac app), and the widgets read it. `WidgetSnapshot` lives in `Shared/`,
 which belongs to all four app and widget targets; code there must compile for each of them (no SwiftData models, no app-only helpers).
+
+Budget figures in the summary are for the period that was current when the app wrote it (budgets outside an active period
+are left out). Widgets and complications can't work out a new period, so after `periodEnd` they show "Open Stirling Money to
+update" (`BudgetSummary.isCurrent(on:)`), and their timelines reload at the earliest `periodEnd` shown.
 
 The Watch can't read the iPhone's store or App Group either, and there's no iCloud sync yet, so the iPhone sends it the same summary
 over WatchConnectivity (`WatchSync`, iPhone only):
@@ -87,7 +93,7 @@ over WatchConnectivity (`WatchSync`, iPhone only):
   for the complications, and reloads their timelines.
 - On watchOS, complications aren't configured with the intent's parameters: the watch face editor lists the presets from each
   provider's `recommendations()` (the total, each account, each goal), which the system caches. `WatchStore` calls
-  `invalidateConfigurationRecommendations()` at launch and when accounts or goals change; without it the list stays as first made.
+  `invalidateConfigurationRecommendations()` at launch and when accounts, goals or budgets change; without it the list stays as first made.
 - The Watch app asks again when its session finishes activating and when the iPhone becomes reachable: the request when the app
   comes to the front usually runs before activation and is skipped.
 - WatchConnectivity calls delegates and reply handlers on its own queue: keep them `nonisolated`/`@Sendable` and hop to the main
