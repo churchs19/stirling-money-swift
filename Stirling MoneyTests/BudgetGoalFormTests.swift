@@ -184,4 +184,39 @@ struct BudgetGoalFormTests {
         #expect(Decimal(positiveUserInput: "") == nil)
         #expect(Decimal(positiveUserInput: "abc") == nil)
     }
+
+    @Test func goalTargetIsInvalidOnlyWhenSomethingUnusableIsTyped() {
+        var draft = GoalDraft(now: day(2026, 11, 17), calendar: utc)
+        #expect(!draft.hasInvalidTarget, "nothing typed yet isn't an error")
+        draft.targetText = "abc"
+        #expect(draft.hasInvalidTarget)
+        draft.targetText = "0"
+        #expect(draft.hasInvalidTarget)
+        draft.targetText = "-500"
+        #expect(!draft.hasInvalidTarget, "a typed minus sign is dropped")
+        #expect(draft.target == 500)
+        draft.targetText = "5000"
+        #expect(!draft.hasInvalidTarget)
+    }
+
+    @Test func editingABudgetWithAnEndDateFillsTheForm() throws {
+        let budget = Budget(name: "Trip", amount: 600, period: .custom, startDate: day(2026, 6, 1), endDate: day(2026, 6, 30))
+        let draft = BudgetDraft(editing: budget, calendar: utc)
+        #expect(draft.name == "Trip")
+        #expect(Decimal(userInput: draft.amountText) == 600, "the amount is shown as currency and parses back")
+        #expect(draft.period == .custom)
+        #expect(draft.startDate == day(2026, 6, 1))
+        #expect(draft.hasEndDate)
+        #expect(draft.endDate == day(2026, 6, 30))
+        #expect(draft.effectiveEndDate == day(2026, 6, 30))
+    }
+
+    @Test func editingABudgetWithoutAnEndDateLeavesItOff() {
+        let budget = Budget(name: "Food", amount: 400, period: .weekly, startDate: day(2026, 3, 2))
+        let draft = BudgetDraft(editing: budget, calendar: utc)
+        #expect(draft.period == .weekly)
+        #expect(draft.startDate == day(2026, 3, 2))
+        #expect(!draft.hasEndDate)
+        #expect(draft.effectiveEndDate == nil)
+    }
 }

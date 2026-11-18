@@ -220,3 +220,42 @@ struct DeepLinkTests {
         #expect(try DeepLink(url: #require(URL(string: "stirlingmoney://account"))) == nil)
     }
 }
+
+/// Which account a widget's account link opens (`DeepLink.account(withWidgetID:in:)`).
+@MainActor
+struct AccountLinkTests {
+    @Test func linkOpensTheAccountItWasMadeFor() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let checking = Account(name: "Checking")
+        let savings = Account(name: "Savings")
+        context.insert(checking)
+        context.insert(savings)
+        try context.save()
+        let accounts = [checking, savings]
+
+        let id = WidgetSnapshot.widgetID(for: savings)
+        #expect(DeepLink.account(withWidgetID: id, in: accounts) === savings)
+        // The link survives a rename.
+        savings.name = "Rainy Day"
+        #expect(DeepLink.account(withWidgetID: id, in: accounts) === savings)
+    }
+
+    @Test func linkToADeletedAccountOpensNothing() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let checking = Account(name: "Checking")
+        let old = Account(name: "Old")
+        context.insert(checking)
+        context.insert(old)
+        try context.save()
+        let id = WidgetSnapshot.widgetID(for: old)
+        context.delete(old)
+        try context.save()
+
+        #expect(DeepLink.account(withWidgetID: id, in: [checking]) == nil)
+        #expect(DeepLink.account(withWidgetID: "not-an-id", in: [checking]) == nil)
+        #expect(DeepLink.account(withWidgetID: id, in: []) == nil)
+    }
+}
+

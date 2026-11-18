@@ -67,4 +67,34 @@ struct BudgetPeriodTests {
         #expect(interval(.custom, start: day(2026, 11, 1), on: day(2026, 11, 4)) == nil)
         #expect(interval(.custom, start: day(2026, 11, 10), end: day(2026, 11, 1), on: day(2026, 11, 4)) == nil)
     }
+
+    /// Local midnight, since the text is formatted in the current time zone.
+    private func localDay(_ year: Int, _ month: Int, _ day: Int) -> Date {
+        Calendar.current.date(from: DateComponents(year: year, month: month, day: day))!
+    }
+
+    @Test func periodDaysShowTheLastDayNotTheExclusiveEnd() {
+        let november = DateInterval(start: localDay(2026, 11, 1), end: localDay(2026, 12, 1))
+        let withYear = november.formattedDays()
+        let withoutYear = november.formattedDays(withYear: false)
+        #expect(withYear.contains("2026"))
+        #expect(!withoutYear.contains("2026"))
+        #expect(withoutYear.contains("30"), "the last day is Nov 30")
+        #expect(!withoutYear.contains("Dec"))
+    }
+
+    @Test func aOneDayPeriodShowsJustThatDay() {
+        let oneDay = DateInterval(start: localDay(2026, 11, 5), end: localDay(2026, 11, 6))
+        #expect(oneDay.formattedDays() == localDay(2026, 11, 5).formatted(.dateTime.month(.abbreviated).day()))
+    }
+
+    @Test func widgetsAndTheBudgetsScreenFormatPeriodsTheSameWay() {
+        let budget = WidgetSnapshot.BudgetSummary(
+            id: "b", name: "Food", amount: 400, spent: 0,
+            periodStart: localDay(2026, 11, 1), periodEnd: localDay(2026, 12, 1), periodTitle: "Monthly"
+        )
+        let interval = DateInterval(start: budget.periodStart, end: budget.periodEnd)
+        #expect(budget.periodText(withYear: true) == "Monthly · \(interval.formattedDays())")
+        #expect(budget.periodText(withYear: false) == "Monthly · \(interval.formattedDays(withYear: false))")
+    }
 }

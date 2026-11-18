@@ -487,7 +487,7 @@ Code coverage of the unit tests:
      ja_JP, es_MX and ar_SA: shown amounts (including negative and over a million) and editable text parse back, each
      locale reads its own separators and symbol, a locale with no region falls back to dollars, and CSV amounts keep
      "." (they use `Decimal`'s description). No locale bugs found.
-7. [ ] **Fill the smaller gaps.**
+7. [x] **Fill the smaller gaps.**
    - `ChartPalette.color(slot:)`: slots 0–7, then nil and 8 fall back to "Other".
    - `AccountSort` and `AccountLayout`: the parts only the app's launch used to cover (titles, icons, sorting edge
      cases).
@@ -497,6 +497,17 @@ Code coverage of the unit tests:
    - The tie-break order in `Reports.spendingByCategory`.
    - **Account links:** move "which account a link opens" out of `RootView.open(_:)` into a function, and test a known
      ID, a deleted account and a bad ID.
+   - Done (16 tests, added to the files that already cover each area, plus `ChartPaletteTests`):
+     - `DateInterval.formattedDays(withYear:)` moved to `Shared/DateInterval+Days.swift`. `BudgetSummary.periodText`
+       uses it, so the Budgets screen, budget history, widgets and Watch share one formatter.
+     - `DeepLink.account(withWidgetID:in:)` is now used by `RootView`.
+     - `BudgetSummaryCard`'s helper extensions are `nonisolated`.
+   - Coverage after step 7: 16.4% of the app (from 14.4%):
+     - `ChartPalette`, `AccountLayout`, `DeepLink`, `WidgetChoice` and the money formatting and parsing: 100%.
+     - `GoalDraft` 98%, `BudgetDraft` 95%, `AccountSort` 87%.
+     - What's left in these files only runs with the system: `AppLock`'s `LAContext` calls (63%), the pickers' display
+       names (`WidgetIntents`, 45%), and `WidgetSnapshotWriter`'s fetch-and-write (0%; its decision is
+       `needsWrite`, tested in step 4).
 8. [ ] **Prepare the app for UI tests.**
    - A `-UITesting` launch argument (Debug only) that:
      - Implies `-UseSampleData`.

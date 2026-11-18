@@ -135,4 +135,22 @@ struct ReportsTests {
         #expect(history.map(\.interval) == [DateInterval(start: day(2026, 6, 1), end: day(2026, 6, 15))])
         #expect(Reports.history(of: budget, allTransactions: [], on: day(2026, 5, 1), calendar: utc).isEmpty)
     }
+
+    @Test func categoriesThatSpendTheSameAreOrderedByName() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let checking = Account(name: "Checking")
+        context.insert(checking)
+        for name in ["Beta", "alpha", "Gamma"] {
+            let category = try Ledger.category(named: name, in: context)
+            Ledger.addTransaction(.withdrawal, amount: 50, to: checking, date: day(2026, 11, 3), payee: "Shop", category: category, in: context)
+        }
+        let all = try context.fetch(FetchDescriptor<AccountTransaction>())
+
+        let slices = Reports.spendingByCategory(all, in: DateInterval(start: day(2026, 11, 1), end: day(2026, 12, 1)))
+
+        // Ties are broken by name, ignoring case, so the colors don't depend on the order things were entered.
+        #expect(slices.map(\.categoryName) == ["alpha", "Beta", "Gamma"])
+        #expect(slices.map(\.colorSlot) == [0, 1, 2])
+    }
 }
