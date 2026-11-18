@@ -451,11 +451,17 @@ Code coverage of the unit tests:
      `load(from:)`. `WidgetPickerTests` (6 tests) covers the three pickers, lookups with known, deleted, mixed and no
      IDs, loading a saved, missing or unreadable file, and `total` with a negative balance. The App Intents metadata
      still builds without warnings for the iPhone, Watch and Mac widgets.
-4. [ ] **Test the summary writer's change check.**
+4. [x] **Test the summary writer's change check.**
    - Move "decode the existing file, ignore `updatedAt`, compare" into a function such as
      `WidgetSnapshot.needsWrite(_:existing:)`.
    - Test: no file, an unreadable file, the same figures at a later time (no write), and a changed balance, budget or
      accent (write).
+   - Done: `WidgetSnapshot.needsWrite(over:)` in `Shared/`, used by `WidgetSnapshotWriter`; `WidgetSnapshotWriteTests`
+     (7 tests).
+   - Bug found and fixed: with a custom accent color, every update counted as a change, because the color's `Float`s
+     don't come back from JSON exactly. So the app rewrote the summary, reloaded every widget and sent the Watch the
+     same figures on every save, at launch and on every trip to the background. It now compares both summaries as
+     saved (the new one is encoded and decoded first).
 5. [ ] **Make `AppLock` testable.**
    - Pass in the authentication (`(String) async -> Bool`) and "is a passcode set" (`() -> Bool`) checks, defaulting
      to `LAContext`.
