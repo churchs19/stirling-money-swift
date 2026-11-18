@@ -15,7 +15,7 @@ as a SwiftUI + SwiftData app for iOS, iPadOS and macOS.
 | 5 | Reports | Done (`0a38edc`) |
 | 6 | Platform features (widgets, app lock, export, settings) | Done; sync still deferred |
 | 7 | Apple Watch app (read-only) and complications | Done; checked on simulators and a real iPhone and Watch |
-| 8 | Budget widgets (iPhone, iPad, Mac, Lock Screen, Watch) | Planned |
+| 8 | Budget widgets (iPhone, iPad, Mac, Lock Screen, Watch) | Done; checked on simulators and a real iPhone, Watch and Mac |
 
 ## Decisions
 
@@ -303,7 +303,7 @@ Until then:
 - **Signing.** The free personal team can install Watch apps, with the same 7-day expiry as the iPhone app.
   Each Watch target needs its own App Group profile, which automatic signing creates.
 
-### Phase 8: Budget widgets (planned)
+### Phase 8: Budget widgets (done)
 
 Widgets that show budgets the way the Budgets screen's cards do (`BudgetRow`): the name and what it covers
 (category or "All Spending"), a bar in the accent color (red when over), "$X of $Y", "$X left" or "$X over", and
@@ -376,7 +376,7 @@ so the list is rebuilt when one is added, renamed or removed. A list of budgets 
      (widget links don't need it; the Budgets link has a unit test).
    - [x] On the real iPhone, Watch and Mac (Nov 18, 2026): the Budget, All Budgets and Lock Screen widgets and the
      Budget complication work. The list widget was renamed "All Budgets" in the gallery to tell it apart from "Budget".
-7. [ ] README, CLAUDE.md and this plan.
+7. [x] README, CLAUDE.md and this plan.
 
 **Risks and questions**
 - **Ended periods.** Widgets can't work out a new period's spending; they ask for the app to be opened until it

@@ -13,8 +13,8 @@ It's a re-implementation of [Stirling Money for Windows Phone](https://github.co
 - **Budgets**: weekly, monthly, yearly or custom periods, for one category or all spending
 - **Goals**: savings targets measured against an account's balance, with days left
 - **Reports** (Swift Charts): net income, spending by category, one category over time, budget history
-- **Widgets**: an account's balance (or the total) and a goal's progress; tapping an account's widget opens its transactions
-- **Apple Watch** (read-only): accounts, budgets and goals, plus Balance (the total or one account) and Goal complications, chosen when you edit a watch face. The iPhone sends the Watch a summary whenever something changes
+- **Widgets**: an account's balance (or the total), a goal's progress, one budget's spending (also on the iPhone Lock Screen) and All Budgets; tapping an account's widget opens its transactions, a budget widget opens Budgets
+- **Apple Watch** (read-only): accounts, budgets and goals, plus Balance (the total or one account), Goal and Budget complications, chosen when you edit a watch face. The iPhone sends the Watch a summary whenever something changes
 - **App lock**: Face ID, Touch ID or the device passcode
 - **Account tiles** (or a list) with an optional icon: an SF Symbol or one of 116 payment logos and currency signs
 - **Accent color**: Stirling Money's purple, one you pick, or (on the Mac) the system's
@@ -58,8 +58,8 @@ Tests use an in-memory store and a fixed UTC calendar, so they don't depend on t
 | `Stirling Money/Managers` | `Ledger` (creating and editing transactions and transfers), the app lock, the widget snapshot writer, `WatchSync` (sending the summary to the Watch) |
 | `Stirling Money/Views` | Screens, `Reports/` and `Components/` |
 | `Stirling Money/Extensions` | Money formatting and parsing, chart colors, macOS-safe view helpers |
-| `Shared` | Code and resources used by the app, the widgets and the Watch targets: the summary, the currency format, PaymentFont |
-| `StirlingMoneyWidgets` | The widget extension |
+| `Shared` | Code and resources used by the app, the widgets and the Watch targets: the summary, the budget card, the widget pickers, the currency format, PaymentFont |
+| `StirlingMoneyWidgets` | The widget extension: Balance, Goal, Budget and All Budgets |
 | `StirlingMoney Watch App`, `StirlingMoneyWatchWidgets` | The Apple Watch app and its complications |
 | `Stirling MoneyTests`, `StirlingMoney Watch AppTests` | Unit tests |
 | `docs` | The re-implementation plan |
