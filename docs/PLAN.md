@@ -16,6 +16,7 @@ as a SwiftUI + SwiftData app for iOS, iPadOS and macOS.
 | 6 | Platform features (widgets, app lock, export, settings) | Done; sync still deferred |
 | 7 | Apple Watch app (read-only) and complications | Done; checked on simulators and a real iPhone and Watch |
 | 8 | Budget widgets (iPhone, iPad, Mac, Lock Screen, Watch) | Done; checked on simulators and a real iPhone, Watch and Mac |
+| 9 | Test coverage: isolated unit tests, real UI tests, testable widget, lock and writer logic | Planned |
 
 ## Decisions
 
@@ -387,6 +388,115 @@ so the list is rebuilt when one is added, renamed or removed. A list of budgets 
   `privacySensitive()` would hide them while locked; worth deciding for the Balance widget at the same time.
 - **Widget gallery.** Two budget widgets plus Balance and Goal makes four; the names "Budget" and "All Budgets" with
   descriptions ("One budget's spending this period", "Every budget's spending this period") keep them apart.
+
+### Phase 9: Test coverage (planned)
+
+From a review of the tests on Nov 18, 2026. There are 85 iPhone unit tests and 8 Watch unit tests (Swift Testing, all
+passing), and two UI tests in each UI test target, both Xcode's templates that check nothing.
+Code coverage of the unit tests:
+- **Models and calculations:** 80–100% (`Ledger` 96%, `TransactionDraft` 100%, `Budget` 98%, `Reports` 81%; the
+  report gaps are only sort tie-breaks).
+- **Untested logic:**
+  - `AppLock`: 15%.
+  - The widget pickers' queries (`WidgetIntents.swift`): 0%.
+  - `ChartPalette`: 0%.
+  - `BudgetSummaryCard`: 10%; only `periodText` is tested.
+  - The widget and complication providers: no test target at all.
+
+**Problems found**
+- **Unit tests run inside the real app.** The test target's host is the app, so every run opens the simulator's real
+  store, rewrites the widget summary and tries to send it to the Watch. Some coverage is borrowed from that launch, not
+  earned by tests: `AccountsView` 50%, `WidgetSnapshotWriter` 90%.
+- **Placeholder tests.** `Stirling_MoneyTests.example` and both UI test targets' `testExample` check nothing.
+- **`AppLock` can't be tested.** It calls `LAContext` directly, and `isEnabled` reads `UserDefaults.standard` instead
+  of the `defaults` passed to `init`.
+- **The same choice rule is copied into each provider.** Each widget and complication provider has its own copy of
+  "none chosen → the first; chosen one gone → a message", and none of them is tested.
+
+**Order of work** (each step keeps every test passing and the iPhone, Watch and Mac builds green)
+
+1. [ ] **Isolate the unit tests from the app.**
+   - When the app starts under tests (`XCTestConfigurationFilePath` in the environment), use an empty in-memory
+     container and skip `WatchSync.start()` and `WidgetSnapshotWriter.startObserving`.
+   - Delete `Stirling_MoneyTests.example`. Measure coverage again as the baseline for the steps below.
+   - A code check, not a project change: making the tests hostless would mean changing the test target's `TEST_HOST`.
+2. [ ] **One rule for which item a widget shows.**
+   - Add `WidgetSnapshot` lookups to `Shared/` that return the item to show, or why there isn't one: no summary yet,
+     none exist, or the chosen one is gone. "None chosen" means the first item, except for Balance, where it means
+     the total.
+   - The Balance, Goal and Budget widgets and the three complications use them.
+   - Tests for each case, for accounts, goals and budgets.
+3. [ ] **Test the widget pickers.**
+   - Give the entity queries a way to read a given summary instead of the App Group file (a `static var` source that
+     tests set; `load()` stays the default).
+   - Test `entities(for:)` with known, unknown and mixed IDs, and `suggestedEntities()` with no summary.
+   - Test `WidgetSnapshot.load()` against a temporary file, and `total`.
+4. [ ] **Test the summary writer's change check.**
+   - Move "decode the existing file, ignore `updatedAt`, compare" into a function such as
+     `WidgetSnapshot.needsWrite(_:existing:)`.
+   - Test: no file, an unreadable file, the same figures at a later time (no write), and a changed balance, budget or
+     accent (write).
+5. [ ] **Make `AppLock` testable.**
+   - Pass in the authentication (`(String) async -> Bool`) and "is a passcode set" (`() -> Bool`) checks, defaulting
+     to `LAContext`.
+   - Read `isEnabled` from the injected defaults.
+   - Test:
+     - It starts locked only when enabled.
+     - Going to the background locks it only when enabled.
+     - It prompts once per lock.
+     - A cancel leaves it locked with no second prompt; Unlock asks again.
+     - With no passcode it unlocks instead of shutting you out.
+     - A second unlock while one is already in progress does nothing.
+6. [ ] **Test parsing and display in other locales.**
+   - Give `Decimal(userInput:)` and `.localCurrency` an optional locale (default `.current`).
+   - Test en_US, de_DE ("1.250,75 €"), fr_FR (narrow no-break space grouping), de_CH ("1’250.75") and ja_JP (no
+     decimals).
+   - Check that text shown with `.localCurrency` parses back, and that CSV export still writes "." whatever the locale.
+7. [ ] **Fill the smaller gaps.**
+   - `ChartPalette.color(slot:)`: slots 0–7, then nil and 8 fall back to "Other".
+   - `GoalDraft.hasInvalidTarget`.
+   - `BudgetDraft(editing:)` for a budget with an end date and a custom period.
+   - `DateInterval.formattedDays`, or replace it with `BudgetSummary.periodText` so there's one formatter.
+   - The tie-break order in `Reports.spendingByCategory`.
+   - **Account links:** move "which account a link opens" out of `RootView.open(_:)` into a function, and test a known
+     ID, a deleted account and a bad ID.
+8. [ ] **Prepare the app for UI tests.**
+   - A `-UITesting` launch argument (Debug only) that:
+     - Implies `-UseSampleData`.
+     - Turns the app lock off.
+     - Keeps settings in a fresh `UserDefaults` suite, so the accent, layout and sort start at their defaults.
+     - Skips the widget summary and Watch.
+   - `accessibilityIdentifier`s on the controls the tests drive: the add buttons, the account tiles and rows, the form
+     fields, Save, the tabs and the Settings controls.
+9. [ ] **Real iPhone UI tests** (replacing the template; on the iPhone simulator, one `XCUIApplication` per test with
+   `-UITesting`):
+   - Launch: the Accounts tab shows the sample total and three tiles.
+   - Add an account with an opening balance; the total goes up by that amount.
+   - Add a withdrawal to Checking; its balance and the total go down.
+   - Transfer between two accounts; both balances change and the total doesn't.
+   - Search the register by payee.
+   - Mark a transaction posted; the posted balance changes.
+   - Add a budget and a goal; their cards show on Budgets and Goals.
+   - Reports: each report opens.
+   - Settings: switch to the list layout and back, choose a custom accent.
+   - Keep the launch performance test, which is fine as it is.
+   - Optional later: run the same suite on an iPad simulator; on the Mac, check the sidebar and the Settings window.
+10. [ ] **A Watch UI smoke test.**
+    - The Watch app's own `-UseSampleData` loads `WidgetSnapshot.sample` instead of the saved summary.
+    - Replace the template with: the Accounts page shows the total, then swipe to Budgets and Goals.
+11. [ ] **README, CLAUDE.md** (how to run each test target and the `-UITesting` argument) **and this plan**, with the
+    new coverage figures.
+
+**Not planned:** unit tests of SwiftUI layout, charts or widget rendering. Previews and checks on the devices suit those
+better.
+
+**Risks and questions**
+- **UI test speed and flakiness.** Each test launches the app: keep about ten, use identifiers rather than labels, and
+  wait for elements instead of sleeping.
+- **Detecting tests at launch** relies on an Xcode environment variable. If that ever changes, the hostless test target
+  is the fallback, and it needs an approved project change.
+- **Locale tests** depend on Foundation's formatting data. Assert that values round-trip, not exact strings, except
+  where the separator is the point of the test.
 
 ## Open items
 
