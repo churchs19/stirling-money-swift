@@ -462,7 +462,7 @@ Code coverage of the unit tests:
      don't come back from JSON exactly. So the app rewrote the summary, reloaded every widget and sent the Watch the
      same figures on every save, at launch and on every trip to the background. It now compares both summaries as
      saved (the new one is encoded and decoded first).
-5. [ ] **Make `AppLock` testable.**
+5. [x] **Make `AppLock` testable.**
    - Pass in the authentication (`(String) async -> Bool`) and "is a passcode set" (`() -> Bool`) checks, defaulting
      to `LAContext`.
    - Read `isEnabled` from the injected defaults.
@@ -473,6 +473,10 @@ Code coverage of the unit tests:
      - A cancel leaves it locked with no second prompt; Unlock asks again.
      - With no passcode it unlocks instead of shutting you out.
      - A second unlock while one is already in progress does nothing.
+   - Done: `AppLock(defaults:canAuthenticate:authenticator:)`, defaulting to `AppLock.isAvailable` and
+     `AppLock.askDeviceOwner` (`LAContext`). `isEnabled` now reads the injected store; with the old code, a lock turned
+     on in a test or a second store would have been ignored. `AppLockTests` (9 tests) uses a stand-in for Face ID, and
+     one test holds the prompt open to check that a second tap on Unlock doesn't open another.
 6. [ ] **Test parsing and display in other locales.**
    - Give `Decimal(userInput:)` and `.localCurrency` an optional locale (default `.current`).
    - Test en_US, de_DE ("1.250,75 €"), fr_FR (narrow no-break space grouping), de_CH ("1’250.75") and ja_JP (no
