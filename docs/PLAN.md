@@ -353,7 +353,11 @@ so the list is rebuilt when one is added, renamed or removed. A list of budgets 
    Full matches `BudgetRow` ("$275.00 of $400.00", "Monthly · Nov 8 – Dec 7, 2026"); compact stacks the name over the
    category and drops "of $Y" and the year. `BudgetSummary.periodText(withYear:)` builds the period line. Callers add
    their own padding. Checked in previews on the iPhone and the Watch.
-3. [ ] `SelectBudgetIntent`/`BudgetEntity`; the Budget widget (small, medium, Lock Screen) and `stirlingmoney://budgets`.
+3. [x] `SelectBudgetIntent`/`BudgetEntity`; the Budget widget (small, medium, Lock Screen) and `stirlingmoney://budgets`.
+   Small uses the compact card, medium the full one; Lock Screen rectangular (name, bar, "$X left"), circular (ring of
+   spending, amount left in compact notation, negative when over) and inline. Unconfigured shows the first budget. The
+   timeline reloads at the end of the shown budget's period. Checked in previews (Lock Screen ones only render in
+   interactive mode; static snapshots come out blank).
 4. [ ] The Budgets list widget (medium, large, extra large); a test for how many fit and the "+N more" count.
 5. [ ] The Watch Budget complication and its recommendations; extend the recommendations test to budgets.
 6. [ ] Check on the iPhone and iPad simulators, the Mac, the Watch simulator, then the real iPhone and Watch.

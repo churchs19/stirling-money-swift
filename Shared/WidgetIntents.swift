@@ -56,6 +56,32 @@ nonisolated struct GoalQuery: EntityQuery {
     }
 }
 
+/// A budget a widget can show, read from the snapshot (which only has budgets in an active period).
+nonisolated struct BudgetEntity: AppEntity {
+    let id: String
+    let name: String
+
+    static var typeDisplayRepresentation: TypeDisplayRepresentation {
+        "Budget"
+    }
+
+    static let defaultQuery = BudgetQuery()
+
+    var displayRepresentation: DisplayRepresentation {
+        DisplayRepresentation(title: "\(name)")
+    }
+}
+
+nonisolated struct BudgetQuery: EntityQuery {
+    func entities(for identifiers: [BudgetEntity.ID]) async throws -> [BudgetEntity] {
+        try await suggestedEntities().filter { identifiers.contains($0.id) }
+    }
+
+    func suggestedEntities() async throws -> [BudgetEntity] {
+        (WidgetSnapshot.load()?.budgets ?? []).map { BudgetEntity(id: $0.id, name: $0.name) }
+    }
+}
+
 struct SelectAccountIntent: WidgetConfigurationIntent {
     static var title: LocalizedStringResource {
         "Account"
@@ -80,4 +106,17 @@ struct SelectGoalIntent: WidgetConfigurationIntent {
 
     @Parameter(title: "Goal")
     var goal: GoalEntity?
+}
+
+struct SelectBudgetIntent: WidgetConfigurationIntent {
+    static var title: LocalizedStringResource {
+        "Budget"
+    }
+
+    static var description: IntentDescription {
+        "Shows a budget's spending this period."
+    }
+
+    @Parameter(title: "Budget")
+    var budget: BudgetEntity?
 }
