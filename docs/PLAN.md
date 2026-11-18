@@ -477,11 +477,16 @@ Code coverage of the unit tests:
      `AppLock.askDeviceOwner` (`LAContext`). `isEnabled` now reads the injected store; with the old code, a lock turned
      on in a test or a second store would have been ignored. `AppLockTests` (9 tests) uses a stand-in for Face ID, and
      one test holds the prompt open to check that a second tap on Unlock doesn't open another.
-6. [ ] **Test parsing and display in other locales.**
+6. [x] **Test parsing and display in other locales.**
    - Give `Decimal(userInput:)` and `.localCurrency` an optional locale (default `.current`).
    - Test en_US, de_DE ("1.250,75 €"), fr_FR (narrow no-break space grouping), de_CH ("1’250.75") and ja_JP (no
      decimals).
    - Check that text shown with `.localCurrency` parses back, and that CSV export still writes "." whatever the locale.
+   - Done: `.localCurrency(in:)`, `Decimal(userInput:locale:)`, `Decimal(positiveUserInput:locale:)` and
+     `editableText(in:)`, all defaulting to the current locale. `LocaleTests` covers en_US, en_GB, de_DE, fr_FR, de_CH,
+     ja_JP, es_MX and ar_SA: shown amounts (including negative and over a million) and editable text parse back, each
+     locale reads its own separators and symbol, a locale with no region falls back to dollars, and CSV amounts keep
+     "." (they use `Decimal`'s description). No locale bugs found.
 7. [ ] **Fill the smaller gaps.**
    - `ChartPalette.color(slot:)`: slots 0–7, then nil and 8 fall back to "Other".
    - `AccountSort` and `AccountLayout`: the parts only the app's launch used to cover (titles, icons, sorting edge
