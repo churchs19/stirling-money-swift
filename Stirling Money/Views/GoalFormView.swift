@@ -28,11 +28,12 @@ struct GoalFormView: View {
                 Section {
                     LabeledContent("Name") {
                         TextField("Name", text: $draft.name, prompt: Text("Required"))
+                            .accessibilityIdentifier("goalName")
                             .labelsHidden()
                             .multilineTextAlignment(.trailing)
                             .capitalizesWords()
                     }
-                    CurrencyField("Target", text: $draft.targetText)
+                    CurrencyField("Target", text: $draft.targetText, identifier: "goalTarget")
                     DatePicker("Target Date", selection: $draft.targetDate, displayedComponents: .date)
                 } footer: {
                     if draft.hasInvalidTarget {
@@ -48,6 +49,7 @@ struct GoalFormView: View {
                             Text(account.name).tag(Optional(account))
                         }
                     }
+                    .accessibilityIdentifier("goalAccount")
                 } footer: {
                     if let footer = accountFooter {
                         Text(footer)
@@ -71,6 +73,7 @@ struct GoalFormView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save", action: save)
+                        .accessibilityIdentifier("save")
                         .disabled(!draft.isValid)
                 }
             }

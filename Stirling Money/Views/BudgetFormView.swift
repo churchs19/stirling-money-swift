@@ -28,11 +28,12 @@ struct BudgetFormView: View {
                 Section {
                     LabeledContent("Name") {
                         TextField("Name", text: $draft.name, prompt: Text("Required"))
+                            .accessibilityIdentifier("budgetName")
                             .labelsHidden()
                             .multilineTextAlignment(.trailing)
                             .capitalizesWords()
                     }
-                    CurrencyField("Amount", text: $draft.amountText)
+                    CurrencyField("Amount", text: $draft.amountText, identifier: "budgetAmount")
                     Picker("Category", selection: $draft.category) {
                         Text("All Spending").tag(Category?.none)
                         ForEach(sortedCategories) { category in
@@ -92,6 +93,7 @@ struct BudgetFormView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save", action: save)
+                        .accessibilityIdentifier("save")
                         .disabled(!draft.isValid)
                 }
             }

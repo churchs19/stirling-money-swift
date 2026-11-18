@@ -5,6 +5,8 @@ import Testing
 struct TestHostTests {
     @Test func appKnowsItIsHostingUnitTests() {
         // Otherwise the host app opens the real store, rewrites the widget summary and talks to the Watch.
-        #expect(Stirling_MoneyApp.isHostingUnitTests)
+        #expect(LaunchMode.isHostingUnitTests)
+        #expect(LaunchMode.isTesting)
+        #expect(!LaunchMode.isUITesting, "only the UI tests pass -UITesting")
     }
 }

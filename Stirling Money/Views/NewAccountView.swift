@@ -32,6 +32,7 @@ struct NewAccountView: View {
             Form {
                 Section {
                     TextField("Account Name", text: $name)
+                        .accessibilityIdentifier("accountName")
                         .capitalizesWords()
                         .focused($focusedField, equals: .name)
                         .submitLabel(.next)
@@ -40,6 +41,7 @@ struct NewAccountView: View {
 
                 Section {
                     TextField("Initial Balance", text: $balanceText, prompt: Text("0.00"))
+                        .accessibilityIdentifier("initialBalance")
                         .amountKeyboard()
                         .focused($focusedField, equals: .balance)
                         .submitLabel(.done)
@@ -75,6 +77,7 @@ struct NewAccountView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save", action: save)
+                        .accessibilityIdentifier("save")
                         .disabled(!canSave)
                 }
             }

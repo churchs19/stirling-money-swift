@@ -4,17 +4,10 @@ import SwiftUI
 @main
 struct Stirling_MoneyApp: App {
     @Environment(\.scenePhase) private var scenePhase
-    @State private var appLock = AppLock()
-
-    /// Whether the app was launched only to host the unit tests. Then it uses an empty in-memory store and
-    /// doesn't write the widget summary or talk to the Watch, so tests never touch the real data. (UI tests launch
-    /// the app as a separate process without this variable, so they get the normal app.)
-    nonisolated static var isHostingUnitTests: Bool {
-        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
-    }
+    @State private var appLock = AppLock(defaults: LaunchMode.settings)
 
     var sharedModelContainer: ModelContainer = {
-        if Self.isHostingUnitTests {
+        if LaunchMode.isHostingUnitTests {
             do {
                 return try ModelContainer(
                     for: Schema(AppSchema.models),
@@ -26,9 +19,9 @@ struct Stirling_MoneyApp: App {
         }
 
         #if DEBUG
-            // Launch with `-UseSampleData` to review screens with the preview data in memory.
-            // The real store on disk is left untouched.
-            if ProcessInfo.processInfo.arguments.contains("-UseSampleData") {
+            // Launch with `-UseSampleData` to review screens with the preview data in memory, as the UI tests
+            // (`-UITesting`) do. The real store on disk is left untouched.
+            if ProcessInfo.processInfo.arguments.contains("-UseSampleData") || LaunchMode.isUITesting {
                 return .preview
             }
         #endif
@@ -44,7 +37,7 @@ struct Stirling_MoneyApp: App {
     }()
 
     init() {
-        guard !Self.isHostingUnitTests else { return }
+        guard !LaunchMode.isTesting else { return }
         #if os(iOS)
             // Before the writer starts, so its first summary can go straight to the Watch.
             WatchSync.start()
@@ -64,11 +57,13 @@ struct Stirling_MoneyApp: App {
             // (on the Mac, and on iPad with several windows). With no window open, one is created.
             .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
             .appAccent()
+            // Settings: the standard store, or a fresh one under UI tests.
+            .defaultAppStorage(LaunchMode.settings)
     }
 
     var body: some Scene {
         WindowGroup {
-            if Self.isHostingUnitTests {
+            if LaunchMode.isHostingUnitTests {
                 // Nothing to draw: the tests make their own models and views.
                 Color.clear
             } else {
@@ -94,6 +89,7 @@ struct Stirling_MoneyApp: App {
                 SettingsView()
                     .frame(minWidth: 420, minHeight: 380)
                     .appAccent()
+                    .defaultAppStorage(LaunchMode.settings)
             }
             .modelContainer(sharedModelContainer)
             .environment(appLock)

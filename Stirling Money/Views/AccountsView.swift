@@ -42,6 +42,7 @@ struct AccountsView: View {
                     Button("Add Account", systemImage: "plus") {
                         isAddingAccount = true
                     }
+                    .accessibilityIdentifier("addAccount")
                 }
                 ToolbarItem(placement: .primaryAction) {
                     // Shows the layout it switches to.
@@ -51,6 +52,7 @@ struct AccountsView: View {
                         }
                     }
                     .help(layout.toggled.switchTitle)
+                    .accessibilityIdentifier("toggleLayout")
                 }
                 ToolbarItem(placement: .secondaryAction) {
                     Button("Categories", systemImage: "tag") {
@@ -74,6 +76,7 @@ struct AccountsView: View {
                         Button("Settings", systemImage: "gear") {
                             isShowingSettings = true
                         }
+                        .accessibilityIdentifier("settings")
                     #endif
                 }
             }
@@ -136,6 +139,7 @@ struct AccountsView: View {
                     AmountText(accounts.reduce(0) { $0 + $1.balance })
                 }
                 .bold()
+                .accessibilityIdentifier("accountsTotal")
                 // A card like the list layout's Total row.
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
@@ -152,6 +156,7 @@ struct AccountsView: View {
                         AccountTile(account: account)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("account.\(account.name)")
                     .contextMenu {
                         Button("Delete Account…", systemImage: "trash", role: .destructive) {
                             afterMenuCloses { accountPendingDeletion = account }
@@ -173,6 +178,7 @@ struct AccountsView: View {
                         AmountText(sortedAccounts.reduce(0) { $0 + $1.balance })
                     }
                     .bold()
+                    .accessibilityIdentifier("accountsTotal")
                 }
 
                 Section {
@@ -190,6 +196,7 @@ struct AccountsView: View {
                                 }
                             }
                         }
+                        .accessibilityIdentifier("account.\(account.name)")
                         .contextMenu {
                             Button("Delete Account…", systemImage: "trash", role: .destructive) {
                                 afterMenuCloses { accountPendingDeletion = account }

@@ -15,15 +15,19 @@ struct ReportsView: View {
                 NavigationRow(value: Report.netIncome, path: $path) {
                     reportLabel("Net Income", systemImage: "chart.bar.xaxis", detail: "Income vs. expenses each month")
                 }
+                .accessibilityIdentifier("report.netIncome")
                 NavigationRow(value: Report.categorySpending, path: $path) {
                     reportLabel("Spending by Category", systemImage: "chart.pie", detail: "Where the money went")
                 }
+                .accessibilityIdentifier("report.categorySpending")
                 NavigationRow(value: Report.categoryTrend, path: $path) {
                     reportLabel("Category Over Time", systemImage: "chart.line.uptrend.xyaxis", detail: "One category, month by month")
                 }
+                .accessibilityIdentifier("report.categoryTrend")
                 NavigationRow(value: Report.budgetHistory, path: $path) {
                     reportLabel("Budget History", systemImage: "chart.bar", detail: "Spending vs. budget for recent periods")
                 }
+                .accessibilityIdentifier("report.budgetHistory")
             }
             .navigationTitle("Reports")
             .navigationDestination(for: Report.self) { report in

@@ -29,6 +29,7 @@ struct SettingsView: View {
                         Text(option.title).tag(option)
                     }
                 }
+                .accessibilityIdentifier("sortAccounts")
             }
 
             Section {
@@ -37,8 +38,10 @@ struct SettingsView: View {
                         Text(choice.title).tag(choice)
                     }
                 }
+                .accessibilityIdentifier("accentChoice")
                 if accentChoice == .custom {
                     ColorPicker("Custom Color", selection: customAccentBinding, supportsOpacity: false)
+                        .accessibilityIdentifier("customAccent")
                 }
             } header: {
                 Text("Appearance")

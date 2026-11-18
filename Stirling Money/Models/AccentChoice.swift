@@ -15,7 +15,10 @@ nonisolated enum AccentChoice: String, CaseIterable, Identifiable {
     static let key = "accentChoice"
     static let customColorKey = "accentCustomColor"
     /// Shared with the widget extension.
-    @MainActor static let store = UserDefaults(suiteName: WidgetSnapshot.appGroup) ?? .standard
+    /// The App Group's store, or under UI tests their own store (see `LaunchMode.settings`).
+    @MainActor static let store = LaunchMode.isUITesting
+        ? LaunchMode.settings
+        : UserDefaults(suiteName: WidgetSnapshot.appGroup) ?? .standard
 
     var id: Self { self }
 

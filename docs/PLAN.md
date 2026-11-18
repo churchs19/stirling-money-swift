@@ -508,7 +508,7 @@ Code coverage of the unit tests:
      - What's left in these files only runs with the system: `AppLock`'s `LAContext` calls (63%), the pickers' display
        names (`WidgetIntents`, 45%), and `WidgetSnapshotWriter`'s fetch-and-write (0%; its decision is
        `needsWrite`, tested in step 4).
-8. [ ] **Prepare the app for UI tests.**
+8. [x] **Prepare the app for UI tests.**
    - A `-UITesting` launch argument (Debug only) that:
      - Implies `-UseSampleData`.
      - Turns the app lock off.
@@ -516,6 +516,22 @@ Code coverage of the unit tests:
      - Skips the widget summary and Watch.
    - `accessibilityIdentifier`s on the controls the tests drive: the add buttons, the account tiles and rows, the form
      fields, Save, the tabs and the Settings controls.
+   - Done: `LaunchMode` (`Stirling Money/Models/LaunchMode.swift`) holds `isHostingUnitTests` (moved from the app),
+     `isUITesting` and `settings`. Under `-UITesting`, `settings` is a store of its own, emptied at launch. The app
+     uses it for `@AppStorage` (`.defaultAppStorage`), for `AppLock`, and for `AccentChoice.store` in place of the
+     App Group.
+   - Checked on the simulator: with the layout saved as list, a `-UITesting` launch shows the sample data in tiles,
+     and a normal launch still shows the list.
+   - Identifiers:
+     - Accounts: `addAccount`, `toggleLayout`, `settings`, `accountsTotal`, `account.<name>`.
+     - New account: `accountName`, `initialBalance`.
+     - Register: `addTransaction`, `availableBalance`, `postedBalance`, `transaction.<payee>`.
+     - Transaction form: `transactionType`, `amount`, `payee`, `otherAccount`, `transactionPosted`.
+     - Budgets and goals: `addBudget`, `budget.<name>`, `budgetName`, `budgetAmount`; `addGoal`, `goal.<name>`,
+       `goalName`, `goalTarget`, `goalAccount`.
+     - Reports: `report.<case>`.
+     - Settings: `sortAccounts`, `accentChoice`, `customAccent`.
+     - Every form's Save button: `save`. `CurrencyField` takes an `identifier` for its text field.
 9. [ ] **Real iPhone UI tests** (replacing the template; on the iPhone simulator, one `XCUIApplication` per test with
    `-UITesting`):
    - Launch: the Accounts tab shows the sample total and three tiles.
