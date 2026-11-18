@@ -363,7 +363,11 @@ so the list is rebuilt when one is added, renamed or removed. A list of budgets 
    line): medium shows 2 dense cards with no heading (and so no "+N more"); large a "Budgets" heading, "+N more" and 3
    full cards; extra large (iPad and Mac) 6 full cards in two columns. `WidgetSnapshot.budgetsToList` picks them. The
    timeline reloads when the earliest shown period ends. Checked in previews on the iPhone and the iPad.
-5. [ ] The Watch Budget complication and its recommendations; extend the recommendations test to budgets.
+5. [x] The Watch Budget complication and its recommendations; extend the recommendations test to budgets.
+   Rectangular: name in the accent color, a bar (red when over), "$X left" or "$X over". Circular: a ring with the
+   amount left in compact notation (negative when over). Corner: the amount left with a curved bar. Inline:
+   "Food: $125.00 left". After the period ends it asks for the iPhone app instead. Unconfigured shows the first budget;
+   the timeline reloads at the period's end. `complicationChoicesChanged` now includes budgets. Checked in previews.
 6. [ ] Check on the iPhone and iPad simulators, the Mac, the Watch simulator, then the real iPhone and Watch.
 7. [ ] README, CLAUDE.md and this plan.
 

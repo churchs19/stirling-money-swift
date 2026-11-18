@@ -125,12 +125,13 @@ final class WatchStore {
         return true
     }
 
-    /// Whether the accounts or goals a complication can show (their IDs and names) differ.
+    /// Whether the accounts, goals or budgets a complication can show (their IDs and names) differ.
     nonisolated static func complicationChoicesChanged(from old: WidgetSnapshot?, to new: WidgetSnapshot) -> Bool {
         func choices(_ snapshot: WidgetSnapshot?) -> [[String]] {
             [
                 snapshot?.accounts.flatMap { [$0.id, $0.name] } ?? [],
                 snapshot?.goals.flatMap { [$0.id, $0.name] } ?? [],
+                snapshot?.budgets.flatMap { [$0.id, $0.name] } ?? [],
             ]
         }
         return choices(old) != choices(new)

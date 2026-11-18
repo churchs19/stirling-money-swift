@@ -57,7 +57,7 @@ struct WatchStoreTests {
         #expect(store.asOf == Date(timeIntervalSince1970: 5000))
     }
 
-    @Test func complicationChoicesChangeWithAccountsAndGoalsOnly() {
+    @Test func complicationChoicesChangeWithAccountsGoalsAndBudgetsOnly() {
         let sample = WidgetSnapshot.sample
         // The first summary: the watch face editor's list needs rebuilding.
         #expect(WatchStore.complicationChoicesChanged(from: nil, to: sample))
@@ -75,6 +75,14 @@ struct WatchStoreTests {
         var goalRemoved = sample
         goalRemoved.goals.removeLast()
         #expect(WatchStore.complicationChoicesChanged(from: sample, to: goalRemoved))
+
+        var budgetSpending = sample
+        budgetSpending.budgets[0].spent += 10
+        #expect(!WatchStore.complicationChoicesChanged(from: sample, to: budgetSpending))
+
+        var budgetRenamed = sample
+        budgetRenamed.budgets[0].name = "Groceries"
+        #expect(WatchStore.complicationChoicesChanged(from: sample, to: budgetRenamed))
     }
 
     @Test func ignoresDataThatIsNotASummary() throws {

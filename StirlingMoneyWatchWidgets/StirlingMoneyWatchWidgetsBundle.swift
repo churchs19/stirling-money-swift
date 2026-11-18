@@ -8,6 +8,7 @@ struct StirlingMoneyWatchWidgetsBundle: WidgetBundle {
     var body: some Widget {
         BalanceComplication()
         GoalComplication()
+        BudgetComplication()
     }
 }
 
