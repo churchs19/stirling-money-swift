@@ -532,7 +532,7 @@ Code coverage of the unit tests:
      - Reports: `report.<case>`.
      - Settings: `sortAccounts`, `accentChoice`, `customAccent`.
      - Every form's Save button: `save`. `CurrencyField` takes an `identifier` for its text field.
-9. [ ] **Real iPhone UI tests** (replacing the template; on the iPhone simulator, one `XCUIApplication` per test with
+9. [x] **Real iPhone UI tests** (replacing the template; on the iPhone simulator, one `XCUIApplication` per test with
    `-UITesting`):
    - Launch: the Accounts tab shows the sample total and three tiles.
    - Add an account with an opening balance; the total goes up by that amount.
@@ -545,6 +545,16 @@ Code coverage of the unit tests:
    - Settings: switch to the list layout and back, choose a custom accent.
    - Keep the launch performance test, which is fine as it is.
    - Optional later: run the same suite on an iPad simulator; on the Mac, check the sidebar and the Settings window.
+   - Done: 11 tests plus launch performance in `Stirling_MoneyUITests`, about 4 minutes on the iPhone simulator.
+     They passed twice in a row.
+   - Each test launches with `-UITesting -AppleLanguages (en) -AppleLocale en_US`, so amounts read the same whatever
+     the simulator's language. The performance test uses the same arguments.
+   - SwiftUI folds an amount into the label of its row or tile ("Total, $19,660.73"), so the tests wait for that
+     label to contain the amount (`expectLabel(of:toContain:)`) rather than looking for a text element.
+   - The register's search field is hidden under the title until the list is pulled down.
+   - A row's posted checkmark is a button that carries the row's identifier, and it reads "Posted" or "Not posted".
+   - The register's balances are checked through `availableBalance` and `postedBalance`, the accounts screen's
+     through `accountsTotal` and each tile.
 10. [ ] **A Watch UI smoke test.**
     - The Watch app's own `-UseSampleData` loads `WidgetSnapshot.sample` instead of the saved summary.
     - Replace the template with: the Accounts page shows the total, then swipe to Budgets and Goals.
