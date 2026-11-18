@@ -441,11 +441,16 @@ Code coverage of the unit tests:
      no summary yet, none exist, and "This goal was deleted / This budget is gone / This account was deleted. Edit the
      watch face to choose another." (`ComplicationEmptyState` and `ComplicationMessage` in the complications bundle.)
      Checked in Watch previews.
-3. [ ] **Test the widget pickers.**
+3. [x] **Test the widget pickers.**
    - Give the entity queries a way to read a given summary instead of the App Group file (a `static var` source that
      tests set; `load()` stays the default).
    - Test `entities(for:)` with known, unknown and mixed IDs, and `suggestedEntities()` with no summary.
    - Test `WidgetSnapshot.load()` against a temporary file, and `total`.
+   - Done: each query has a `summary` closure (default `WidgetSnapshot.load()`), set through the memberwise
+     initializer in tests rather than a shared static, so tests can't interfere with each other. `load()` now calls
+     `load(from:)`. `WidgetPickerTests` (6 tests) covers the three pickers, lookups with known, deleted, mixed and no
+     IDs, loading a saved, missing or unreadable file, and `total` with a negative balance. The App Intents metadata
+     still builds without warnings for the iPhone, Watch and Mac widgets.
 4. [ ] **Test the summary writer's change check.**
    - Move "decode the existing file, ignore `updatedAt`, compare" into a function such as
      `WidgetSnapshot.needsWrite(_:existing:)`.

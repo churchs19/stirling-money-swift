@@ -84,7 +84,12 @@ nonisolated struct WidgetSnapshot: Codable, Equatable {
 
     /// The latest snapshot, or nil if the app hasn't written one yet.
     static func load() -> WidgetSnapshot? {
-        guard let url = fileURL, let data = try? Data(contentsOf: url) else { return nil }
+        load(from: fileURL)
+    }
+
+    /// The snapshot saved at `url`, or nil when there's no file or it can't be read.
+    static func load(from url: URL?) -> WidgetSnapshot? {
+        guard let url, let data = try? Data(contentsOf: url) else { return nil }
         return try? JSONDecoder().decode(WidgetSnapshot.self, from: data)
     }
 
