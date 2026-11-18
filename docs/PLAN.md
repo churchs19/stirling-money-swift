@@ -427,12 +427,20 @@ Code coverage of the unit tests:
      - Coverage that came only from the launch went to 0%: `WidgetSnapshotWriter`, `WatchSync`, `AccountsView`,
        `RootView`, `View+Accent`.
      - Two models dropped and were added to step 7: `AccountSort` (100% to 61%) and `AccountLayout` (100% to 20%).
-2. [ ] **One rule for which item a widget shows.**
+2. [x] **One rule for which item a widget shows.**
    - Add `WidgetSnapshot` lookups to `Shared/` that return the item to show, or why there isn't one: no summary yet,
      none exist, or the chosen one is gone. "None chosen" means the first item, except for Balance, where it means
      the total.
    - The Balance, Goal and Budget widgets and the three complications use them.
    - Tests for each case, for accounts, goals and budgets.
+   - Done: `Shared/WidgetChoice.swift` has `WidgetChoice<Item>` (item, noSummary, noneExist, missing) for goals and
+     budgets, and `BalanceChoice` (total, account, noSummary, missing). All six providers use them, and
+     `WidgetChoiceTests` covers each case (8 tests).
+   - Fixed while here: the complications showed "Add a goal…" or "Add a budget…" when the chosen one was gone (and
+     the Balance one "Open Stirling Money on your iPhone."). Like the iPhone widgets, they now tell the three cases apart:
+     no summary yet, none exist, and "This goal was deleted / This budget is gone / This account was deleted. Edit the
+     watch face to choose another." (`ComplicationEmptyState` and `ComplicationMessage` in the complications bundle.)
+     Checked in Watch previews.
 3. [ ] **Test the widget pickers.**
    - Give the entity queries a way to read a given summary instead of the App Group file (a `static var` source that
      tests set; `load()` stays the default).

@@ -33,21 +33,17 @@ struct BudgetProvider: AppIntentTimelineProvider {
     }
 
     private func entry(for configuration: SelectBudgetIntent, on date: Date) -> BudgetEntry {
-        guard let snapshot = WidgetSnapshot.load() else {
-            return BudgetEntry(date: date, budget: nil, message: "Open Stirling Money to see your budgets.")
+        switch WidgetChoice.choose(id: configuration.budget?.id, from: WidgetSnapshot.load()?.budgets) {
+        case let .item(budget):
+            BudgetEntry(date: date, budget: budget, message: "", accent: WidgetAccent.current)
+        case .noSummary:
+            BudgetEntry(date: date, budget: nil, message: "Open Stirling Money to see your budgets.")
+        case .noneExist:
+            BudgetEntry(date: date, budget: nil, message: "Add a budget in Stirling Money.")
+        case .missing:
+            // Deleted, or its period ended and the app has left it out of the summary.
+            BudgetEntry(date: date, budget: nil, message: "This budget isn't available. Edit the widget to choose another.")
         }
-        guard let wanted = configuration.budget else {
-            // Not configured yet: show the first budget, if there is one.
-            if let first = snapshot.budgets.first {
-                return BudgetEntry(date: date, budget: first, message: "", accent: WidgetAccent.current)
-            }
-            return BudgetEntry(date: date, budget: nil, message: "Add a budget in Stirling Money.")
-        }
-        if let budget = snapshot.budgets.first(where: { $0.id == wanted.id }) {
-            return BudgetEntry(date: date, budget: budget, message: "", accent: WidgetAccent.current)
-        }
-        // Deleted, or its period ended and the app has left it out of the summary.
-        return BudgetEntry(date: date, budget: nil, message: "This budget isn't available. Edit the widget to choose another.")
     }
 }
 

@@ -3,9 +3,10 @@ import WidgetKit
 
 struct BudgetComplicationEntry: TimelineEntry {
     let date: Date
-    /// nil when there's no summary yet, no budgets, or the chosen budget is gone.
+    /// nil when there's no summary yet, no budgets, or the chosen budget is gone; `emptyState` says which.
     let budget: WidgetSnapshot.BudgetSummary?
     var accent: Color = .init("AccentColor")
+    var emptyState: ComplicationEmptyState = .noSummary
 }
 
 struct BudgetComplicationProvider: AppIntentTimelineProvider {
@@ -38,9 +39,8 @@ struct BudgetComplicationProvider: AppIntentTimelineProvider {
 
     private func entry(for configuration: SelectBudgetIntent, snapshot: WidgetSnapshot?, on date: Date) -> BudgetComplicationEntry {
         let accent = complicationAccent(snapshot)
-        // Not configured yet: the first budget.
-        let budget = configuration.budget.map { wanted in snapshot?.budgets.first { $0.id == wanted.id } } ?? snapshot?.budgets.first
-        return BudgetComplicationEntry(date: date, budget: budget, accent: accent)
+        let choice = WidgetChoice.choose(id: configuration.budget?.id, from: snapshot?.budgets)
+        return BudgetComplicationEntry(date: date, budget: choice.item, accent: accent, emptyState: ComplicationEmptyState(choice))
     }
 }
 
@@ -56,16 +56,18 @@ struct BudgetComplicationView: View {
                 ended(budget)
             }
         } else {
-            switch family {
-            case .accessoryInline:
-                Text("No budgets")
-            case .accessoryRectangular:
-                Text("Add a budget in Stirling Money on your iPhone.")
-                    .font(.footnote)
-            default:
-                Image(systemName: "chart.bar")
-                    .font(.title3)
-                    .widgetAccentable()
+            switch entry.emptyState {
+            case .noSummary:
+                ComplicationMessage(inline: "Stirling Money", message: "Open Stirling Money on your iPhone.", systemImage: "chart.bar")
+            case .noneExist:
+                ComplicationMessage(inline: "No budgets", message: "Add a budget in Stirling Money on your iPhone.", systemImage: "chart.bar")
+            case .missing:
+                // Deleted, or its period ended and the iPhone has left it out of the summary.
+                ComplicationMessage(
+                    inline: "Budget unavailable",
+                    message: "This budget is gone. Edit the watch face to choose another.",
+                    systemImage: "chart.bar.xaxis"
+                )
             }
         }
     }
@@ -174,7 +176,8 @@ struct BudgetComplication: Widget {
 } timeline: {
     BudgetComplicationEntry(date: .now, budget: WidgetSnapshot.sample.budgets[0])
     BudgetComplicationEntry(date: .now, budget: WidgetSnapshot.sample.budgets[1])
-    BudgetComplicationEntry(date: .now, budget: nil)
+    BudgetComplicationEntry(date: .now, budget: nil, emptyState: .noneExist)
+    BudgetComplicationEntry(date: .now, budget: nil, emptyState: .missing)
 }
 
 #Preview("Circular", as: .accessoryCircular) {
