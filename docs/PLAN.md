@@ -346,7 +346,9 @@ so the list is rebuilt when one is added, renamed or removed. A list of budgets 
 `StirlingMoneyWatchWidgets/`, `Shared/`), and both widget bundles just list the new widgets.
 
 **Order of work**
-1. [ ] `periodTitle` in the summary; tests for it and for decoding a summary without it.
+1. [x] `periodTitle` in the summary; tests for it and for decoding a summary without it.
+   It's an optional with a default, so the synthesized decoder reads summaries without it (the iPhone and Watch may
+   briefly run different versions). The sample summary has "Monthly" and "Weekly" for previews.
 2. [ ] `BudgetSummaryCard` in `Shared/` (full and compact), with previews; the Watch app's Budgets page uses it.
 3. [ ] `SelectBudgetIntent`/`BudgetEntity`; the Budget widget (small, medium, Lock Screen) and `stirlingmoney://budgets`.
 4. [ ] The Budgets list widget (medium, large, extra large); a test for how many fit and the "+N more" count.
