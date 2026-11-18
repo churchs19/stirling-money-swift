@@ -116,7 +116,7 @@ struct BudgetListWidget: Widget {
                 // Opens the app's Budgets tab. Matches `DeepLink.budgets` in the app; keep them in step.
                 .widgetURL(URL(string: "stirlingmoney://budgets"))
         }
-        .configurationDisplayName("Budgets")
+        .configurationDisplayName("All Budgets")
         .description("Every budget's spending this period.")
         .supportedFamilies([.systemMedium, .systemLarge, .systemExtraLarge])
     }

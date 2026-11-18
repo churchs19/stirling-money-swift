@@ -329,7 +329,7 @@ which the summary leaves out.)
    - Medium: the full card, as on the Budgets screen.
    - Lock Screen (iPhone): rectangular (name, bar, "$X left"), circular (ring of the amount spent, "$X left" below
      where it fits), inline ("Groceries: $120 left").
-2. **Budgets** (every budget, no setup; same order as the Budgets screen, as many as fit):
+2. **All Budgets** (every budget, no setup; same order as the Budgets screen, as many as fit):
    - Medium: 2 cards; large: 3; extra large (iPad and Mac): 6 in two columns. "+3 more" when they don't all fit.
 - Both open the app's Budgets tab: add `stirlingmoney://budgets` to `DeepLink`.
 - Timeline: one entry, reloaded when the app writes new data (as now) and at the end of the earliest period shown, so
@@ -369,6 +369,13 @@ so the list is rebuilt when one is added, renamed or removed. A list of budgets 
    "Food: $125.00 left". After the period ends it asks for the iPhone app instead. Unconfigured shows the first budget;
    the timeline reloads at the period's end. `complicationChoicesChanged` now includes budgets. Checked in previews.
 6. [ ] Check on the iPhone and iPad simulators, the Mac, the Watch simulator, then the real iPhone and Watch.
+   - [x] Simulators and previews (Nov 18, 2026): the iPhone writes `periodTitle` into the summary; every widget size and
+     the four complications checked in previews (iPhone, iPad, Watch); the Watch app's Budgets page shows the iPhone's
+     budgets in the shared card. Adding widgets to the simulator's home screen can't be driven reliably from here (the
+     edit menu ignores injected taps), and `simctl openurl` can't test the link because the scheme isn't registered
+     (widget links don't need it; the Budgets link has a unit test).
+   - [ ] On the real iPhone, Watch and Mac: add the Budget, Budgets and Lock Screen widgets and the Budget complication;
+     check that tapping a widget opens the Budgets tab.
 7. [ ] README, CLAUDE.md and this plan.
 
 **Risks and questions**
@@ -378,7 +385,7 @@ so the list is rebuilt when one is added, renamed or removed. A list of budgets 
   exists (as now). Fine for personal ledgers.
 - **Privacy on the Lock Screen.** Budget amounts show on a locked iPhone, as balances already do. Marking amounts
   `privacySensitive()` would hide them while locked; worth deciding for the Balance widget at the same time.
-- **Widget gallery.** Two budget widgets plus Balance and Goal makes four; the names "Budget" and "Budgets" with
+- **Widget gallery.** Two budget widgets plus Balance and Goal makes four; the names "Budget" and "All Budgets" with
   descriptions ("One budget's spending this period", "Every budget's spending this period") keep them apart.
 
 ## Open items
