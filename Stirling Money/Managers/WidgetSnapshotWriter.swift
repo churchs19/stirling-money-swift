@@ -77,12 +77,7 @@ enum WidgetSnapshotWriter {
                 transactions: transactions,
                 accentColor: AccentChoice.sharedCustomColor
             )
-            if let existing = try? Data(contentsOf: url),
-               var previous = try? JSONDecoder().decode(WidgetSnapshot.self, from: existing)
-            {
-                previous.updatedAt = snapshot.updatedAt
-                if previous == snapshot { return }
-            }
+            guard snapshot.needsWrite(over: try? Data(contentsOf: url)) else { return }
             let data = try JSONEncoder().encode(snapshot)
             try data.write(to: url, options: .atomic)
             WidgetCenter.shared.reloadAllTimelines()

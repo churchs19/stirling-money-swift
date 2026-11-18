@@ -8,18 +8,22 @@ struct CurrencyField: View {
     @Binding var text: String
     /// When false, a typed minus sign is dropped when the field is formatted.
     var allowsNegative = false
+    /// The text field's accessibility identifier, for UI tests.
+    var identifier: String?
 
     @FocusState private var isFocused: Bool
 
-    init(_ title: LocalizedStringKey, text: Binding<String>, allowsNegative: Bool = false) {
+    init(_ title: LocalizedStringKey, text: Binding<String>, allowsNegative: Bool = false, identifier: String? = nil) {
         self.title = title
         _text = text
         self.allowsNegative = allowsNegative
+        self.identifier = identifier
     }
 
     var body: some View {
         LabeledContent(title) {
             TextField(title, text: $text, prompt: Text(Decimal.zero.formatted(.localCurrency)))
+                .accessibilityIdentifier(identifier ?? "")
                 .labelsHidden()
                 .multilineTextAlignment(.trailing)
                 .amountKeyboard()

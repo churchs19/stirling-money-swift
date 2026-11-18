@@ -60,12 +60,3 @@ extension Budget {
         return BudgetSummary(state: .active(period), amount: amount, spent: spent(during: period, from: candidates))
     }
 }
-
-extension DateInterval {
-    /// The interval's days as text, e.g. "Nov 1 – 30". The end is exclusive, so the last day shown is the day before.
-    func formattedDays(calendar: Calendar = .current) -> String {
-        let lastDay = calendar.date(byAdding: .day, value: -1, to: end) ?? end
-        guard lastDay > start else { return start.formatted(.dateTime.month(.abbreviated).day()) }
-        return (start ..< lastDay).formatted(.interval.month(.abbreviated).day().year())
-    }
-}

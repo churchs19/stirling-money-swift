@@ -46,3 +46,10 @@ nonisolated enum DeepLink: Equatable {
         return components.url!
     }
 }
+
+extension DeepLink {
+    /// The account an account link opens, or nil when it was deleted (the link then opens the accounts list).
+    static func account(withWidgetID id: String, in accounts: [Account]) -> Account? {
+        accounts.first { WidgetSnapshot.widgetID(for: $0) == id }
+    }
+}

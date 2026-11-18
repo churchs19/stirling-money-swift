@@ -112,7 +112,7 @@ struct BudgetSummaryCard: View {
     }
 }
 
-extension WidgetSnapshot {
+nonisolated extension WidgetSnapshot {
     /// The budgets a list widget with room for `capacity` cards shows, in the summary's order (by name, as on the
     /// Budgets screen), and how many it leaves out.
     static func budgetsToList(_ budgets: [BudgetSummary], capacity: Int) -> (shown: [BudgetSummary], more: Int) {
@@ -121,19 +121,11 @@ extension WidgetSnapshot {
     }
 }
 
-extension WidgetSnapshot.BudgetSummary {
+nonisolated extension WidgetSnapshot.BudgetSummary {
     /// "Monthly · Nov 1 – 30, 2026", as on the Budgets screen, or without the year for small spaces.
     /// Summaries written before `periodTitle` was added show just the dates.
     func periodText(withYear: Bool, calendar: Calendar = .current) -> String {
-        // `periodEnd` is the start of the day after the last day.
-        let lastDay = calendar.date(byAdding: .day, value: -1, to: periodEnd) ?? periodEnd
-        let days: String
-        if lastDay > periodStart {
-            let style = Date.IntervalFormatStyle.interval.month(.abbreviated).day()
-            days = (periodStart ..< lastDay).formatted(withYear ? style.year() : style)
-        } else {
-            days = periodStart.formatted(.dateTime.month(.abbreviated).day())
-        }
+        let days = DateInterval(start: periodStart, end: periodEnd).formattedDays(withYear: withYear, calendar: calendar)
         guard let periodTitle else { return days }
         return "\(periodTitle) · \(days)"
     }

@@ -16,6 +16,7 @@ as a SwiftUI + SwiftData app for iOS, iPadOS and macOS.
 | 6 | Platform features (widgets, app lock, export, settings) | Done; sync still deferred |
 | 7 | Apple Watch app (read-only) and complications | Done; checked on simulators and a real iPhone and Watch |
 | 8 | Budget widgets (iPhone, iPad, Mac, Lock Screen, Watch) | Done; checked on simulators and a real iPhone, Watch and Mac |
+| 9 | Test coverage: isolated unit tests, real UI tests, testable widget, lock and writer logic | Done |
 
 ## Decisions
 
@@ -387,6 +388,206 @@ so the list is rebuilt when one is added, renamed or removed. A list of budgets 
   `privacySensitive()` would hide them while locked; worth deciding for the Balance widget at the same time.
 - **Widget gallery.** Two budget widgets plus Balance and Goal makes four; the names "Budget" and "All Budgets" with
   descriptions ("One budget's spending this period", "Every budget's spending this period") keep them apart.
+
+### Phase 9: Test coverage (done)
+
+From a review of the tests on Nov 18, 2026. There are 85 iPhone unit tests and 8 Watch unit tests (Swift Testing, all
+passing), and two UI tests in each UI test target, both Xcode's templates that check nothing.
+Code coverage of the unit tests:
+- **Models and calculations:** 80–100% (`Ledger` 96%, `TransactionDraft` 100%, `Budget` 98%, `Reports` 81%; the
+  report gaps are only sort tie-breaks).
+- **Untested logic:**
+  - `AppLock`: 15%.
+  - The widget pickers' queries (`WidgetIntents.swift`): 0%.
+  - `ChartPalette`: 0%.
+  - `BudgetSummaryCard`: 10%; only `periodText` is tested.
+  - The widget and complication providers: no test target at all.
+
+**Problems found**
+- **Unit tests run inside the real app.** The test target's host is the app, so every run opens the simulator's real
+  store, rewrites the widget summary and tries to send it to the Watch. Some coverage is borrowed from that launch, not
+  earned by tests: `AccountsView` 50%, `WidgetSnapshotWriter` 90%.
+- **Placeholder tests.** `Stirling_MoneyTests.example` and both UI test targets' `testExample` check nothing.
+- **`AppLock` can't be tested.** It calls `LAContext` directly, and `isEnabled` reads `UserDefaults.standard` instead
+  of the `defaults` passed to `init`.
+- **The same choice rule is copied into each provider.** Each widget and complication provider has its own copy of
+  "none chosen → the first; chosen one gone → a message", and none of them is tested.
+
+**Order of work** (each step keeps every test passing and the iPhone, Watch and Mac builds green)
+
+1. [x] **Isolate the unit tests from the app.**
+   - When the app starts under tests (`XCTestConfigurationFilePath` in the environment), use an empty in-memory
+     container and skip `WatchSync.start()` and `WidgetSnapshotWriter.startObserving`.
+   - Delete `Stirling_MoneyTests.example`. Measure coverage again as the baseline for the steps below.
+   - A code check, not a project change: making the tests hostless would mean changing the test target's `TEST_HOST`.
+   - Done: `Stirling_MoneyApp.isHostingUnitTests` (tested by `TestHostTests`). When hosting tests the app also draws an
+     empty window, so no screen counts as covered unless a test draws it. The placeholder test is gone.
+   - **Baseline** (unit tests, Nov 18, 2026): 14.4% of the app (1073 of 7471 lines), down from a borrowed 20.3%.
+     - Unchanged: `Ledger` 96%, `TransactionDraft` 100%, `Budget` 98%, `WidgetSnapshot+Models` 98%, `Reports` 81%.
+     - Coverage that came only from the launch went to 0%: `WidgetSnapshotWriter`, `WatchSync`, `AccountsView`,
+       `RootView`, `View+Accent`.
+     - Two models dropped and were added to step 7: `AccountSort` (100% to 61%) and `AccountLayout` (100% to 20%).
+2. [x] **One rule for which item a widget shows.**
+   - Add `WidgetSnapshot` lookups to `Shared/` that return the item to show, or why there isn't one: no summary yet,
+     none exist, or the chosen one is gone. "None chosen" means the first item, except for Balance, where it means
+     the total.
+   - The Balance, Goal and Budget widgets and the three complications use them.
+   - Tests for each case, for accounts, goals and budgets.
+   - Done: `Shared/WidgetChoice.swift` has `WidgetChoice<Item>` (item, noSummary, noneExist, missing) for goals and
+     budgets, and `BalanceChoice` (total, account, noSummary, missing). All six providers use them, and
+     `WidgetChoiceTests` covers each case (8 tests).
+   - Fixed while here: the complications showed "Add a goal…" or "Add a budget…" when the chosen one was gone (and
+     the Balance one "Open Stirling Money on your iPhone."). Like the iPhone widgets, they now tell the three cases apart:
+     no summary yet, none exist, and "This goal was deleted / This budget is gone / This account was deleted. Edit the
+     watch face to choose another." (`ComplicationEmptyState` and `ComplicationMessage` in the complications bundle.)
+     Checked in Watch previews.
+3. [x] **Test the widget pickers.**
+   - Give the entity queries a way to read a given summary instead of the App Group file (a `static var` source that
+     tests set; `load()` stays the default).
+   - Test `entities(for:)` with known, unknown and mixed IDs, and `suggestedEntities()` with no summary.
+   - Test `WidgetSnapshot.load()` against a temporary file, and `total`.
+   - Done: each query has a `summary` closure (default `WidgetSnapshot.load()`), set through the memberwise
+     initializer in tests rather than a shared static, so tests can't interfere with each other. `load()` now calls
+     `load(from:)`. `WidgetPickerTests` (6 tests) covers the three pickers, lookups with known, deleted, mixed and no
+     IDs, loading a saved, missing or unreadable file, and `total` with a negative balance. The App Intents metadata
+     still builds without warnings for the iPhone, Watch and Mac widgets.
+4. [x] **Test the summary writer's change check.**
+   - Move "decode the existing file, ignore `updatedAt`, compare" into a function such as
+     `WidgetSnapshot.needsWrite(_:existing:)`.
+   - Test: no file, an unreadable file, the same figures at a later time (no write), and a changed balance, budget or
+     accent (write).
+   - Done: `WidgetSnapshot.needsWrite(over:)` in `Shared/`, used by `WidgetSnapshotWriter`; `WidgetSnapshotWriteTests`
+     (7 tests).
+   - Bug found and fixed: with a custom accent color, every update counted as a change, because the color's `Float`s
+     don't come back from JSON exactly. So the app rewrote the summary, reloaded every widget and sent the Watch the
+     same figures on every save, at launch and on every trip to the background. It now compares both summaries as
+     saved (the new one is encoded and decoded first).
+5. [x] **Make `AppLock` testable.**
+   - Pass in the authentication (`(String) async -> Bool`) and "is a passcode set" (`() -> Bool`) checks, defaulting
+     to `LAContext`.
+   - Read `isEnabled` from the injected defaults.
+   - Test:
+     - It starts locked only when enabled.
+     - Going to the background locks it only when enabled.
+     - It prompts once per lock.
+     - A cancel leaves it locked with no second prompt; Unlock asks again.
+     - With no passcode it unlocks instead of shutting you out.
+     - A second unlock while one is already in progress does nothing.
+   - Done: `AppLock(defaults:canAuthenticate:authenticator:)`, defaulting to `AppLock.isAvailable` and
+     `AppLock.askDeviceOwner` (`LAContext`). `isEnabled` now reads the injected store; with the old code, a lock turned
+     on in a test or a second store would have been ignored. `AppLockTests` (9 tests) uses a stand-in for Face ID, and
+     one test holds the prompt open to check that a second tap on Unlock doesn't open another.
+6. [x] **Test parsing and display in other locales.**
+   - Give `Decimal(userInput:)` and `.localCurrency` an optional locale (default `.current`).
+   - Test en_US, de_DE ("1.250,75 €"), fr_FR (narrow no-break space grouping), de_CH ("1’250.75") and ja_JP (no
+     decimals).
+   - Check that text shown with `.localCurrency` parses back, and that CSV export still writes "." whatever the locale.
+   - Done: `.localCurrency(in:)`, `Decimal(userInput:locale:)`, `Decimal(positiveUserInput:locale:)` and
+     `editableText(in:)`, all defaulting to the current locale. `LocaleTests` covers en_US, en_GB, de_DE, fr_FR, de_CH,
+     ja_JP, es_MX and ar_SA: shown amounts (including negative and over a million) and editable text parse back, each
+     locale reads its own separators and symbol, a locale with no region falls back to dollars, and CSV amounts keep
+     "." (they use `Decimal`'s description). No locale bugs found.
+7. [x] **Fill the smaller gaps.**
+   - `ChartPalette.color(slot:)`: slots 0–7, then nil and 8 fall back to "Other".
+   - `AccountSort` and `AccountLayout`: the parts only the app's launch used to cover (titles, icons, sorting edge
+     cases).
+   - `GoalDraft.hasInvalidTarget`.
+   - `BudgetDraft(editing:)` for a budget with an end date and a custom period.
+   - `DateInterval.formattedDays`, or replace it with `BudgetSummary.periodText` so there's one formatter.
+   - The tie-break order in `Reports.spendingByCategory`.
+   - **Account links:** move "which account a link opens" out of `RootView.open(_:)` into a function, and test a known
+     ID, a deleted account and a bad ID.
+   - Done (16 tests, added to the files that already cover each area, plus `ChartPaletteTests`):
+     - `DateInterval.formattedDays(withYear:)` moved to `Shared/DateInterval+Days.swift`. `BudgetSummary.periodText`
+       uses it, so the Budgets screen, budget history, widgets and Watch share one formatter.
+     - `DeepLink.account(withWidgetID:in:)` is now used by `RootView`.
+     - `BudgetSummaryCard`'s helper extensions are `nonisolated`.
+   - Coverage after step 7: 16.4% of the app (from 14.4%):
+     - `ChartPalette`, `AccountLayout`, `DeepLink`, `WidgetChoice` and the money formatting and parsing: 100%.
+     - `GoalDraft` 98%, `BudgetDraft` 95%, `AccountSort` 87%.
+     - What's left in these files only runs with the system: `AppLock`'s `LAContext` calls (63%), the pickers' display
+       names (`WidgetIntents`, 45%), and `WidgetSnapshotWriter`'s fetch-and-write (0%; its decision is
+       `needsWrite`, tested in step 4).
+8. [x] **Prepare the app for UI tests.**
+   - A `-UITesting` launch argument (Debug only) that:
+     - Implies `-UseSampleData`.
+     - Turns the app lock off.
+     - Keeps settings in a fresh `UserDefaults` suite, so the accent, layout and sort start at their defaults.
+     - Skips the widget summary and Watch.
+   - `accessibilityIdentifier`s on the controls the tests drive: the add buttons, the account tiles and rows, the form
+     fields, Save, the tabs and the Settings controls.
+   - Done: `LaunchMode` (`Stirling Money/Models/LaunchMode.swift`) holds `isHostingUnitTests` (moved from the app),
+     `isUITesting` and `settings`. Under `-UITesting`, `settings` is a store of its own, emptied at launch. The app
+     uses it for `@AppStorage` (`.defaultAppStorage`), for `AppLock`, and for `AccentChoice.store` in place of the
+     App Group.
+   - Checked on the simulator: with the layout saved as list, a `-UITesting` launch shows the sample data in tiles,
+     and a normal launch still shows the list.
+   - Identifiers:
+     - Accounts: `addAccount`, `toggleLayout`, `settings`, `accountsTotal`, `account.<name>`.
+     - New account: `accountName`, `initialBalance`.
+     - Register: `addTransaction`, `availableBalance`, `postedBalance`, `transaction.<payee>`.
+     - Transaction form: `transactionType`, `amount`, `payee`, `otherAccount`, `transactionPosted`.
+     - Budgets and goals: `addBudget`, `budget.<name>`, `budgetName`, `budgetAmount`; `addGoal`, `goal.<name>`,
+       `goalName`, `goalTarget`, `goalAccount`.
+     - Reports: `report.<case>`.
+     - Settings: `sortAccounts`, `accentChoice`, `customAccent`.
+     - Every form's Save button: `save`. `CurrencyField` takes an `identifier` for its text field.
+9. [x] **Real iPhone UI tests** (replacing the template; on the iPhone simulator, one `XCUIApplication` per test with
+   `-UITesting`):
+   - Launch: the Accounts tab shows the sample total and three tiles.
+   - Add an account with an opening balance; the total goes up by that amount.
+   - Add a withdrawal to Checking; its balance and the total go down.
+   - Transfer between two accounts; both balances change and the total doesn't.
+   - Search the register by payee.
+   - Mark a transaction posted; the posted balance changes.
+   - Add a budget and a goal; their cards show on Budgets and Goals.
+   - Reports: each report opens.
+   - Settings: switch to the list layout and back, choose a custom accent.
+   - Keep the launch performance test, which is fine as it is.
+   - Optional later: run the same suite on an iPad simulator; on the Mac, check the sidebar and the Settings window.
+   - Done: 11 tests plus launch performance in `Stirling_MoneyUITests`, about 4 minutes on the iPhone simulator.
+     They passed twice in a row.
+   - Each test launches with `-UITesting -AppleLanguages (en) -AppleLocale en_US`, so amounts read the same whatever
+     the simulator's language. The performance test uses the same arguments.
+   - SwiftUI folds an amount into the label of its row or tile ("Total, $19,660.73"), so the tests wait for that
+     label to contain the amount (`expectLabel(of:toContain:)`) rather than looking for a text element.
+   - The register's search field is hidden under the title until the list is pulled down.
+   - A row's posted checkmark is a button that carries the row's identifier, and it reads "Posted" or "Not posted".
+   - The register's balances are checked through `availableBalance` and `postedBalance`, the accounts screen's
+     through `accountsTotal` and each tile.
+10. [x] **A Watch UI smoke test.**
+    - The Watch app's own `-UseSampleData` loads `WidgetSnapshot.sample` instead of the saved summary.
+    - Replace the template with: the Accounts page shows the total, then swipe to Budgets and Goals.
+    - Done: `-UseSampleData` in the Watch app (Debug only) shows `WidgetSnapshot.sample` and skips the WatchConnectivity
+      session and refresh requests, so the test needs no paired iPhone.
+    - `StirlingMoney_Watch_AppUITests`: the three pages with the sample's amounts, tapping an account to see its posted
+      balance, and launch performance, about 1 minute on the Watch simulator.
+    - A page's list scrolls to its end before the next page comes in, so the test swipes until the next page's title
+      can be tapped.
+11. [x] **README, CLAUDE.md** (how to run each test target and the `-UITesting` argument) **and this plan**, with the
+    new coverage figures.
+    - Done (Nov 18, 2026). Where the tests stand:
+      - **iPhone unit tests:** 137 (from 85).
+      - **iPhone UI tests:** 11 plus launch time (from a template).
+      - **Watch unit tests:** 8.
+      - **Watch UI tests:** 2 plus launch time (from a template).
+    - Unit-test coverage of the app is 16.4% of lines, against an honest 14.4% baseline. Models and logic are at 80–100%;
+      screens are left to the UI tests.
+    - Bugs found on the way:
+      - A custom accent color made every update rewrite the widget summary and resend it to the Watch (step 4).
+      - `AppLock.isEnabled` ignored the store it was given (step 5).
+      - The Watch complications showed "Add a goal…" for a deleted goal (step 2).
+
+**Not planned:** unit tests of SwiftUI layout, charts or widget rendering. Previews and checks on the devices suit those
+better.
+
+**Risks and questions**
+- **UI test speed and flakiness.** Each test launches the app: keep about ten, use identifiers rather than labels, and
+  wait for elements instead of sleeping.
+- **Detecting tests at launch** relies on an Xcode environment variable. If that ever changes, the hostless test target
+  is the fallback, and it needs an approved project change.
+- **Locale tests** depend on Foundation's formatting data. Assert that values round-trip, not exact strings, except
+  where the separator is the point of the test.
 
 ## Open items
 

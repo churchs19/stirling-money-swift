@@ -32,11 +32,12 @@ struct BalanceProvider: AppIntentTimelineProvider {
 
     private func entry(for configuration: SelectAccountIntent) -> BalanceEntry {
         let snapshot = WidgetSnapshot.load()
-        guard let wanted = configuration.account else {
-            return BalanceEntry(date: .now, snapshot: snapshot, account: nil, isMissing: false, accent: WidgetAccent.current)
+        let choice = BalanceChoice.choose(accountID: configuration.account?.id, in: snapshot)
+        var account: WidgetSnapshot.AccountSummary?
+        if case let .account(chosen) = choice {
+            account = chosen
         }
-        let account = snapshot?.accounts.first { $0.id == wanted.id }
-        return BalanceEntry(date: .now, snapshot: snapshot, account: account, isMissing: account == nil, accent: WidgetAccent.current)
+        return BalanceEntry(date: .now, snapshot: snapshot, account: account, isMissing: choice == .missing, accent: WidgetAccent.current)
     }
 }
 

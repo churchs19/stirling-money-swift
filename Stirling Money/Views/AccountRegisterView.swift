@@ -25,9 +25,11 @@ struct AccountRegisterView: View {
                 LabeledContent("Available Balance") {
                     AmountText(account.balance)
                 }
+                .accessibilityIdentifier("availableBalance")
                 LabeledContent("Posted Balance") {
                     AmountText(account.postedBalance)
                 }
+                .accessibilityIdentifier("postedBalance")
             }
 
             Section {
@@ -42,6 +44,7 @@ struct AccountRegisterView: View {
                 } else {
                     ForEach(transactions) { transaction in
                         TransactionRow(transaction: transaction)
+                            .accessibilityIdentifier("transaction.\(transaction.displayPayee)")
                             // The posted toggle inside the row is a button of its own,
                             // so a tap gesture (not a row button) opens the editor.
                             .contentShape(Rectangle())
@@ -91,6 +94,7 @@ struct AccountRegisterView: View {
                 Button("Add Transaction", systemImage: "plus") {
                     isAddingTransaction = true
                 }
+                .accessibilityIdentifier("addTransaction")
             }
             ToolbarItem(placement: .secondaryAction) {
                 Button("Edit Account", systemImage: "pencil") {

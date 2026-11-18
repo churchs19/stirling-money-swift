@@ -43,16 +43,18 @@ struct TransactionFormView: View {
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
+                    .accessibilityIdentifier("transactionType")
                 }
 
                 Section {
-                    CurrencyField("Amount", text: $draft.amountText)
+                    CurrencyField("Amount", text: $draft.amountText, identifier: "amount")
 
                     if draft.kind == .transfer {
                         transferAccountPicker
                     } else {
                         LabeledContent("Payee") {
                             TextField("Payee", text: $draft.payee, prompt: Text("Required"))
+                                .accessibilityIdentifier("payee")
                                 .labelsHidden()
                                 .multilineTextAlignment(.trailing)
                                 .capitalizesWords()
@@ -71,6 +73,7 @@ struct TransactionFormView: View {
                     DatePicker("Date", selection: $draft.date, displayedComponents: .date)
                     Toggle("Posted", isOn: $draft.isPosted)
                         .toggleStyle(.posted)
+                        .accessibilityIdentifier("transactionPosted")
                 } footer: {
                     footer
                 }
@@ -112,6 +115,7 @@ struct TransactionFormView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save", action: save)
+                        .accessibilityIdentifier("save")
                         .disabled(!draft.isValid)
                 }
             }
@@ -144,6 +148,7 @@ struct TransactionFormView: View {
                     Text(other.name).tag(Optional(other))
                 }
             }
+            .accessibilityIdentifier("otherAccount")
         }
     }
 

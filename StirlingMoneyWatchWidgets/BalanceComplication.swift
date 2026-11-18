@@ -3,9 +3,11 @@ import WidgetKit
 
 struct BalanceComplicationEntry: TimelineEntry {
     let date: Date
-    /// nil when there's no summary yet or the chosen account was deleted.
+    /// nil when there's no summary yet or the chosen account was deleted; `isMissing` says which.
     let content: Content?
     var accent: Color = Color("AccentColor")
+    /// The chosen account was deleted.
+    var isMissing = false
 
     struct Content {
         /// nil for the total of all accounts.
@@ -43,23 +45,24 @@ struct BalanceComplicationProvider: AppIntentTimelineProvider {
 
     private func entry(for configuration: SelectAccountIntent, snapshot: WidgetSnapshot?) -> BalanceComplicationEntry {
         let accent = complicationAccent(snapshot)
-        guard let snapshot else {
-            return BalanceComplicationEntry(date: .now, content: nil, accent: accent)
-        }
-        guard let wanted = configuration.account else {
-            let content = BalanceComplicationEntry.Content(
-                account: nil, name: String(localized: "All Accounts"),
-                balance: snapshot.total, accountCount: snapshot.accounts.count
+        let content: BalanceComplicationEntry.Content?
+        let choice = BalanceChoice.choose(accountID: configuration.account?.id, in: snapshot)
+        switch choice {
+        case .total:
+            content = snapshot.map {
+                BalanceComplicationEntry.Content(
+                    account: nil, name: String(localized: "All Accounts"),
+                    balance: $0.total, accountCount: $0.accounts.count
+                )
+            }
+        case let .account(account):
+            content = BalanceComplicationEntry.Content(
+                account: account, name: account.name, balance: account.balance, accountCount: 1
             )
-            return BalanceComplicationEntry(date: .now, content: content, accent: accent)
+        case .noSummary, .missing:
+            content = nil
         }
-        guard let account = snapshot.accounts.first(where: { $0.id == wanted.id }) else {
-            return BalanceComplicationEntry(date: .now, content: nil, accent: accent)
-        }
-        let content = BalanceComplicationEntry.Content(
-            account: account, name: account.name, balance: account.balance, accountCount: 1
-        )
-        return BalanceComplicationEntry(date: .now, content: content, accent: accent)
+        return BalanceComplicationEntry(date: .now, content: content, accent: accent, isMissing: choice == .missing)
     }
 }
 
@@ -82,18 +85,14 @@ struct BalanceComplicationView: View {
             default:
                 rectangular(content)
             }
+        } else if entry.isMissing {
+            ComplicationMessage(
+                inline: "Account deleted",
+                message: "This account was deleted. Edit the watch face to choose another.",
+                systemImage: "banknote"
+            )
         } else {
-            switch family {
-            case .accessoryInline:
-                Text("Stirling Money")
-            case .accessoryRectangular:
-                Text("Open Stirling Money on your iPhone.")
-                    .font(.footnote)
-            default:
-                Image(systemName: "banknote")
-                    .font(.title3)
-                    .widgetAccentable()
-            }
+            ComplicationMessage(inline: "Stirling Money", message: "Open Stirling Money on your iPhone.", systemImage: "banknote")
         }
     }
 
@@ -182,6 +181,7 @@ struct BalanceComplication: Widget {
     ))
     BalanceComplicationEntry(date: .now, content: .init(account: nil, name: "All Accounts", balance: 9750.75, accountCount: 2))
     BalanceComplicationEntry(date: .now, content: nil)
+    BalanceComplicationEntry(date: .now, content: nil, isMissing: true)
 }
 
 #Preview("Circular", as: .accessoryCircular) {

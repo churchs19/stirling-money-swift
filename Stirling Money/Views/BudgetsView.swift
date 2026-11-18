@@ -19,6 +19,7 @@ struct BudgetsView: View {
                         editingBudget = budget
                     } label: {
                         BudgetRow(budget: budget, summary: budget.summary(allTransactions: transactions))
+                            .accessibilityIdentifier("budget.\(budget.name)")
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -52,6 +53,7 @@ struct BudgetsView: View {
                     Button("Add Budget", systemImage: "plus") {
                         isAddingBudget = true
                     }
+                    .accessibilityIdentifier("addBudget")
                 }
             }
             .sheet(isPresented: $isAddingBudget) {

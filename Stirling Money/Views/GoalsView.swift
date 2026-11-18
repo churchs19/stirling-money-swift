@@ -18,6 +18,7 @@ struct GoalsView: View {
                         editingGoal = goal
                     } label: {
                         GoalRow(goal: goal)
+                            .accessibilityIdentifier("goal.\(goal.name)")
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -59,6 +60,7 @@ struct GoalsView: View {
                     Button("Add Goal", systemImage: "plus") {
                         isAddingGoal = true
                     }
+                    .accessibilityIdentifier("addGoal")
                     .disabled(accounts.isEmpty)
                 }
             }

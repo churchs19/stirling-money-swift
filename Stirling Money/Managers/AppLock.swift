@@ -16,14 +16,30 @@ final class AppLock {
     /// Set when the app locks, so it asks to unlock once the next time it's active.
     private var needsPrompt: Bool
 
-    init(defaults: UserDefaults = .standard) {
+    @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored private let canAuthenticate: () -> Bool
+    @ObservationIgnored private let authenticator: (String) async -> Bool
+
+    /// - Parameters:
+    ///   - defaults: where the "Require Face ID" setting is stored.
+    ///   - canAuthenticate: whether the device has Face ID, Touch ID or a passcode set up. Tests pass their own.
+    ///   - authenticator: asks for Face ID, Touch ID or the passcode with the given reason, and returns whether it
+    ///     succeeded. Tests pass their own.
+    init(
+        defaults: UserDefaults = .standard,
+        canAuthenticate: @escaping () -> Bool = { AppLock.isAvailable },
+        authenticator: @escaping (String) async -> Bool = AppLock.askDeviceOwner
+    ) {
+        self.defaults = defaults
+        self.canAuthenticate = canAuthenticate
+        self.authenticator = authenticator
         let enabled = defaults.bool(forKey: Self.enabledKey)
         isLocked = enabled
         needsPrompt = enabled
     }
 
     var isEnabled: Bool {
-        UserDefaults.standard.bool(forKey: Self.enabledKey)
+        defaults.bool(forKey: Self.enabledKey)
     }
 
     /// Call when the app goes to the background.
@@ -43,7 +59,7 @@ final class AppLock {
     func unlock() async {
         guard isLocked, !isAuthenticating else { return }
         // If the device no longer has a passcode, the lock can't be checked, so don't shut the person out.
-        guard Self.isAvailable else {
+        guard canAuthenticate() else {
             isLocked = false
             return
         }
@@ -56,9 +72,13 @@ final class AppLock {
     func authenticate(reason: String) async -> Bool {
         isAuthenticating = true
         defer { isAuthenticating = false }
-        let context = LAContext()
+        return await authenticator(reason)
+    }
+
+    /// The real check: Face ID, Touch ID, Optic ID or the device passcode.
+    static func askDeviceOwner(reason: String) async -> Bool {
         do {
-            return try await context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason)
+            return try await LAContext().evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason)
         } catch {
             return false
         }

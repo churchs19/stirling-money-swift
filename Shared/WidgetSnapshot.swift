@@ -84,8 +84,28 @@ nonisolated struct WidgetSnapshot: Codable, Equatable {
 
     /// The latest snapshot, or nil if the app hasn't written one yet.
     static func load() -> WidgetSnapshot? {
-        guard let url = fileURL, let data = try? Data(contentsOf: url) else { return nil }
+        load(from: fileURL)
+    }
+
+    /// The snapshot saved at `url`, or nil when there's no file or it can't be read.
+    static func load(from url: URL?) -> WidgetSnapshot? {
+        guard let url, let data = try? Data(contentsOf: url) else { return nil }
         return try? JSONDecoder().decode(WidgetSnapshot.self, from: data)
+    }
+
+    /// Whether this summary should be written over `existing`, the bytes of the saved file: when there's no file, it
+    /// can't be read, or anything other than `updatedAt` changed. Skipping unchanged summaries saves reloading the
+    /// widgets and sending the Watch the same figures again.
+    ///
+    /// Compares the two as saved: a custom accent color's `Float`s don't come back from JSON exactly, so comparing
+    /// with this summary as it is in memory would always find a change.
+    func needsWrite(over existing: Data?) -> Bool {
+        let decoder = JSONDecoder()
+        guard let existing, var previous = try? decoder.decode(WidgetSnapshot.self, from: existing),
+              let current = try? decoder.decode(WidgetSnapshot.self, from: JSONEncoder().encode(self))
+        else { return true }
+        previous.updatedAt = current.updatedAt
+        return previous != current
     }
 
     var total: Decimal {

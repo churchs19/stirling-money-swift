@@ -3,9 +3,10 @@ import WidgetKit
 
 struct GoalComplicationEntry: TimelineEntry {
     let date: Date
-    /// nil when there's no summary yet, no goals, or the chosen goal was deleted.
+    /// nil when there's no summary yet, no goals, or the chosen goal was deleted; `emptyState` says which.
     let goal: WidgetSnapshot.GoalSummary?
     var accent: Color = Color("AccentColor")
+    var emptyState: ComplicationEmptyState = .noSummary
 }
 
 struct GoalComplicationProvider: AppIntentTimelineProvider {
@@ -34,9 +35,8 @@ struct GoalComplicationProvider: AppIntentTimelineProvider {
 
     private func entry(for configuration: SelectGoalIntent, snapshot: WidgetSnapshot?, on date: Date) -> GoalComplicationEntry {
         let accent = complicationAccent(snapshot)
-        // Not configured yet: the first goal.
-        let goal = configuration.goal.map { wanted in snapshot?.goals.first { $0.id == wanted.id } } ?? snapshot?.goals.first
-        return GoalComplicationEntry(date: date, goal: goal, accent: accent)
+        let choice = WidgetChoice.choose(id: configuration.goal?.id, from: snapshot?.goals)
+        return GoalComplicationEntry(date: date, goal: choice.item, accent: accent, emptyState: ComplicationEmptyState(choice))
     }
 }
 
@@ -98,16 +98,17 @@ struct GoalComplicationView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         } else {
-            switch family {
-            case .accessoryInline:
-                Text("No goals")
-            case .accessoryRectangular:
-                Text("Add a goal in Stirling Money on your iPhone.")
-                    .font(.footnote)
-            default:
-                Image(systemName: "flag")
-                    .font(.title3)
-                    .widgetAccentable()
+            switch entry.emptyState {
+            case .noSummary:
+                ComplicationMessage(inline: "Stirling Money", message: "Open Stirling Money on your iPhone.", systemImage: "flag")
+            case .noneExist:
+                ComplicationMessage(inline: "No goals", message: "Add a goal in Stirling Money on your iPhone.", systemImage: "flag")
+            case .missing:
+                ComplicationMessage(
+                    inline: "Goal deleted",
+                    message: "This goal was deleted. Edit the watch face to choose another.",
+                    systemImage: "flag.slash"
+                )
             }
         }
     }
@@ -145,7 +146,8 @@ struct GoalComplication: Widget {
     GoalComplication()
 } timeline: {
     GoalComplicationEntry(date: .now, goal: WidgetSnapshot.sample.goals[0])
-    GoalComplicationEntry(date: .now, goal: nil)
+    GoalComplicationEntry(date: .now, goal: nil, emptyState: .noneExist)
+    GoalComplicationEntry(date: .now, goal: nil, emptyState: .missing)
 }
 
 #Preview("Circular", as: .accessoryCircular) {

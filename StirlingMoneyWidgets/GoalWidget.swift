@@ -29,20 +29,16 @@ struct GoalProvider: AppIntentTimelineProvider {
     }
 
     private func entry(for configuration: SelectGoalIntent, on date: Date) -> GoalEntry {
-        guard let snapshot = WidgetSnapshot.load() else {
-            return GoalEntry(date: date, goal: nil, message: "Open Stirling Money to see your goals.")
+        switch WidgetChoice.choose(id: configuration.goal?.id, from: WidgetSnapshot.load()?.goals) {
+        case let .item(goal):
+            GoalEntry(date: date, goal: goal, message: "", accent: WidgetAccent.current)
+        case .noSummary:
+            GoalEntry(date: date, goal: nil, message: "Open Stirling Money to see your goals.")
+        case .noneExist:
+            GoalEntry(date: date, goal: nil, message: "Add a goal in Stirling Money.")
+        case .missing:
+            GoalEntry(date: date, goal: nil, message: "This goal was deleted. Edit the widget to choose another.")
         }
-        guard let wanted = configuration.goal else {
-            // Not configured yet: show the first goal, if there is one.
-            if let first = snapshot.goals.first {
-                return GoalEntry(date: date, goal: first, message: "", accent: WidgetAccent.current)
-            }
-            return GoalEntry(date: date, goal: nil, message: "Add a goal in Stirling Money.")
-        }
-        if let goal = snapshot.goals.first(where: { $0.id == wanted.id }) {
-            return GoalEntry(date: date, goal: goal, message: "", accent: WidgetAccent.current)
-        }
-        return GoalEntry(date: date, goal: nil, message: "This goal was deleted. Edit the widget to choose another.")
     }
 }
 

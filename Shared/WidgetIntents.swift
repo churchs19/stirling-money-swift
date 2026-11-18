@@ -21,12 +21,15 @@ nonisolated struct AccountEntity: AppEntity {
 }
 
 nonisolated struct AccountQuery: EntityQuery {
+    /// Where the summary comes from: the App Group file, or one a test supplies.
+    var summary: @Sendable () -> WidgetSnapshot? = { WidgetSnapshot.load() }
+
     func entities(for identifiers: [AccountEntity.ID]) async throws -> [AccountEntity] {
         try await suggestedEntities().filter { identifiers.contains($0.id) }
     }
 
     func suggestedEntities() async throws -> [AccountEntity] {
-        (WidgetSnapshot.load()?.accounts ?? []).map { AccountEntity(id: $0.id, name: $0.name) }
+        (summary()?.accounts ?? []).map { AccountEntity(id: $0.id, name: $0.name) }
     }
 }
 
@@ -47,12 +50,15 @@ nonisolated struct GoalEntity: AppEntity {
 }
 
 nonisolated struct GoalQuery: EntityQuery {
+    /// Where the summary comes from: the App Group file, or one a test supplies.
+    var summary: @Sendable () -> WidgetSnapshot? = { WidgetSnapshot.load() }
+
     func entities(for identifiers: [GoalEntity.ID]) async throws -> [GoalEntity] {
         try await suggestedEntities().filter { identifiers.contains($0.id) }
     }
 
     func suggestedEntities() async throws -> [GoalEntity] {
-        (WidgetSnapshot.load()?.goals ?? []).map { GoalEntity(id: $0.id, name: $0.name) }
+        (summary()?.goals ?? []).map { GoalEntity(id: $0.id, name: $0.name) }
     }
 }
 
@@ -73,12 +79,15 @@ nonisolated struct BudgetEntity: AppEntity {
 }
 
 nonisolated struct BudgetQuery: EntityQuery {
+    /// Where the summary comes from: the App Group file, or one a test supplies.
+    var summary: @Sendable () -> WidgetSnapshot? = { WidgetSnapshot.load() }
+
     func entities(for identifiers: [BudgetEntity.ID]) async throws -> [BudgetEntity] {
         try await suggestedEntities().filter { identifiers.contains($0.id) }
     }
 
     func suggestedEntities() async throws -> [BudgetEntity] {
-        (WidgetSnapshot.load()?.budgets ?? []).map { BudgetEntity(id: $0.id, name: $0.name) }
+        (summary()?.budgets ?? []).map { BudgetEntity(id: $0.id, name: $0.name) }
     }
 }
 
