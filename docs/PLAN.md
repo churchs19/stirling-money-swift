@@ -555,9 +555,15 @@ Code coverage of the unit tests:
    - A row's posted checkmark is a button that carries the row's identifier, and it reads "Posted" or "Not posted".
    - The register's balances are checked through `availableBalance` and `postedBalance`, the accounts screen's
      through `accountsTotal` and each tile.
-10. [ ] **A Watch UI smoke test.**
+10. [x] **A Watch UI smoke test.**
     - The Watch app's own `-UseSampleData` loads `WidgetSnapshot.sample` instead of the saved summary.
     - Replace the template with: the Accounts page shows the total, then swipe to Budgets and Goals.
+    - Done: `-UseSampleData` in the Watch app (Debug only) shows `WidgetSnapshot.sample` and skips the WatchConnectivity
+      session and refresh requests, so the test needs no paired iPhone.
+    - `StirlingMoney_Watch_AppUITests`: the three pages with the sample's amounts, tapping an account to see its posted
+      balance, and launch performance, about 1 minute on the Watch simulator.
+    - A page's list scrolls to its end before the next page comes in, so the test swipes until the next page's title
+      can be tapped.
 11. [ ] **README, CLAUDE.md** (how to run each test target and the `-UITesting` argument) **and this plan**, with the
     new coverage figures.
 

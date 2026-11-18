@@ -1,43 +1,64 @@
-//
-//  StirlingMoney_Watch_AppUITests.swift
-//  StirlingMoney Watch AppUITests
-//
-//  Created by Shane Church on 11/10/26.
-//
-
 import XCTest
 
+/// A smoke test of the Watch app's three pages, with `WidgetSnapshot.sample` (`-UseSampleData`): Checking $1,250.75
+/// and Savings $8,500.00 (total $9,750.75), the Food and Fun budgets, and the Emergency Fund goal. It doesn't need a
+/// paired iPhone.
+@MainActor
 final class StirlingMoney_Watch_AppUITests: XCTestCase {
+    private var app: XCUIApplication!
 
-    override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
-
-        // In UI tests it is usually best to stop immediately when a failure occurs.
+    override func setUp() async throws {
         continueAfterFailure = false
-
-        // In UI tests it’s important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
-    }
-
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
-    }
-
-    @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
-        let app = XCUIApplication()
+        app = XCUIApplication()
+        app.launchArguments = ["-UseSampleData", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
-
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
-        // XCUIAutomation Documentation
-        // https://developer.apple.com/documentation/xcuiautomation
     }
 
-    @MainActor
-    func testLaunchPerformance() throws {
-        // This measures how long it takes to launch your application.
+    /// Waits for any element whose label contains `text`. watchOS often folds a row's texts into one label.
+    private func expectText(_ text: String, file: StaticString = #filePath, line: UInt = #line) {
+        let match = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
+        XCTAssertTrue(match.waitForExistence(timeout: 5), "nothing shows \"\(text)\"", file: file, line: line)
+    }
+
+    /// Swipes up until a page titled `title` shows. A page's list scrolls to its end before the next page comes in.
+    private func swipeUp(toPage title: String, file: StaticString = #filePath, line: UInt = #line) {
+        let heading = app.staticTexts[title].firstMatch
+        for _ in 0 ..< 5 where !heading.isHittable {
+            app.swipeUp()
+        }
+        XCTAssertTrue(heading.waitForExistence(timeout: 5) && heading.isHittable, "didn't reach \(title)", file: file, line: line)
+    }
+
+    func testAccountsBudgetsAndGoalsPagesShowTheSummary() {
+        expectText("Accounts")
+        expectText("$9,750.75")
+        expectText("Checking")
+        expectText("$1,250.75")
+        expectText("Savings")
+
+        // The pages are stacked vertically.
+        swipeUp(toPage: "Budgets")
+        expectText("Food")
+        expectText("$125.00 left")
+        expectText("$30.00 over")
+
+        swipeUp(toPage: "Goals")
+        expectText("Emergency Fund")
+        expectText("$6,500.00 to go")
+    }
+
+    func testTappingAnAccountShowsItsPostedBalance() {
+        let checking = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Checking")).firstMatch
+        XCTAssertTrue(checking.waitForExistence(timeout: 5))
+        checking.tap()
+        expectText("Posted $1,180.25")
+    }
+
+    func testLaunchPerformance() {
         measure(metrics: [XCTApplicationLaunchMetric()]) {
-            XCUIApplication().launch()
+            let launched = XCUIApplication()
+            launched.launchArguments = app.launchArguments
+            launched.launch()
         }
     }
 }
