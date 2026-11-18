@@ -368,14 +368,14 @@ so the list is rebuilt when one is added, renamed or removed. A list of budgets 
    amount left in compact notation (negative when over). Corner: the amount left with a curved bar. Inline:
    "Food: $125.00 left". After the period ends it asks for the iPhone app instead. Unconfigured shows the first budget;
    the timeline reloads at the period's end. `complicationChoicesChanged` now includes budgets. Checked in previews.
-6. [ ] Check on the iPhone and iPad simulators, the Mac, the Watch simulator, then the real iPhone and Watch.
+6. [x] Check on the iPhone and iPad simulators, the Mac, the Watch simulator, then the real iPhone and Watch.
    - [x] Simulators and previews (Nov 18, 2026): the iPhone writes `periodTitle` into the summary; every widget size and
      the four complications checked in previews (iPhone, iPad, Watch); the Watch app's Budgets page shows the iPhone's
      budgets in the shared card. Adding widgets to the simulator's home screen can't be driven reliably from here (the
      edit menu ignores injected taps), and `simctl openurl` can't test the link because the scheme isn't registered
      (widget links don't need it; the Budgets link has a unit test).
-   - [ ] On the real iPhone, Watch and Mac: add the Budget, Budgets and Lock Screen widgets and the Budget complication;
-     check that tapping a widget opens the Budgets tab.
+   - [x] On the real iPhone, Watch and Mac (Nov 18, 2026): the Budget, All Budgets and Lock Screen widgets and the
+     Budget complication work. The list widget was renamed "All Budgets" in the gallery to tell it apart from "Budget".
 7. [ ] README, CLAUDE.md and this plan.
 
 **Risks and questions**
