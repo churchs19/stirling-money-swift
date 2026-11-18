@@ -7,5 +7,6 @@ struct StirlingMoneyWidgetsBundle: WidgetBundle {
         BalanceWidget()
         GoalWidget()
         BudgetWidget()
+        BudgetListWidget()
     }
 }

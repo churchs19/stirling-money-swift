@@ -7,6 +7,8 @@ struct BudgetSummaryCard: View {
     enum Style {
         /// As on the Budgets screen.
         case full
+        /// As on the Budgets screen without the period line, for stacking several in a medium widget.
+        case dense
         /// Stacked for narrow spaces (a small widget, the Watch): "$X left" without "of $Y", dates without the year.
         case compact
     }
@@ -27,13 +29,15 @@ struct BudgetSummaryCard: View {
                     .tint(budget.isOverBudget ? .red : accent)
                     .accessibilityHidden(true)
                 amounts
-                Text(budget.periodText(withYear: style == .full))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if style != .dense {
+                    Text(budget.periodText(withYear: style == .full))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             } else {
                 // The iPhone worked these figures out for a period that has since ended.
                 Text(Self.updateMessage)
-                    .font(style == .full ? .subheadline : .footnote)
+                    .font(style == .compact ? .footnote : .subheadline)
                     .foregroundStyle(.secondary)
             }
         }
@@ -47,7 +51,7 @@ struct BudgetSummaryCard: View {
 
     @ViewBuilder private var heading: some View {
         switch style {
-        case .full:
+        case .full, .dense:
             HStack(alignment: .firstTextBaseline) {
                 Text(budget.name)
                     .font(.headline)
@@ -73,7 +77,7 @@ struct BudgetSummaryCard: View {
 
     @ViewBuilder private var amounts: some View {
         switch style {
-        case .full:
+        case .full, .dense:
             HStack(alignment: .firstTextBaseline) {
                 Text("\(budget.spent, format: .localCurrency) of \(budget.amount, format: .localCurrency)")
                 Spacer()
@@ -105,6 +109,15 @@ struct BudgetSummaryCard: View {
         #else
             "Open Stirling Money to update."
         #endif
+    }
+}
+
+extension WidgetSnapshot {
+    /// The budgets a list widget with room for `capacity` cards shows, in the summary's order (by name, as on the
+    /// Budgets screen), and how many it leaves out.
+    static func budgetsToList(_ budgets: [BudgetSummary], capacity: Int) -> (shown: [BudgetSummary], more: Int) {
+        let shown = Array(budgets.prefix(max(capacity, 0)))
+        return (shown, budgets.count - shown.count)
     }
 }
 

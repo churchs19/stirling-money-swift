@@ -128,6 +128,24 @@ struct WidgetSnapshotTests {
         #expect(!budget.periodText(withYear: true).contains("·"))
     }
 
+    @Test func budgetListShowsWhatFitsAndCountsTheRest() {
+        let budgets = (1 ... 5).map {
+            WidgetSnapshot.BudgetSummary(
+                id: "\($0)", name: "B\($0)", amount: 100, spent: 0,
+                periodStart: day(2026, 11, 1), periodEnd: day(2026, 12, 1)
+            )
+        }
+        let medium = WidgetSnapshot.budgetsToList(budgets, capacity: 2)
+        #expect(medium.shown.map(\.id) == ["1", "2"], "in the summary's order")
+        #expect(medium.more == 3)
+
+        let roomy = WidgetSnapshot.budgetsToList(budgets, capacity: 8)
+        #expect(roomy.shown.count == 5)
+        #expect(roomy.more == 0)
+
+        #expect(WidgetSnapshot.budgetsToList([], capacity: 2).more == 0)
+    }
+
     @Test func budgetSummaryKnowsWhenItsPeriodIsOver() {
         let budget = WidgetSnapshot.BudgetSummary(
             id: "b", name: "Food", amount: 400, spent: 100,

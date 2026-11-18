@@ -330,7 +330,7 @@ which the summary leaves out.)
    - Lock Screen (iPhone): rectangular (name, bar, "$X left"), circular (ring of the amount spent, "$X left" below
      where it fits), inline ("Groceries: $120 left").
 2. **Budgets** (every budget, no setup; same order as the Budgets screen, as many as fit):
-   - Medium: 2 cards; large: about 5; extra large (iPad and Mac): two columns. "+3 more" when they don't all fit.
+   - Medium: 2 cards; large: 3; extra large (iPad and Mac): 6 in two columns. "+3 more" when they don't all fit.
 - Both open the app's Budgets tab: add `stirlingmoney://budgets` to `DeepLink`.
 - Timeline: one entry, reloaded when the app writes new data (as now) and at the end of the earliest period shown, so
   an ended period switches to "Open Stirling Money to update."
@@ -358,7 +358,11 @@ so the list is rebuilt when one is added, renamed or removed. A list of budgets 
    spending, amount left in compact notation, negative when over) and inline. Unconfigured shows the first budget. The
    timeline reloads at the end of the shown budget's period. Checked in previews (Lock Screen ones only render in
    interactive mode; static snapshots come out blank).
-4. [ ] The Budgets list widget (medium, large, extra large); a test for how many fit and the "+N more" count.
+4. [x] The Budgets list widget (medium, large, extra large); a test for how many fit and the "+N more" count.
+   Two full cards don't fit a medium widget, so the card gained a `dense` style (the full card without the period
+   line): medium shows 2 dense cards with no heading (and so no "+N more"); large a "Budgets" heading, "+N more" and 3
+   full cards; extra large (iPad and Mac) 6 full cards in two columns. `WidgetSnapshot.budgetsToList` picks them. The
+   timeline reloads when the earliest shown period ends. Checked in previews on the iPhone and the iPad.
 5. [ ] The Watch Budget complication and its recommendations; extend the recommendations test to budgets.
 6. [ ] Check on the iPhone and iPad simulators, the Mac, the Watch simulator, then the real iPhone and Watch.
 7. [ ] README, CLAUDE.md and this plan.
