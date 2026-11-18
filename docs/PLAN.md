@@ -349,7 +349,10 @@ so the list is rebuilt when one is added, renamed or removed. A list of budgets 
 1. [x] `periodTitle` in the summary; tests for it and for decoding a summary without it.
    It's an optional with a default, so the synthesized decoder reads summaries without it (the iPhone and Watch may
    briefly run different versions). The sample summary has "Monthly" and "Weekly" for previews.
-2. [ ] `BudgetSummaryCard` in `Shared/` (full and compact), with previews; the Watch app's Budgets page uses it.
+2. [x] `BudgetSummaryCard` in `Shared/` (full and compact), with previews; the Watch app's Budgets page uses it.
+   Full matches `BudgetRow` ("$275.00 of $400.00", "Monthly · Nov 8 – Dec 7, 2026"); compact stacks the name over the
+   category and drops "of $Y" and the year. `BudgetSummary.periodText(withYear:)` builds the period line. Callers add
+   their own padding. Checked in previews on the iPhone and the Watch.
 3. [ ] `SelectBudgetIntent`/`BudgetEntity`; the Budget widget (small, medium, Lock Screen) and `stirlingmoney://budgets`.
 4. [ ] The Budgets list widget (medium, large, extra large); a test for how many fit and the "+N more" count.
 5. [ ] The Watch Budget complication and its recommendations; extend the recommendations test to budgets.

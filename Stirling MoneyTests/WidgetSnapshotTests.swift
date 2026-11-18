@@ -114,6 +114,20 @@ struct WidgetSnapshotTests {
         #expect(budget.categoryName == nil)
     }
 
+    @Test func budgetPeriodTextStartsWithThePeriodsNameWhenKnown() {
+        var budget = WidgetSnapshot.BudgetSummary(
+            id: "b", name: "Food", amount: 400, spent: 100,
+            periodStart: day(2026, 11, 1), periodEnd: day(2026, 12, 1), periodTitle: "Monthly"
+        )
+        #expect(budget.periodText(withYear: true).hasPrefix("Monthly · "))
+        #expect(budget.periodText(withYear: true).contains("2026"))
+        #expect(!budget.periodText(withYear: false).contains("2026"))
+
+        // A summary from before period names were added shows just the dates.
+        budget.periodTitle = nil
+        #expect(!budget.periodText(withYear: true).contains("·"))
+    }
+
     @Test func budgetSummaryKnowsWhenItsPeriodIsOver() {
         let budget = WidgetSnapshot.BudgetSummary(
             id: "b", name: "Food", amount: 400, spent: 100,
