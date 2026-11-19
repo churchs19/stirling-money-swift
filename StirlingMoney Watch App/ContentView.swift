@@ -6,14 +6,8 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if let summary = store.snapshot {
-                // Recurring transactions the iPhone hasn't added yet count from the day they fall due
-                // (`projected(on:)`), checked every hour while the app is open. The schedule starts at a fixed
-                // time (today's midnight): starting it at `.now` would make each redraw a new schedule, and so
-                // another redraw, without end.
-                TimelineView(.periodic(from: Calendar.current.startOfDay(for: .now), by: 3600)) { context in
-                    pages(summary.projected(on: context.date))
-                }
+            if let summary = store.current {
+                pages(summary)
             } else {
                 ContentUnavailableView(
                     "No Data Yet",

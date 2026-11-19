@@ -142,7 +142,6 @@ struct AccountRegisterView: View {
                 Button("Add Recurring Transaction", systemImage: "repeat") {
                     recurringForm = .new
                 }
-                .accessibilityIdentifier("addRecurring")
             }
             ToolbarItem(placement: .secondaryAction) {
                 Button("Edit Account", systemImage: "pencil") {

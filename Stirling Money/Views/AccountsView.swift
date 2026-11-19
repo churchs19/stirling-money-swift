@@ -59,7 +59,6 @@ struct AccountsView: View {
                     Button("Recurring", systemImage: "repeat") {
                         isShowingRecurring = true
                     }
-                    .accessibilityIdentifier("recurringTransactions")
                 }
                 ToolbarItem(placement: .secondaryAction) {
                     Button("Categories", systemImage: "tag") {
@@ -83,7 +82,6 @@ struct AccountsView: View {
                         Button("Settings", systemImage: "gear") {
                             isShowingSettings = true
                         }
-                        .accessibilityIdentifier("settings")
                     #endif
                 }
             }

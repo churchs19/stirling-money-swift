@@ -793,10 +793,20 @@ change balances without opening the app.
      end, midnight for days left). Each provider (Balance, Goal, Budget, All Budgets and the three complications) makes
      one entry per date from `projected(on:)` and reloads `.atEnd`. The Watch app's pages show the projection,
      redrawn hourly.
-   - Found and fixed: a `TimelineView(.periodic(from: .now, …))` starts a new schedule on every redraw, and so redraws
-     without end; the Watch UI test timed out waiting for the app to go idle. It now starts at today's midnight.
-   - 206 iPhone unit tests (one new for `timelineDates`), the 8 Watch unit tests and the Mac build pass.
-8. [ ] UI tests: add a recurring transaction and see it in Upcoming; Skip Next; the Recurring screen.
+   - The Watch app's pages show `WatchStore.current`: the summary projected to `today`, which `showToday()` moves on
+     whenever the app comes to the front (every wrist raise). A first attempt wrapped the pages in an hourly
+     `TimelineView`, which kept the app from going idle: every UI-test query took about 30 seconds and the Watch UI test
+     ran for 10 minutes or more. Neither `.periodic(from: .now, …)` nor a fixed start fixed that, so the TimelineView
+     is gone.
+   - 206 iPhone unit tests (one new for `timelineDates`), 9 Watch unit tests (one new for `current`), both Watch UI
+     tests and the Mac build pass.
+8. [x] UI tests: add a recurring transaction and see it in Upcoming; Skip Next; the Recurring screen.
+   - Done: three tests in `Stirling_MoneyUITests`. Adding one checks the Upcoming row; under `-UITesting` the runner is
+     off, so it's listed and the balance doesn't change. Skip Next checks the sample rent's next date before and after,
+     worked out from today. The Recurring screen checks the rules from every account.
+   - Found: items in a toolbar's ⋯ menu lose their accessibility identifiers, so tests find them by label
+     (`menuItem(_:)`). The Settings test had only passed because its gear icon's accessibility label happened to be
+     "settings". The unused identifiers on those menu items are removed.
 9. [ ] Check on the simulators, the Mac, and the real iPhone and Watch. The background run needs a few days on the
    iPhone to see iOS's timing.
 10. [ ] README, CLAUDE.md and this plan.
