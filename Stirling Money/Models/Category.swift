@@ -13,6 +13,10 @@ final class Category {
     @Relationship(deleteRule: .cascade, inverse: \Budget.category)
     var budgets: [Budget]? = []
 
+    /// Recurring transactions in this category keep repeating, uncategorized, when it's deleted.
+    @Relationship(deleteRule: .nullify, inverse: \RecurringTransaction.category)
+    var recurringTransactions: [RecurringTransaction]? = []
+
     init(name: String) {
         self.name = name
     }

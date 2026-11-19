@@ -697,8 +697,20 @@ change balances without opening the app.
    - Twice a month uses the start's day plus `secondDay`, leaving out a day before the start. A day past the month's
      end means its last day.
    - `RecurrenceScheduleTests`: 15 tests (18 runs with the per-frequency arguments).
-2. [ ] `RecurringTransaction` and the relationships, in `AppSchema`. Tests for the delete rules (an account, the other
+2. [x] `RecurringTransaction` and the relationships, in `AppSchema`. Tests for the delete rules (an account, the other
    account, a category, a rule).
+   - Done: `Models/RecurringTransaction.swift`. The amount is stored positive and dates as days. It has `schedule`,
+     `hasEnded(calendar:)`, `problem` (the account, or a transfer's other account, was deleted) and `displayPayee`.
+   - Inverses, each declared on one side:
+     - `Account.recurringTransactions` (cascade).
+     - `Account.recurringTransfersIn` (nullify, for `otherAccount`).
+     - `Category.recurringTransactions` (nullify).
+     - `RecurringTransaction.transactions` (nullify, inverse `AccountTransaction.recurrence`).
+   - `RecurringTransactionTests`: 10 tests. In test files, write `Stirling_Money.Category`: Swift Testing has a
+     `Category` too.
+   - Upgrading an existing store: the simulator's real store opened and gained the `ZRECURRINGTRANSACTION` table
+     without trouble. The store is in the App Group's container, not the app's. The real devices are checked in
+     step 9.
 3. [ ] `RecurringScheduler.addDue`. Tests for:
    - one due occurrence, a catch-up over several months, and nothing due;
    - the end date and end count;
