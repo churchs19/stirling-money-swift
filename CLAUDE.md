@@ -161,7 +161,9 @@ Structured data means fewer tokens consumed and better error diagnosis.
   (`XcodeNewTarget`, `AddInfoPlist`, `AddEntitlement`) were used to add the widget target, App Group and
   `NSFaceIDUsageDescription`. Approved for Phase 7: the Watch app and complications targets, their App Group, display
   names and Swift version, and (made by hand in Xcode) the `Shared/` folder membership and the Watch app's iOS platform
-  filters. Ask before any further project change.
+  filters. Approved for Phase 10 (made with `AddInfoPlist`): `UIBackgroundModes` = `fetch` and
+  `BGTaskSchedulerPermittedIdentifiers` = `net.s-church.stirlingmoney.recurring` on the app target, which put them in
+  `Stirling-Money-Info.plist` (merged with the generated Info.plist keys). Ask before any further project change.
 - NEVER use ObservableObject — use @Observable
 - NEVER use NavigationView — use NavigationStack
 - @Model classes are already Observable — do not add @Observable macro

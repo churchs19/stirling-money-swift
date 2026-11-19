@@ -685,6 +685,10 @@ change balances without opening the app.
 **Project changes** (to be confirmed before each is made, using Xcode's tools):
 1. The app target's **Background Modes** capability with **Background fetch** (iOS only).
 2. `BGTaskSchedulerPermittedIdentifiers` in the app's Info.plist, listing `net.s-church.stirlingmoney.recurring`.
+- Done (Nov 19, 2026, approved). Both were made with Xcode's `AddInfoPlist`, which created `Stirling-Money-Info.plist`
+  at the top of the repo and set the app target's `INFOPLIST_FILE` for Debug and Release. Its keys are merged with the
+  generated ones (`GENERATE_INFOPLIST_FILE` stays on).
+- Background fetch needs no entitlement. The built app has both keys, and the Mac build is unaffected.
 - The new model needs no project change; it's added to `AppSchema`. SwiftData migrates by adding the new entity and
   optional relationships, which also stays CloudKit-compatible.
 
@@ -711,12 +715,19 @@ change balances without opening the app.
    - Upgrading an existing store: the simulator's real store opened and gained the `ZRECURRINGTRANSACTION` table
      without trouble. The store is in the App Group's container, not the app's. The real devices are checked in
      step 9.
-3. [ ] `RecurringScheduler.addDue`. Tests for:
+3. [x] `RecurringScheduler.addDue`. Tests for:
    - one due occurrence, a catch-up over several months, and nothing due;
    - the end date and end count;
    - transfers as linked pairs, check numbers, category and note;
    - Skip Next and Add Now;
    - running twice adds nothing new.
+   - Done: `Managers/RecurringScheduler.swift` has `addDue(in:now:calendar:)`, `addNow`, `skipNext` and
+     `nextDueDate` (for scheduling the background run).
+   - Transfers link both halves to the rule. Checks take `account.nextCheckNumber` one by one. A rule with a `problem`
+     is left where it is.
+   - Skipping counts toward an "after N times" end.
+   - `RecurringSchedulerTests`: 16 tests, which also cover a deposit twice a month, the catch-up cap of 400 per run
+     carrying on next time, and an occurrence due late at night.
 4. [ ] Running it at launch, on becoming active, on the Mac's timer and in the background, after the project changes
    (with approval). Check a background run with Xcode's "Simulate Background Fetch" on the simulator and on the
    device.
