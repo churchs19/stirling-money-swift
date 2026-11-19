@@ -728,9 +728,22 @@ change balances without opening the app.
    - Skipping counts toward an "after N times" end.
    - `RecurringSchedulerTests`: 16 tests, which also cover a deposit twice a month, the catch-up cap of 400 per run
      carrying on next time, and an occurrence due late at night.
-4. [ ] Running it at launch, on becoming active, on the Mac's timer and in the background, after the project changes
+4. [x] Running it at launch, on becoming active, on the Mac's timer and in the background, after the project changes
    (with approval). Check a background run with Xcode's "Simulate Background Fetch" on the simulator and on the
    device.
+   - Done: `Managers/RecurringRunner.swift`.
+     - **When it runs:** `start` runs it at launch (after `WidgetSnapshotWriter` starts), when the app becomes active,
+       and at midnight (`.NSCalendarDayChanged`). On the Mac it also runs every hour and when the Mac wakes.
+     - **Background:** after each run, and when the app goes to the background, it asks for a background run at the
+       earliest due date with the async `BGTaskScheduler.submitTaskRequest` (`submit` is deprecated in iOS 27). The
+       app's scene handles `.backgroundTask(.appRefresh(...))` with `runInBackground()`, which also writes the widget
+       summary straight away.
+     - **Not under tests:** nothing runs under `LaunchMode.isTesting`, unit or UI.
+   - Tests: `RecurringRunnerTests` checks the wake-up date and that the identifier is in the built Info.plist.
+   - Not yet checked at run time: a launch actually adding a due rule (needs the sample-data rules from step 5), and a
+     background run. The simulator doesn't run BGTasks, so on the device use the debugger:
+     `e -l objc -- (void)[[BGTaskScheduler sharedScheduler] _simulateLaunchForTaskWithIdentifier:@"net.s-church.stirlingmoney.recurring"]`
+     (step 9).
 5. [ ] `RecurringDraft` and `RecurringFormView`, the register's Upcoming section, "Make Recurring…", and the
    Recurring screen. Sample-data rules. Form tests like the other drafts'.
 6. [ ] `upcoming` in the summary and `WidgetSnapshot.projected(on:)`, with tests for:

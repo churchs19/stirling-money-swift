@@ -193,3 +193,19 @@ struct RecurringSchedulerTests {
         #expect(try RecurringScheduler.nextDueDate(in: context, calendar: utc) == day(2026, 12, 3))
     }
 }
+
+/// When the app asks iOS to wake it for recurring transactions.
+struct RecurringRunnerTests {
+    @Test func wakesAtTheNextDueDateOrAsSoonAsPossibleIfOneIsDue() {
+        let now = day(2026, 11, 20).addingTimeInterval(10 * 3600)
+        #expect(RecurringRunner.earliestBeginDate(nextDue: day(2026, 12, 1), now: now) == day(2026, 12, 1))
+        #expect(RecurringRunner.earliestBeginDate(nextDue: day(2026, 11, 1), now: now) == now, "already due")
+        #expect(RecurringRunner.earliestBeginDate(nextDue: nil, now: now) == nil, "nothing will fall due")
+    }
+
+    @Test func theTaskIdentifierMatchesTheInfoPlist() throws {
+        // BGTaskScheduler refuses identifiers that aren't listed under BGTaskSchedulerPermittedIdentifiers.
+        let permitted = Bundle.main.object(forInfoDictionaryKey: "BGTaskSchedulerPermittedIdentifiers") as? [String]
+        #expect(permitted?.contains(RecurringRunner.taskIdentifier) == true)
+    }
+}
