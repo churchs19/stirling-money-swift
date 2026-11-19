@@ -75,6 +75,7 @@ enum WidgetSnapshotWriter {
                 goals: context.fetch(FetchDescriptor<Goal>()),
                 budgets: budgets,
                 transactions: transactions,
+                recurring: context.fetch(FetchDescriptor<RecurringTransaction>()),
                 accentColor: AccentChoice.sharedCustomColor
             )
             guard snapshot.needsWrite(over: try? Data(contentsOf: url)) else { return }

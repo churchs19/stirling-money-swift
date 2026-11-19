@@ -24,6 +24,10 @@ nonisolated struct WidgetSnapshot: Codable, Equatable {
         var targetAmount: Decimal
         var progress: Double
         var targetDate: Date
+        /// The goal's account, so projected balances can move it. nil in summaries written before it was added.
+        var accountID: String? = nil
+        /// The account's balance when the goal started, which progress is measured from. nil in older summaries.
+        var initialBalance: Decimal? = nil
     }
 
     /// A budget's current period, worked out on the iPhone. Only budgets in an active period are included.
@@ -69,6 +73,8 @@ nonisolated struct WidgetSnapshot: Codable, Equatable {
     var accounts: [AccountSummary]
     var goals: [GoalSummary]
     var budgets: [BudgetSummary] = []
+    /// Recurring transactions in the next 45 days that the app hasn't added yet, oldest first. See `projected(on:)`.
+    var upcoming: [UpcomingOccurrence] = []
     /// The custom accent color chosen on the iPhone; nil means Stirling Money's purple.
     var accentColor: Color.Resolved? = nil
     var updatedAt: Date
@@ -148,6 +154,7 @@ extension WidgetSnapshot {
         accounts = try container.decode([AccountSummary].self, forKey: .accounts)
         goals = try container.decode([GoalSummary].self, forKey: .goals)
         budgets = try container.decodeIfPresent([BudgetSummary].self, forKey: .budgets) ?? []
+        upcoming = try container.decodeIfPresent([UpcomingOccurrence].self, forKey: .upcoming) ?? []
         accentColor = try container.decodeIfPresent(Color.Resolved.self, forKey: .accentColor)
         updatedAt = try container.decode(Date.self, forKey: .updatedAt)
     }

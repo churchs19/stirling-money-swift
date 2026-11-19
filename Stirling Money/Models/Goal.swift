@@ -33,10 +33,8 @@ final class Goal {
 
     /// Fraction of the way from the starting balance to the target, from 0 to 1.
     var progress: Double {
-        let span = targetAmount - initialBalance
-        guard span > 0 else { return currentAmount >= targetAmount ? 1 : 0 }
-        let fraction = NSDecimalNumber(decimal: (currentAmount - initialBalance) / span).doubleValue
-        return min(max(fraction, 0), 1)
+        // Shared with the widgets' projection, so the two can't disagree.
+        WidgetSnapshot.GoalSummary.progress(current: currentAmount, target: targetAmount, initial: initialBalance)
     }
 
     /// Whole days until the target date; negative once it's overdue.

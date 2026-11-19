@@ -772,12 +772,21 @@ change balances without opening the app.
      - Saving a $15 "Gym" rule starting today added it straight away (unposted, with the repeat icon; Checking went
        from $10,229.11 to $10,214.11), and its next date moved to a month later. This is also step 4's pending check.
    - The 11 iPhone UI tests still pass, and the Mac builds.
-6. [ ] `upcoming` in the summary and `WidgetSnapshot.projected(on:)`, with tests for:
+6. [x] `upcoming` in the summary and `WidgetSnapshot.projected(on:)`, with tests for:
    - balances and the total;
    - transfers (the total doesn't change);
    - goals;
    - budgets, both by category and all-spending, inside and outside the current period;
    - decoding old summaries.
+   - Done: `Shared/WidgetSnapshot+Projection.swift` has `UpcomingOccurrence`, `projected(on:)`, `upcomingDays(after:)`,
+     `BudgetSummary.counts(_:)` (the same rule as `Budget.spent`) and `GoalSummary.progress(current:target:initial:)`,
+     which `Goal.progress` now uses too.
+   - Goal summaries gained an optional `accountID` and `initialBalance`, which the projection needs. Older summaries
+     decode without them, and their goals just don't move.
+   - The app builds `upcoming` from `RecurringTransaction.upcomingDates(through:)`, which respects the end date and
+     count and skips rules that need attention. `WidgetSnapshotWriter` passes the rules in.
+   - `WidgetProjectionTests`: 12 tests. One builds the summary before `addDue`, projects it, then compares it with the
+     summary after `addDue`: balances, posted balances, goal amounts and progress, and budget spending all match.
 7. [ ] The widgets, complications and Watch pages use the projection; widget timelines get an entry per occurrence
    day. Check in previews and on the simulator.
 8. [ ] UI tests: add a recurring transaction and see it in Upcoming; Skip Next; the Recurring screen.

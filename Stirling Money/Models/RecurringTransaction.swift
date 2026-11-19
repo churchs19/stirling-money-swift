@@ -90,6 +90,23 @@ final class RecurringTransaction {
         return false
     }
 
+    /// The occurrences still to add, from `nextDate` through `last`'s day, within the end date and count.
+    func upcomingDates(through last: Date, limit: Int = 100, calendar: Calendar = .current) -> [Date] {
+        guard problem == nil else { return [] }
+        var lastDay = calendar.startOfDay(for: last)
+        if let endDate {
+            lastDay = min(lastDay, calendar.startOfDay(for: endDate))
+        }
+        let cap = min(limit, remainingCount ?? limit)
+        var dates: [Date] = []
+        var current = calendar.startOfDay(for: nextDate)
+        while current <= lastDay, dates.count < cap {
+            dates.append(current)
+            current = schedule.next(after: current, calendar: calendar)
+        }
+        return dates
+    }
+
     /// Why the rule can't add its next occurrence, if it can't: its account is gone, or a transfer's other account is.
     var problem: String? {
         if account == nil {
