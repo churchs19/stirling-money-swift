@@ -15,17 +15,19 @@ struct BudgetComplicationProvider: AppIntentTimelineProvider {
     }
 
     func snapshot(for configuration: SelectBudgetIntent, in context: Context) async -> BudgetComplicationEntry {
-        entry(for: configuration, snapshot: WidgetSnapshot.load() ?? (context.isPreview ? .sample : nil), on: .now)
+        entry(for: configuration, snapshot: (WidgetSnapshot.load() ?? (context.isPreview ? .sample : nil))?.projected(on: .now), on: .now)
     }
 
     func timeline(for configuration: SelectBudgetIntent, in context: Context) async -> Timeline<BudgetComplicationEntry> {
-        let entry = entry(for: configuration, snapshot: WidgetSnapshot.load(), on: .now)
-        // Amounts change when the Watch app receives a new summary. Also redraw when the period ends, so the
-        // complication stops showing last period's figures.
-        if let budget = entry.budget, budget.isCurrent(on: entry.date) {
-            return Timeline(entries: [entry], policy: .after(budget.periodEnd))
-        }
-        return Timeline(entries: [entry], policy: .never)
+        // Amounts change when the Watch app receives a new summary, and when recurring transactions fall due. Also
+        // redraw when the period ends, so the complication stops showing last period's figures.
+        let summary = WidgetSnapshot.load()
+        let now = Date.now
+        let current = entry(for: configuration, snapshot: summary?.projected(on: now), on: now)
+        let periodEnd = current.budget.flatMap { $0.isCurrent(on: now) ? $0.periodEnd : nil }
+        let dates = summary?.timelineDates(now: now, adding: periodEnd.map { [$0] } ?? []) ?? [now]
+        let entries = [current] + dates.dropFirst().map { entry(for: configuration, snapshot: summary?.projected(on: $0), on: $0) }
+        return Timeline(entries: entries, policy: dates.count > 1 ? .atEnd : .never)
     }
 
     /// The watch face editor lists each budget.

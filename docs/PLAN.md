@@ -787,8 +787,15 @@ change balances without opening the app.
      count and skips rules that need attention. `WidgetSnapshotWriter` passes the rules in.
    - `WidgetProjectionTests`: 12 tests. One builds the summary before `addDue`, projects it, then compares it with the
      summary after `addDue`: balances, posted balances, goal amounts and progress, and budget spending all match.
-7. [ ] The widgets, complications and Watch pages use the projection; widget timelines get an entry per occurrence
+7. [x] The widgets, complications and Watch pages use the projection; widget timelines get an entry per occurrence
    day. Check in previews and on the simulator.
+   - Done: `WidgetSnapshot.timelineDates(now:adding:)` gives now, each due day and extra moments (a budget period's
+     end, midnight for days left). Each provider (Balance, Goal, Budget, All Budgets and the three complications) makes
+     one entry per date from `projected(on:)` and reloads `.atEnd`. The Watch app's pages show the projection,
+     redrawn hourly.
+   - Found and fixed: a `TimelineView(.periodic(from: .now, …))` starts a new schedule on every redraw, and so redraws
+     without end; the Watch UI test timed out waiting for the app to go idle. It now starts at today's midnight.
+   - 206 iPhone unit tests (one new for `timelineDates`), the 8 Watch unit tests and the Mac build pass.
 8. [ ] UI tests: add a recurring transaction and see it in Upcoming; Skip Next; the Recurring screen.
 9. [ ] Check on the simulators, the Mac, and the real iPhone and Watch. The background run needs a few days on the
    iPhone to see iOS's timing.

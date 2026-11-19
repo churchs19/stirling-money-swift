@@ -112,6 +112,20 @@ struct WidgetProjectionTests {
         #expect(snapshot.upcomingDays(after: day(2026, 11, 19), within: 45, calendar: utc) == [day(2026, 11, 20), day(2026, 12, 25)])
     }
 
+    @Test func widgetsRedrawNowOnEachDueDayAndAtExtraMoments() {
+        let now = day(2026, 11, 19).addingTimeInterval(10 * 3600)
+        let snapshot = summary(upcoming: [
+            Occurrence(date: day(2026, 11, 20), accountID: "checking", amount: -1),
+            Occurrence(date: day(2026, 11, 25), accountID: "checking", amount: -1),
+        ])
+        // A budget period ending Dec 1, and one extra moment already past (ignored).
+        #expect(snapshot.timelineDates(now: now, adding: [day(2026, 12, 1), day(2026, 11, 1)], calendar: utc)
+            == [now, day(2026, 11, 20), day(2026, 11, 25), day(2026, 12, 1)])
+        #expect(summary(upcoming: []).timelineDates(now: now, calendar: utc) == [now], "nothing due: just now")
+        // The same day twice is one entry.
+        #expect(snapshot.timelineDates(now: now, adding: [day(2026, 11, 20)], calendar: utc).count == 3)
+    }
+
     // MARK: Building the summary
 
     @Test func theSummaryListsTheNext45DaysOfOccurrences() throws {

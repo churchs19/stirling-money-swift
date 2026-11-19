@@ -70,6 +70,14 @@ nonisolated extension WidgetSnapshot {
         return result
     }
 
+    /// When a widget showing this summary should redraw: now, the start of each day in the next 45 days when
+    /// something falls due, and any `extra` moments after now (a budget period's end, midnight), oldest first.
+    /// Each entry shows `projected(on:)` its date.
+    func timelineDates(now: Date, adding extra: [Date] = [], calendar: Calendar = .current) -> [Date] {
+        let later = upcomingDays(after: now, calendar: calendar) + extra.filter { $0 > now }
+        return [now] + Array(Set(later)).sorted()
+    }
+
     /// The days in the next `days` days (after today) when something falls due, for widget timelines.
     func upcomingDays(after now: Date, within days: Int = 45, calendar: Calendar = .current) -> [Date] {
         let today = calendar.startOfDay(for: now)

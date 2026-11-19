@@ -19,17 +19,21 @@ struct GoalProvider: AppIntentTimelineProvider {
         if context.isPreview, WidgetSnapshot.load() == nil {
             return placeholder(in: context)
         }
-        return entry(for: configuration, on: .now)
+        return entry(for: configuration, snapshot: WidgetSnapshot.load()?.projected(on: .now), on: .now)
     }
 
     func timeline(for configuration: SelectGoalIntent, in context: Context) async -> Timeline<GoalEntry> {
-        // Days left changes at midnight; balances change when the app writes new data.
+        // Days left changes at midnight; balances change when the app writes new data, and when recurring
+        // transactions fall due.
         let midnight = Calendar.current.startOfDay(for: .now.addingTimeInterval(86400))
-        return Timeline(entries: [entry(for: configuration, on: .now)], policy: .after(midnight))
+        let summary = WidgetSnapshot.load()
+        let dates = summary?.timelineDates(now: .now, adding: [midnight]) ?? [.now]
+        let entries = dates.map { entry(for: configuration, snapshot: summary?.projected(on: $0), on: $0) }
+        return Timeline(entries: entries, policy: dates.count > 1 ? .atEnd : .after(midnight))
     }
 
-    private func entry(for configuration: SelectGoalIntent, on date: Date) -> GoalEntry {
-        switch WidgetChoice.choose(id: configuration.goal?.id, from: WidgetSnapshot.load()?.goals) {
+    private func entry(for configuration: SelectGoalIntent, snapshot: WidgetSnapshot?, on date: Date) -> GoalEntry {
+        switch WidgetChoice.choose(id: configuration.goal?.id, from: snapshot?.goals) {
         case let .item(goal):
             GoalEntry(date: date, goal: goal, message: "", accent: WidgetAccent.current)
         case .noSummary:
