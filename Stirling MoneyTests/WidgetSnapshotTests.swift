@@ -29,7 +29,8 @@ struct WidgetSnapshotTests {
         #expect(snapshot.goals == [
             WidgetSnapshot.GoalSummary(
                 id: WidgetSnapshot.widgetID(for: goal), name: "Trip", accountName: "Savings",
-                currentAmount: 1500, targetAmount: 2000, progress: 0.5, targetDate: day(2027, 6, 1)
+                currentAmount: 1500, targetAmount: 2000, progress: 0.5, targetDate: day(2027, 6, 1),
+                accountID: WidgetSnapshot.widgetID(for: savings), initialBalance: 1000
             ),
         ])
     }
@@ -258,4 +259,3 @@ struct AccountLinkTests {
         #expect(DeepLink.account(withWidgetID: id, in: []) == nil)
     }
 }
-

@@ -19,21 +19,23 @@ struct BudgetProvider: AppIntentTimelineProvider {
         if context.isPreview, WidgetSnapshot.load()?.budgets.isEmpty ?? true {
             return placeholder(in: context)
         }
-        return entry(for: configuration, on: .now)
+        return entry(for: configuration, snapshot: WidgetSnapshot.load()?.projected(on: .now), on: .now)
     }
 
     func timeline(for configuration: SelectBudgetIntent, in context: Context) async -> Timeline<BudgetEntry> {
-        let entry = entry(for: configuration, on: .now)
-        // The app reloads widgets when it writes new data. Also redraw when the period ends, so the widget
-        // asks for the app to be opened instead of showing last period's figures.
-        if let budget = entry.budget, budget.isCurrent(on: entry.date) {
-            return Timeline(entries: [entry], policy: .after(budget.periodEnd))
-        }
-        return Timeline(entries: [entry], policy: .never)
+        // The app reloads widgets when it writes new data. Also redraw when recurring transactions fall due, and
+        // when the period ends, so the widget asks for the app to be opened instead of showing last period's figures.
+        let summary = WidgetSnapshot.load()
+        let now = Date.now
+        let current = entry(for: configuration, snapshot: summary?.projected(on: now), on: now)
+        let periodEnd = current.budget.flatMap { $0.isCurrent(on: now) ? $0.periodEnd : nil }
+        let dates = summary?.timelineDates(now: now, adding: periodEnd.map { [$0] } ?? []) ?? [now]
+        let entries = [current] + dates.dropFirst().map { entry(for: configuration, snapshot: summary?.projected(on: $0), on: $0) }
+        return Timeline(entries: entries, policy: dates.count > 1 ? .atEnd : .never)
     }
 
-    private func entry(for configuration: SelectBudgetIntent, on date: Date) -> BudgetEntry {
-        switch WidgetChoice.choose(id: configuration.budget?.id, from: WidgetSnapshot.load()?.budgets) {
+    private func entry(for configuration: SelectBudgetIntent, snapshot: WidgetSnapshot?, on date: Date) -> BudgetEntry {
+        switch WidgetChoice.choose(id: configuration.budget?.id, from: snapshot?.budgets) {
         case let .item(budget):
             BudgetEntry(date: date, budget: budget, message: "", accent: WidgetAccent.current)
         case .noSummary:

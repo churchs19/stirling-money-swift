@@ -15,6 +15,15 @@ final class Account {
     @Relationship(deleteRule: .cascade, inverse: \Goal.account)
     var goals: [Goal]? = []
 
+    /// Recurring transactions added to this account; deleted with it.
+    @Relationship(deleteRule: .cascade, inverse: \RecurringTransaction.account)
+    var recurringTransactions: [RecurringTransaction]? = []
+
+    /// Recurring transfers into this account from others. Deleting the account leaves them without a destination,
+    /// and they stop until another is chosen.
+    @Relationship(deleteRule: .nullify, inverse: \RecurringTransaction.otherAccount)
+    var recurringTransfersIn: [RecurringTransaction]? = []
+
     init(name: String, initialBalance: Decimal = 0, iconName: String? = nil) {
         self.name = name
         self.initialBalance = initialBalance

@@ -21,6 +21,14 @@ final class WatchStore {
     private(set) var isRefreshing = false
     /// When the iPhone last sent a summary during this run, even one with no changes.
     private(set) var lastHeardFromPhone: Date?
+    /// The day the pages show. Moved on whenever the app comes to the front (`showToday()`).
+    private(set) var today = Date.now
+
+    /// The summary as of `today`: recurring transactions the iPhone hasn't added yet count from the day they fall
+    /// due (`WidgetSnapshot.projected(on:)`).
+    var current: WidgetSnapshot? {
+        snapshot?.projected(on: today)
+    }
 
     /// The custom accent color chosen on the iPhone, or Stirling Money's purple.
     var accent: Color {
@@ -66,6 +74,11 @@ final class WatchStore {
         self.receiver = receiver
         WCSession.default.delegate = receiver
         WCSession.default.activate()
+    }
+
+    /// Shows the summary as of now, such as when the app comes back to the front on a later day.
+    func showToday(_ now: Date = .now) {
+        today = now
     }
 
     /// Asks the iPhone for a fresh summary, if it's reachable. Otherwise the last one stays.

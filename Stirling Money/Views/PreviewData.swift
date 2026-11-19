@@ -70,6 +70,21 @@
             emergencyFund.account = savings
             vacation.account = savings
 
+            // Recurring transactions: rent and pay on Checking, a transfer to Savings and a yearly subscription.
+            // They start in the future, so the sample balances don't change by date.
+            let nextMonth = Calendar.current.date(byAdding: .month, value: 1, to: monthStart)!
+            let rent = RecurringTransaction(kind: .check, amount: 1450, payee: "Landlord", frequency: .monthly, startDate: Calendar.current.date(byAdding: .day, value: 1, to: nextMonth)!)
+            let pay = RecurringTransaction(kind: .deposit, amount: 2100, payee: "Employer", frequency: .twiceMonthly, startDate: nextMonth)
+            let toSavings = RecurringTransaction(kind: .transfer, amount: 400, frequency: .monthly, startDate: Calendar.current.date(byAdding: .day, value: 15, to: nextMonth)!)
+            let subscription = RecurringTransaction(kind: .withdrawal, amount: 99, payee: "Cloud Storage", frequency: .yearly, startDate: daysAgo(-40))
+            [rent, pay, toSavings, subscription].forEach(context.insert)
+            rent.account = checking
+            rent.category = housing
+            pay.account = checking
+            toSavings.account = checking
+            toSavings.otherAccount = savings
+            subscription.account = creditCard
+
             return container
         }()
     }

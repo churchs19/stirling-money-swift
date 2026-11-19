@@ -22,22 +22,25 @@ struct BalanceProvider: AppIntentTimelineProvider {
         if context.isPreview, WidgetSnapshot.load() == nil {
             return placeholder(in: context)
         }
-        return entry(for: configuration)
+        return entry(for: configuration, snapshot: WidgetSnapshot.load()?.projected(on: .now), on: .now)
     }
 
     func timeline(for configuration: SelectAccountIntent, in context: Context) async -> Timeline<BalanceEntry> {
-        // The app reloads widgets when it writes new data, so there's nothing to schedule.
-        Timeline(entries: [entry(for: configuration)], policy: .never)
+        // The app reloads widgets when it writes new data. Until then, recurring transactions that fall due
+        // change the balance at the start of their day.
+        let summary = WidgetSnapshot.load()
+        let dates = summary?.timelineDates(now: .now) ?? [.now]
+        let entries = dates.map { entry(for: configuration, snapshot: summary?.projected(on: $0), on: $0) }
+        return Timeline(entries: entries, policy: dates.count > 1 ? .atEnd : .never)
     }
 
-    private func entry(for configuration: SelectAccountIntent) -> BalanceEntry {
-        let snapshot = WidgetSnapshot.load()
+    private func entry(for configuration: SelectAccountIntent, snapshot: WidgetSnapshot?, on date: Date) -> BalanceEntry {
         let choice = BalanceChoice.choose(accountID: configuration.account?.id, in: snapshot)
         var account: WidgetSnapshot.AccountSummary?
         if case let .account(chosen) = choice {
             account = chosen
         }
-        return BalanceEntry(date: .now, snapshot: snapshot, account: account, isMissing: choice == .missing, accent: WidgetAccent.current)
+        return BalanceEntry(date: date, snapshot: snapshot, account: account, isMissing: choice == .missing, accent: WidgetAccent.current)
     }
 }
 

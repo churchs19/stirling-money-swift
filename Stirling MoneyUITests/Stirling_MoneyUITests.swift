@@ -70,6 +70,11 @@ final class Stirling_MoneyUITests: XCTestCase {
         waitFor(element("save")).tap()
     }
 
+    /// An item in a toolbar's ⋯ menu. Those lose their accessibility identifiers, so they're found by their label.
+    private func menuItem(_ label: String) -> XCUIElement {
+        app.buttons[label].firstMatch
+    }
+
     private func back() {
         app.navigationBars.buttons.firstMatch.tap()
     }
@@ -141,6 +146,52 @@ final class Stirling_MoneyUITests: XCTestCase {
         XCTAssertEqual(app.buttons["transaction.Coffee Cart"].firstMatch.label, "Posted")
     }
 
+    // MARK: Recurring transactions
+
+    /// "Wed, Dec 2", as the Upcoming rows show next dates (US English, like the launch arguments).
+    private func shortDate(_ date: Date) -> String {
+        date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().locale(Locale(identifier: "en_US")))
+    }
+
+    func testAddingARecurringTransactionShowsItInUpcoming() {
+        openAccount("Checking")
+        waitFor(app.navigationBars["Checking"].buttons["More"]).tap()
+        waitFor(menuItem("Add Recurring Transaction")).tap()
+        type("12.99", into: "recurringAmount")
+        type("Streaming", into: "recurringPayee")
+        waitFor(element("save")).tap()
+
+        // Starting today; under -UITesting the rule is listed but not added, so balances stay put.
+        expectLabel(of: "recurring.Streaming", toContain: "Monthly on the")
+        expectLabel(of: "recurring.Streaming", toContain: "-$12.99")
+        expectLabel(of: "availableBalance", toContain: "$10,229.11")
+    }
+
+    func testSkipNextMovesTheNextDateOn() throws {
+        // The sample rent is due on the 2nd of each month, from next month.
+        let calendar = Calendar.current
+        let thisMonth = try XCTUnwrap(calendar.dateInterval(of: .month, for: .now)?.start)
+        let firstRent = try XCTUnwrap(calendar.date(byAdding: DateComponents(month: 1, day: 1), to: thisMonth))
+        let secondRent = try XCTUnwrap(calendar.date(byAdding: .month, value: 1, to: firstRent))
+
+        openAccount("Checking")
+        expectLabel(of: "recurring.Landlord", toContain: "Next \(shortDate(firstRent))")
+        waitFor(element("recurring.Landlord")).swipeRight()
+        waitFor(app.buttons["Skip Next"]).tap()
+
+        expectLabel(of: "recurring.Landlord", toContain: "Next \(shortDate(secondRent))")
+    }
+
+    func testTheRecurringScreenListsEveryAccountsRules() {
+        waitFor(app.navigationBars["Accounts"].buttons["More"]).tap()
+        waitFor(menuItem("Recurring")).tap()
+        XCTAssertTrue(app.navigationBars["Recurring"].waitForExistence(timeout: 5))
+        for payee in ["Employer", "Landlord", "Transfer to Savings", "Cloud Storage"] {
+            waitFor(element("recurring.\(payee)"))
+        }
+        expectLabel(of: "recurring.Cloud Storage", toContain: "Yearly on")
+    }
+
     // MARK: Budgets and goals
 
     func testAddingABudgetShowsItsCard() {
@@ -195,7 +246,7 @@ final class Stirling_MoneyUITests: XCTestCase {
 
     func testChoosingACustomAccentShowsTheColorPicker() {
         waitFor(app.navigationBars["Accounts"].buttons["More"]).tap()
-        waitFor(element("settings")).tap()
+        waitFor(menuItem("Settings")).tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
         XCTAssertFalse(element("customAccent").exists, "fresh settings use the default accent")
 

@@ -10,6 +10,7 @@ extension WidgetSnapshot {
         goals: [Goal],
         budgets: [Budget] = [],
         transactions: [AccountTransaction] = [],
+        recurring: [RecurringTransaction] = [],
         accentColor: Color.Resolved? = nil,
         now: Date = .now,
         calendar: Calendar = .current
@@ -39,7 +40,9 @@ extension WidgetSnapshot {
                     currentAmount: $0.currentAmount,
                     targetAmount: $0.targetAmount,
                     progress: $0.progress,
-                    targetDate: $0.targetDate
+                    targetDate: $0.targetDate,
+                    accountID: $0.account.map(Self.widgetID(for:)),
+                    initialBalance: $0.initialBalance
                 )
             }
         self.budgets = budgets
@@ -58,9 +61,30 @@ extension WidgetSnapshot {
                     periodTitle: budget.period.title
                 )
             }
+        // Occurrences in the next 45 days that haven't been added yet, for `projected(on:)`.
+        let lookAhead = calendar.date(byAdding: .day, value: Self.lookAheadDays, to: calendar.startOfDay(for: now)) ?? now
+        upcoming = recurring.flatMap { rule -> [UpcomingOccurrence] in
+            guard let account = rule.account else { return [] }
+            let accountID = Self.widgetID(for: account)
+            let otherID = rule.kind == .transfer ? rule.otherAccount.map(Self.widgetID(for:)) : nil
+            return rule.upcomingDates(through: lookAhead, calendar: calendar).map { date in
+                UpcomingOccurrence(
+                    date: date,
+                    accountID: accountID,
+                    amount: rule.signedAmount(in: account),
+                    otherAccountID: otherID,
+                    categoryName: rule.kind == .transfer ? nil : rule.category?.name,
+                    isTransfer: rule.kind == .transfer
+                )
+            }
+        }
+        .sorted { $0.date < $1.date }
         self.accentColor = accentColor
         updatedAt = now
     }
+
+    /// How far ahead `upcoming` lists recurring transactions.
+    static let lookAheadDays = 45
 
     /// A stable string for a saved model, so a widget configured for an account keeps
     /// showing it after renames. Built from SwiftData's persistent identifier.

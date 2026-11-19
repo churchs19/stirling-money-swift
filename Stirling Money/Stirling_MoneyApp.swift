@@ -43,6 +43,8 @@ struct Stirling_MoneyApp: App {
             WatchSync.start()
         #endif
         WidgetSnapshotWriter.startObserving(sharedModelContainer.mainContext)
+        // After the writer, so the transactions it adds reach the widgets and the Watch.
+        RecurringRunner.start(sharedModelContainer.mainContext)
     }
 
     /// The app's window: its tabs, covered by the lock screen while locked.
@@ -77,12 +79,20 @@ struct Stirling_MoneyApp: App {
             case .background:
                 appLock.lockIfEnabled()
                 WidgetSnapshotWriter.updateNow()
+                RecurringRunner.scheduleBackgroundRefresh()
             case .active:
+                RecurringRunner.run()
                 Task { await appLock.promptIfNeeded() }
             default:
                 break
             }
         }
+        #if os(iOS)
+            // iOS wakes the app for this at or after the earliest due date (see RecurringRunner).
+            .backgroundTask(.appRefresh(RecurringRunner.taskIdentifier)) {
+                await RecurringRunner.runInBackground()
+            }
+        #endif
 
         #if os(macOS)
             Settings {

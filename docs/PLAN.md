@@ -17,6 +17,7 @@ as a SwiftUI + SwiftData app for iOS, iPadOS and macOS.
 | 7 | Apple Watch app (read-only) and complications | Done; checked on simulators and a real iPhone and Watch |
 | 8 | Budget widgets (iPhone, iPad, Mac, Lock Screen, Watch) | Done; checked on simulators and a real iPhone, Watch and Mac |
 | 9 | Test coverage: isolated unit tests, real UI tests, testable widget, lock and writer logic | Done |
+| 10 | Recurring transactions, added on schedule; widgets and the Watch show them on the day | Done; background timing still to watch on the iPhone |
 
 ## Decisions
 
@@ -588,6 +589,251 @@ better.
   is the fallback, and it needs an approved project change.
 - **Locale tests** depend on Foundation's formatting data. Assert that values round-trip, not exact strings, except
   where the separator is the point of the test.
+
+### Phase 10: Recurring transactions (done, except the background-timing check)
+
+Recurring transactions (rent, pay, subscriptions, regular transfers) are created automatically on their schedule and
+change balances without opening the app.
+
+**Decisions (Nov 19, 2026)**
+- **While the app is closed:** iOS can't run an app at an exact time. So the app adds due transactions whenever iOS
+  wakes it in the background, and always at launch. Meanwhile the widgets and the Watch count anything that has come
+  due, so the balances you see change on the day itself.
+- **Schedules:** every N weeks on a weekday, every N months on a day of the month, twice a month, and yearly.
+- **How they're entered:** as ordinary unposted transactions that you can edit, delete or mark posted.
+- **Where they're managed:** an "Upcoming" section in each account's register, and an all-accounts Recurring screen.
+
+**Choices made here** (change any of them before starting):
+- **Ends:** never (the default), on a date, or after a number of times.
+- **Missed occurrences:** every occurrence that came due while the app didn't run is added, each on its own date.
+  A rent payment missed during a two-month gap is added twice. The catch-up is capped at 400 per rule.
+- **Types:** withdrawals, deposits, checks (each gets the account's next check number when it's added) and transfers
+  (added as a linked pair through `Ledger`). The rule also sets the payee, category and note.
+- **Editing a rule** changes future occurrences only. Transactions already added are ordinary transactions.
+- **Deleting a rule** keeps the transactions it added. Deleting an account deletes its rules. A transfer rule whose
+  other account is deleted stops, and is shown as needing attention.
+- **Actions on an upcoming occurrence:** "Skip Next" moves the rule to the following date. "Add Now" adds the next
+  occurrence today.
+
+**The model** (CloudKit-compatible like the rest: defaults or optionals, optional relationships, no unique constraints):
+- `RecurringTransaction` (`@Model`) holds what to add:
+  - `kindRawValue`, `amount` (positive; the kind decides the sign, as in `Ledger`), `payee`, `note`, `category`.
+  - `account`, and `otherAccount` for transfers.
+  - The schedule: `frequencyRawValue` (weekly, monthly, twiceMonthly, yearly), `interval` (every N), `startDate`, and
+    for twice a month the second day of the month. A day past the month's end means its last day, as budgets do.
+  - The end: `endDate` or `remainingCount` (both optional).
+  - `nextDate`: the next occurrence, which only moves forward.
+- **Relationships:**
+  - `Account.recurringTransactions` (cascade, inverse `account`).
+  - `otherAccount` (nullify), with an inverse on `Account` so SwiftData can handle deleting the account.
+  - `Category` (nullify).
+  - `AccountTransaction.recurrence` (optional, nullify), so a transaction knows which rule added it. This shows a
+    repeat icon in the register and offers "Edit Recurring…".
+- `RecurrenceSchedule` (`nonisolated`, pure date math like `BudgetPeriod`) gives the occurrence after a date and the
+  occurrences in a range. It's tested with a fixed UTC calendar.
+
+**Adding due transactions** (`RecurringScheduler.addDue(in:now:calendar:)` in `Managers/`):
+- **Which:** for each rule whose `nextDate` is on or before today (local days, not times), it adds the occurrence
+  through `Ledger`, with that date, unposted, and linked to the rule. Then it advances `nextDate` and the end count,
+  and repeats until `nextDate` is in the future or the rule has ended.
+- **No duplicates:** advancing `nextDate` in the same save as the transaction it adds means an occurrence can't be
+  added twice by the same store. (Duplicates across devices only matter once iCloud sync is on; see risks.)
+- **Runs:** at launch, when the app becomes active, on the Mac every hour while it's open (the Mac can't be woken),
+  and in the background on iPhone and iPad.
+- **Background:** a SwiftUI `.backgroundTask(.appRefresh("net.s-church.stirlingmoney.recurring"))`. After each run,
+  the app asks for the next wake-up at the earliest `nextDate` (`BGAppRefreshTaskRequest.earliestBeginDate`). iOS
+  decides when that actually happens.
+- **After adding:** saving triggers `WidgetSnapshotWriter` as usual, so the widgets and Watch get the real
+  transactions.
+- **Not under tests:** `LaunchMode.isHostingUnitTests` skips all of this. UI tests use the sample data's rules
+  directly.
+
+**Widgets and the Watch between runs** (so the balances they show change on the day):
+- The summary gains `upcoming`: each rule's occurrences in the next 45 days (date, account ID, signed amount,
+  other account ID for transfers, category name, kind). Older summaries decode with none.
+- `WidgetSnapshot.projected(on:)` in `Shared/` returns the summary as it would be on a given day. It adds the
+  occurrences due by then to:
+  - account balances (not posted balances, since they arrive unposted) and the total;
+  - goals on those accounts;
+  - budgets whose category matches (or all-spending budgets, for withdrawals and checks) when the date falls in the
+    budget's current period.
+  It's pure and tested.
+- The Balance, Goal, Budget and All Budgets widgets, the complications and the Watch app's pages use `projected(on:)`.
+  Widget timelines add an entry at the start of each occurrence day in the next 45 days, so they switch at midnight
+  without the app.
+- Once the app runs, the real transactions replace the projection; the summary no longer lists them as upcoming.
+
+**Screens**
+- **Register:**
+  - An "Upcoming" section above the transactions, listing the account's rules: payee, amount, schedule ("Monthly
+    on the 1st"), next date, and a mark if one needs attention.
+  - Tap to edit. A swipe and context menu give Skip Next, Add Now and Delete.
+  - The + button becomes a menu: Add Transaction / Add Recurring Transaction.
+- **Making a transaction recurring:** "Make Recurring…" in a transaction's swipe actions and context menu opens the
+  recurring form filled from it.
+- **`RecurringFormView`** (with a `RecurringDraft`, like the other forms):
+  - The transaction's fields, as in `TransactionFormView`.
+  - A Schedule section: frequency, "every N", start date, the second day for twice a month, and the end (never / on a
+    date / after N times).
+  - A preview line: "Next: Fri, Nov 21; then Dec 5, Dec 19".
+- **Recurring screen:** every rule across accounts, grouped by account or sorted by next date (a toggle), with the
+  same actions. It opens from the Accounts ⋯ menu on every platform. (The Mac app has no menu-bar commands yet; a
+  "Recurring Transactions" item there could come later.)
+- **Sample data:** the preview data gets a few rules: monthly rent, biweekly pay, a monthly transfer to Savings and a
+  yearly subscription. Screens and UI tests then have something to show.
+
+**Project changes** (to be confirmed before each is made, using Xcode's tools):
+1. The app target's **Background Modes** capability with **Background fetch** (iOS only).
+2. `BGTaskSchedulerPermittedIdentifiers` in the app's Info.plist, listing `net.s-church.stirlingmoney.recurring`.
+- Done (Nov 19, 2026, approved). Both were made with Xcode's `AddInfoPlist`, which created `Stirling-Money-Info.plist`
+  at the top of the repo and set the app target's `INFOPLIST_FILE` for Debug and Release. Its keys are merged with the
+  generated ones (`GENERATE_INFOPLIST_FILE` stays on).
+- Background fetch needs no entitlement. The built app has both keys, and the Mac build is unaffected.
+- The new model needs no project change; it's added to `AppSchema`. SwiftData migrates by adding the new entity and
+  optional relationships, which also stays CloudKit-compatible.
+
+**Order of work**
+1. [x] `RecurrenceSchedule` (weekly with interval, monthly with clamping, twice a month, yearly with Feb 29) and its
+   tests.
+   - Done: `Models/RecurrenceSchedule.swift` has `RecurrenceFrequency` and `RecurrenceSchedule`:
+     `next(onOrAfter:)`, `next(after:)`, `occurrences(from:through:limit:)`, and `summary()` ("Every 2 weeks on Friday").
+   - Occurrences are counted from the start date, so a clamped Feb 28 doesn't drag later months.
+   - Twice a month uses the start's day plus `secondDay`, leaving out a day before the start. A day past the month's
+     end means its last day.
+   - `RecurrenceScheduleTests`: 15 tests (18 runs with the per-frequency arguments).
+2. [x] `RecurringTransaction` and the relationships, in `AppSchema`. Tests for the delete rules (an account, the other
+   account, a category, a rule).
+   - Done: `Models/RecurringTransaction.swift`. The amount is stored positive and dates as days. It has `schedule`,
+     `hasEnded(calendar:)`, `problem` (the account, or a transfer's other account, was deleted) and `displayPayee`.
+   - Inverses, each declared on one side:
+     - `Account.recurringTransactions` (cascade).
+     - `Account.recurringTransfersIn` (nullify, for `otherAccount`).
+     - `Category.recurringTransactions` (nullify).
+     - `RecurringTransaction.transactions` (nullify, inverse `AccountTransaction.recurrence`).
+   - `RecurringTransactionTests`: 10 tests. In test files, write `Stirling_Money.Category`: Swift Testing has a
+     `Category` too.
+   - Upgrading an existing store: the simulator's real store opened and gained the `ZRECURRINGTRANSACTION` table
+     without trouble. The store is in the App Group's container, not the app's. The real devices are checked in
+     step 9.
+3. [x] `RecurringScheduler.addDue`. Tests for:
+   - one due occurrence, a catch-up over several months, and nothing due;
+   - the end date and end count;
+   - transfers as linked pairs, check numbers, category and note;
+   - Skip Next and Add Now;
+   - running twice adds nothing new.
+   - Done: `Managers/RecurringScheduler.swift` has `addDue(in:now:calendar:)`, `addNow`, `skipNext` and
+     `nextDueDate` (for scheduling the background run).
+   - Transfers link both halves to the rule. Checks take `account.nextCheckNumber` one by one. A rule with a `problem`
+     is left where it is.
+   - Skipping counts toward an "after N times" end.
+   - `RecurringSchedulerTests`: 16 tests, which also cover a deposit twice a month, the catch-up cap of 400 per run
+     carrying on next time, and an occurrence due late at night.
+4. [x] Running it at launch, on becoming active, on the Mac's timer and in the background, after the project changes
+   (with approval). Check a background run with Xcode's "Simulate Background Fetch" on the simulator and on the
+   device.
+   - Done: `Managers/RecurringRunner.swift`.
+     - **When it runs:** `start` runs it at launch (after `WidgetSnapshotWriter` starts), when the app becomes active,
+       and at midnight (`.NSCalendarDayChanged`). On the Mac it also runs every hour and when the Mac wakes.
+     - **Background:** after each run, and when the app goes to the background, it asks for a background run at the
+       earliest due date with the async `BGTaskScheduler.submitTaskRequest` (`submit` is deprecated in iOS 27). The
+       app's scene handles `.backgroundTask(.appRefresh(...))` with `runInBackground()`, which also writes the widget
+       summary straight away.
+     - **Not under tests:** nothing runs under `LaunchMode.isTesting`, unit or UI.
+   - Tests: `RecurringRunnerTests` checks the wake-up date and that the identifier is in the built Info.plist.
+   - Not yet checked at run time: a launch actually adding a due rule (needs the sample-data rules from step 5), and a
+     background run. The simulator doesn't run BGTasks, so on the device use the debugger:
+     `e -l objc -- (void)[[BGTaskScheduler sharedScheduler] _simulateLaunchForTaskWithIdentifier:@"net.s-church.stirlingmoney.recurring"]`
+     (step 9).
+5. [x] `RecurringDraft` and `RecurringFormView`, the register's Upcoming section, "Make Recurring…", and the
+   Recurring screen. Sample-data rules. Form tests like the other drafts'.
+   - **Draft** (`Models/RecurringDraft.swift`):
+     - Validation: amount, payee or another account, every 1–99, two different days, an end after the start, a count
+       above zero.
+     - A preview of the next three dates.
+     - `init(from:)` for "Make Recurring…": a month after the transaction; either half of a transfer moves money from
+       the source.
+     - Saving: editing the schedule recomputes `nextDate` from today, so past occurrences aren't added again.
+     - `RecurringDraftTests`: 14 tests.
+   - **Screens:**
+     - `RecurringFormView`: type, amount, account (a picker, so the Recurring screen can add too), payee or "To
+       Account", category; then the schedule with its preview, the end, a note, and Delete when editing. Saving runs
+       `RecurringRunner.run()`, so a rule starting today is added at once.
+     - `RecurringRow` and `recurringRowActions`: Edit, Skip Next, Add Now and Delete, as swipes and a context menu.
+     - The register's Upcoming section (the account's rules, plus transfers into it, read as "Transfer from …"),
+       hidden while searching.
+     - "Make Recurring…" or "Edit Recurring…" on each transaction, and a repeat icon on transactions a rule added.
+     - `RecurringListView`, grouped by account or by next date, from "Recurring" in the Accounts ⋯ menu.
+   - **Changed from the plan:** "Add Recurring Transaction" is in the register's ⋯ menu instead of turning + into a
+     menu, so adding an ordinary transaction stays one tap (and the existing UI tests didn't change).
+   - **Sample data:** rent (check, monthly), pay (twice a month), $400 to Savings monthly, and a yearly
+     subscription on the Credit Card. All start in the future, so the sample balances don't change by date.
+   - **Checked on the simulator:**
+     - Upcoming, the form and its preview, and the Recurring screen.
+     - Saving a $15 "Gym" rule starting today added it straight away (unposted, with the repeat icon; Checking went
+       from $10,229.11 to $10,214.11), and its next date moved to a month later. This is also step 4's pending check.
+   - The 11 iPhone UI tests still pass, and the Mac builds.
+6. [x] `upcoming` in the summary and `WidgetSnapshot.projected(on:)`, with tests for:
+   - balances and the total;
+   - transfers (the total doesn't change);
+   - goals;
+   - budgets, both by category and all-spending, inside and outside the current period;
+   - decoding old summaries.
+   - Done: `Shared/WidgetSnapshot+Projection.swift` has `UpcomingOccurrence`, `projected(on:)`, `upcomingDays(after:)`,
+     `BudgetSummary.counts(_:)` (the same rule as `Budget.spent`) and `GoalSummary.progress(current:target:initial:)`,
+     which `Goal.progress` now uses too.
+   - Goal summaries gained an optional `accountID` and `initialBalance`, which the projection needs. Older summaries
+     decode without them, and their goals just don't move.
+   - The app builds `upcoming` from `RecurringTransaction.upcomingDates(through:)`, which respects the end date and
+     count and skips rules that need attention. `WidgetSnapshotWriter` passes the rules in.
+   - `WidgetProjectionTests`: 12 tests. One builds the summary before `addDue`, projects it, then compares it with the
+     summary after `addDue`: balances, posted balances, goal amounts and progress, and budget spending all match.
+7. [x] The widgets, complications and Watch pages use the projection; widget timelines get an entry per occurrence
+   day. Check in previews and on the simulator.
+   - Done: `WidgetSnapshot.timelineDates(now:adding:)` gives now, each due day and extra moments (a budget period's
+     end, midnight for days left). Each provider (Balance, Goal, Budget, All Budgets and the three complications) makes
+     one entry per date from `projected(on:)` and reloads `.atEnd`. The Watch app's pages show the projection,
+     redrawn hourly.
+   - The Watch app's pages show `WatchStore.current`: the summary projected to `today`, which `showToday()` moves on
+     whenever the app comes to the front (every wrist raise). A first attempt wrapped the pages in an hourly
+     `TimelineView`, which kept the app from going idle: every UI-test query took about 30 seconds and the Watch UI test
+     ran for 10 minutes or more. Neither `.periodic(from: .now, …)` nor a fixed start fixed that, so the TimelineView
+     is gone.
+   - 206 iPhone unit tests (one new for `timelineDates`), 9 Watch unit tests (one new for `current`), both Watch UI
+     tests and the Mac build pass.
+8. [x] UI tests: add a recurring transaction and see it in Upcoming; Skip Next; the Recurring screen.
+   - Done: three tests in `Stirling_MoneyUITests`. Adding one checks the Upcoming row; under `-UITesting` the runner is
+     off, so it's listed and the balance doesn't change. Skip Next checks the sample rent's next date before and after,
+     worked out from today. The Recurring screen checks the rules from every account.
+   - Found: items in a toolbar's ⋯ menu lose their accessibility identifiers, so tests find them by label
+     (`menuItem(_:)`). The Settings test had only passed because its gear icon's accessibility label happened to be
+     "settings". The unused identifiers on those menu items are removed.
+9. [ ] Check on the simulators, the Mac, and the real iPhone and Watch. The background run needs a few days on the
+   iPhone to see iOS's timing.
+   - [x] Simulators: done along the way (steps 5, 7 and 8).
+   - [x] Real iPhone and Watch (Nov 19, 2026): installed. The iPhone's existing store upgraded with the user's data (the
+     app opened and kept running). `runInBackground` logs "Background run for recurring transactions" at notice level,
+     so a collected device log can show whether iOS woke the app.
+   - Note: once a store has upgraded, a build without `RecurringTransaction` (such as `main` before this phase is
+     merged) can't open it. Merge before installing an older build on that device.
+   - [ ] Over a day or two: a rule starting tomorrow shows in the widgets and on the Watch from midnight, and is added
+     before the app is opened if iOS ran it in the background (check with `sudo log collect --device-udid … --last 2d`).
+   - [x] The Mac with its real data (Nov 19, 2026): the store upgraded and the app opened and kept running.
+10. [x] README, CLAUDE.md and this plan.
+    - README: the feature, background refresh (with the debugger command to trigger it) and the layout. CLAUDE.md: the
+      new files, relationships, how recurring transactions are added and projected, and two lessons for tests (overflow
+      menu items lose identifiers; a screen-wide `TimelineView` keeps an app from going idle).
+
+**Risks and questions**
+- **Background timing:** iOS decides when, and how often, it wakes the app (less often for apps used rarely, and not
+  in Low Power Mode). The widget projection covers the gap, and the app always catches up when opened.
+- **The Mac** has no background wake-ups: the app adds due transactions when it's open, every hour while it stays
+  open, and at launch. Its widgets use the projection.
+- **iCloud sync later:** two devices could each add the same occurrence. When sync is turned on, add a de-duplication
+  step that keeps one transaction per rule and date.
+- **Budget projections** follow the same rules as `Budget.summary` (category spending less refunds; all spending
+  leaves out transfers). One shared function keeps the two from drifting apart.
+- **Time zones:** occurrences are local calendar days. A transaction's date is the start of that day, like ones
+  entered by hand.
 
 ## Open items
 

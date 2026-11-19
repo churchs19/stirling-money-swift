@@ -30,8 +30,16 @@ struct TransactionRow: View {
             .accessibilityHint("Toggles whether the transaction has cleared the bank")
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(transaction.displayPayee)
-                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    Text(transaction.displayPayee)
+                        .lineLimit(1)
+                    if transaction.recurrence != nil {
+                        Image(systemName: "repeat")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel("Recurring")
+                    }
+                }
                 Text(details)
                     .font(.caption)
                     .foregroundStyle(.secondary)

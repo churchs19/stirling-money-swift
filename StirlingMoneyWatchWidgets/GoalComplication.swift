@@ -15,13 +15,17 @@ struct GoalComplicationProvider: AppIntentTimelineProvider {
     }
 
     func snapshot(for configuration: SelectGoalIntent, in context: Context) async -> GoalComplicationEntry {
-        entry(for: configuration, snapshot: WidgetSnapshot.load() ?? (context.isPreview ? .sample : nil), on: .now)
+        entry(for: configuration, snapshot: (WidgetSnapshot.load() ?? (context.isPreview ? .sample : nil))?.projected(on: .now), on: .now)
     }
 
     func timeline(for configuration: SelectGoalIntent, in context: Context) async -> Timeline<GoalComplicationEntry> {
-        // Days left changes at midnight; amounts change when the Watch app receives a new summary.
+        // Days left changes at midnight; amounts change when the Watch app receives a new summary, and when
+        // recurring transactions fall due.
         let midnight = Calendar.current.startOfDay(for: .now.addingTimeInterval(86400))
-        return Timeline(entries: [entry(for: configuration, snapshot: WidgetSnapshot.load(), on: .now)], policy: .after(midnight))
+        let summary = WidgetSnapshot.load()
+        let dates = summary?.timelineDates(now: .now, adding: [midnight]) ?? [.now]
+        let entries = dates.map { entry(for: configuration, snapshot: summary?.projected(on: $0), on: $0) }
+        return Timeline(entries: entries, policy: dates.count > 1 ? .atEnd : .after(midnight))
     }
 
     /// The watch face editor lists each goal.

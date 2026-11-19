@@ -25,7 +25,9 @@ struct StirlingMoneyWatchApp: App {
                 }
                 .onChange(of: scenePhase, initial: true) { _, phase in
                     // Ask the iPhone for a fresh summary each time the app comes to the front.
-                    if phase == .active, !Self.usesSampleData {
+                    guard phase == .active else { return }
+                    store.showToday()
+                    if !Self.usesSampleData {
                         store.refresh()
                     }
                 }

@@ -18,23 +18,26 @@ struct BudgetListProvider: TimelineProvider {
         if context.isPreview, WidgetSnapshot.load()?.budgets.isEmpty ?? true {
             completion(placeholder(in: context))
         } else {
-            completion(currentEntry())
+            completion(entry(snapshot: WidgetSnapshot.load()?.projected(on: .now), on: .now))
         }
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<BudgetListEntry>) -> Void) {
-        let entry = currentEntry()
-        // The app reloads widgets when it writes new data. Also redraw when the first period ends, so that
-        // budget asks for the app to be opened instead of showing last period's figures.
-        let nextEnd = entry.budgets?
-            .filter { $0.isCurrent(on: entry.date) }
+        // The app reloads widgets when it writes new data. Also redraw when recurring transactions fall due, and
+        // when the first period ends, so that budget asks for the app to be opened instead of last period's figures.
+        let summary = WidgetSnapshot.load()
+        let now = Date.now
+        let nextEnd = summary?.budgets
+            .filter { $0.isCurrent(on: now) }
             .map(\.periodEnd)
             .min()
-        completion(Timeline(entries: [entry], policy: nextEnd.map { .after($0) } ?? .never))
+        let dates = summary?.timelineDates(now: now, adding: nextEnd.map { [$0] } ?? []) ?? [now]
+        let entries = dates.map { entry(snapshot: summary?.projected(on: $0), on: $0) }
+        completion(Timeline(entries: entries, policy: dates.count > 1 ? .atEnd : .never))
     }
 
-    private func currentEntry() -> BudgetListEntry {
-        BudgetListEntry(date: .now, budgets: WidgetSnapshot.load()?.budgets, accent: WidgetAccent.current)
+    private func entry(snapshot: WidgetSnapshot?, on date: Date) -> BudgetListEntry {
+        BudgetListEntry(date: date, budgets: snapshot?.budgets, accent: WidgetAccent.current)
     }
 }
 

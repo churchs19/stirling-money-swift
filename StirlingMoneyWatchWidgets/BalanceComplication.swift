@@ -24,12 +24,16 @@ struct BalanceComplicationProvider: AppIntentTimelineProvider {
     }
 
     func snapshot(for configuration: SelectAccountIntent, in context: Context) async -> BalanceComplicationEntry {
-        entry(for: configuration, snapshot: WidgetSnapshot.load() ?? (context.isPreview ? .sample : nil))
+        entry(for: configuration, snapshot: (WidgetSnapshot.load() ?? (context.isPreview ? .sample : nil))?.projected(on: .now))
     }
 
     func timeline(for configuration: SelectAccountIntent, in context: Context) async -> Timeline<BalanceComplicationEntry> {
-        // The Watch app reloads complications whenever a new summary arrives.
-        Timeline(entries: [entry(for: configuration, snapshot: WidgetSnapshot.load())], policy: .never)
+        // The Watch app reloads complications whenever a new summary arrives. Until then, recurring transactions
+        // that fall due change the balance at the start of their day.
+        let summary = WidgetSnapshot.load()
+        let dates = summary?.timelineDates(now: .now) ?? [.now]
+        let entries = dates.map { entry(for: configuration, snapshot: summary?.projected(on: $0), on: $0) }
+        return Timeline(entries: entries, policy: dates.count > 1 ? .atEnd : .never)
     }
 
     /// The watch face editor lists these: the total, then each account.
@@ -43,7 +47,7 @@ struct BalanceComplicationProvider: AppIntentTimelineProvider {
         return recommendations
     }
 
-    private func entry(for configuration: SelectAccountIntent, snapshot: WidgetSnapshot?) -> BalanceComplicationEntry {
+    private func entry(for configuration: SelectAccountIntent, snapshot: WidgetSnapshot?, on date: Date = .now) -> BalanceComplicationEntry {
         let accent = complicationAccent(snapshot)
         let content: BalanceComplicationEntry.Content?
         let choice = BalanceChoice.choose(accountID: configuration.account?.id, in: snapshot)
@@ -62,7 +66,7 @@ struct BalanceComplicationProvider: AppIntentTimelineProvider {
         case .noSummary, .missing:
             content = nil
         }
-        return BalanceComplicationEntry(date: .now, content: content, accent: accent, isMissing: choice == .missing)
+        return BalanceComplicationEntry(date: date, content: content, accent: accent, isMissing: choice == .missing)
     }
 }
 

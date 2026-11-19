@@ -107,4 +107,18 @@ struct WatchStoreTests {
         #expect(budget.isCurrent(on: end.addingTimeInterval(-1)))
         #expect(!budget.isCurrent(on: end), "the Watch should ask the iPhone for the new period")
     }
+
+    @Test func pagesShowRecurringTransactionsFromTheDayTheyFallDue() throws {
+        var summary = WidgetSnapshot.sample
+        summary.upcoming = [
+            .init(date: Calendar.current.startOfDay(for: .now.addingTimeInterval(2 * 86400)), accountID: "checking", amount: -50),
+        ]
+        let store = WatchStore(fileURL: nil, snapshot: summary)
+        store.showToday(.now)
+        #expect(store.current?.accounts.first?.balance == 1250.75, "not due yet")
+
+        store.showToday(.now.addingTimeInterval(3 * 86400))
+        #expect(store.current?.accounts.first?.balance == 1200.75)
+        #expect(store.snapshot?.accounts.first?.balance == 1250.75, "the saved summary itself doesn't change")
+    }
 }

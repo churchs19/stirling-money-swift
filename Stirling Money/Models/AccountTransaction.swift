@@ -38,6 +38,8 @@ final class AccountTransaction {
 
     var account: Account?
     var category: Category?
+    /// The recurring transaction that added this one, if any.
+    var recurrence: RecurringTransaction?
 
     // A property can't be its own inverse, so a transfer pair uses two properties that are
     // each other's inverse: the outgoing half sets `incomingHalf`, and SwiftData fills in

@@ -25,6 +25,9 @@ Stirling Money/
 │   ├── AccountTransaction.swift   # @Model: register entry + TransactionKind
 │   ├── AccountTransaction+Search.swift  # Register search matching
 │   ├── Category.swift             # @Model
+│   ├── RecurringTransaction.swift # @Model: what to add, its schedule, nextDate (only moves forward), end date or count; problem, upcomingDates
+│   ├── RecurrenceSchedule.swift   # Weekly / monthly / twice a month / yearly date math (counted from the start, clamped to short months) + summary text
+│   ├── RecurringDraft.swift       # Recurring form fields + validation + save (editing the schedule recomputes nextDate from today)
 │   ├── DeepLink.swift             # stirlingmoney://account?id=…, goals, budgets: links from widgets (the widgets build the same URLs); + account(withWidgetID:in:)
 │   ├── LaunchMode.swift           # Hosting unit tests / -UITesting (Debug): which store, settings and side effects the app uses
 │   ├── Budget.swift               # @Model: current period, amount spent
@@ -49,14 +52,17 @@ Stirling Money/
 │   ├── CategoriesView.swift       # Category list: add, rename, delete
 │   ├── BudgetsView.swift / BudgetFormView.swift  # Budget cards; add/edit sheet
 │   ├── GoalsView.swift / GoalFormView.swift      # Goal cards; add/edit sheet
+│   ├── RecurringFormView.swift / RecurringListView.swift  # Recurring add/edit sheet; all-accounts Recurring screen (Accounts ⋯ menu)
 │   ├── Reports/                   # ReportsView list + one view per Swift Charts report; ReportSupport.swift
 │   ├── PreviewData.swift          # ModelContainer.preview sample data (DEBUG only)
-│   └── Components/                # AmountText, CurrencyField, TransactionRow, BudgetRow, GoalRow, PostedCheckmark (+ .posted toggle style), AccountTile, AccountIconPicker, AccountIconView (SF Symbol or PaymentFont glyph), NavigationRow
+│   └── Components/                # AmountText, CurrencyField, TransactionRow, BudgetRow, GoalRow, PostedCheckmark (+ .posted toggle style), AccountTile, AccountIconPicker, AccountIconView (SF Symbol or PaymentFont glyph), NavigationRow, RecurringRow (+ recurringRowActions: Edit, Skip Next, Add Now, Delete)
 ├── Managers/
 │   ├── Ledger.swift               # Create/edit/delete transactions and transfers; categories
 │   ├── AppLock.swift              # Face ID / Touch ID / passcode lock (LocalAuthentication)
 │   ├── WidgetSnapshotWriter.swift # Writes the snapshot to the App Group, reloads widgets, sends it to the Watch
-│   └── WatchSync.swift            # iPhone only: WCSession; sends the snapshot as application context, answers Watch requests
+│   ├── WatchSync.swift            # iPhone only: WCSession; sends the snapshot as application context, answers Watch requests
+│   ├── RecurringScheduler.swift   # addDue (adds due occurrences through Ledger, catching up), addNow, skipNext, nextDueDate
+│   └── RecurringRunner.swift      # When addDue runs: launch, active, midnight, hourly + wake on the Mac, BGAppRefreshTask on iOS
 └── Extensions/
     ├── Decimal+Money.swift        # Parsing typed amounts (.localCurrency itself is in Shared/)
     ├── Color+Chart.swift          # ChartPalette: validated chart colors; assign slots in order, never cycle
@@ -74,6 +80,7 @@ Shared/                            # In the app, the widgets, the Watch app and 
 │                                  #   SummaryAccountIcon (a summary account's icon, for widgets and the Watch),
 │                                  #   BudgetSummaryCard (a summary budget laid out like BudgetRow: full, dense, compact; + periodText, budgetsToList),
 │                                  #   WidgetChoice / BalanceChoice (which item a widget or complication shows, or why none),
+│                                  #   WidgetSnapshot+Projection (upcoming recurring occurrences, projected(on:), timelineDates),
 │                                  #   DateInterval.formattedDays (budget period dates for the app, widgets and Watch),
 │                                  #   WidgetIntents (account, goal and budget pickers for the iPhone widgets and the complications),
 │                                  #   Fonts/ (paymentfont-webfont.ttf + its MIT license, bundled into all four)
@@ -87,6 +94,15 @@ which belongs to all four app and widget targets; code there must compile for ea
 Budget figures in the summary are for the period that was current when the app wrote it (budgets outside an active period
 are left out). Widgets and complications can't work out a new period, so after `periodEnd` they show "Open Stirling Money to
 update" (`BudgetSummary.isCurrent(on:)`), and their timelines reload at the earliest `periodEnd` shown.
+
+Recurring transactions are added by `RecurringScheduler.addDue` as ordinary unposted transactions (through `Ledger`, linked
+by `AccountTransaction.recurrence`), moving each rule's `nextDate` on in the same save so nothing is added twice. `RecurringRunner`
+calls it at launch, when the app becomes active, at midnight, hourly and on wake on the Mac, and in a `BGAppRefreshTask` on iOS
+(iOS picks the time). Until the app runs, the summary lists the next 45 days of occurrences (`upcoming`), and every widget,
+complication and Watch page shows `projected(on:)` that day: balances (not posted), goals and budgets by the same rules as
+`Budget.spent` and `Goal.progress` (`BudgetSummary.counts`, `GoalSummary.progress`). Timelines get an entry per due day
+(`timelineDates`). A test compares the projection with what `addDue` really adds; keep the two in step. Nothing runs under
+`LaunchMode.isTesting`. With iCloud sync, two devices could add the same occurrence: de-duplicate by rule and date then.
 
 The Watch can't read the iPhone's store or App Group either, and there's no iCloud sync yet, so the iPhone sends it the same summary
 over WatchConnectivity (`WatchSync`, iPhone only):
@@ -128,6 +144,9 @@ Prefer MCP tools over raw shell commands for ALL build operations:
 - **UI tests** launch with `-UITesting` (sample data, settings in a fresh `LaunchMode.settings` store, no widget summary or Watch)
   and US English. Give controls they drive an `.accessibilityIdentifier` (`addAccount`, `account.<name>`, `save`, …; `CurrencyField`
   takes `identifier:`). SwiftUI folds amounts into their row's label ("Total, $19,660.73"), so check labels, not text elements.
+  Items in a toolbar's ⋯ (overflow) menu lose their identifiers: find them by label (`menuItem(_:)`).
+- Don't wrap a whole screen in a `TimelineView` to refresh it: it kept the Watch app from going idle and UI tests crawled. Move a
+  date on when the app becomes active instead (`WatchStore.showToday()`).
 - **Watch UI tests** launch the Watch app with `-UseSampleData` (`WidgetSnapshot.sample`, no WatchConnectivity).
 
 XcodeBuildMCP only drives iOS simulators. For the Watch targets and their tests, and for Mac builds, use `xcodebuild` with a
@@ -146,6 +165,10 @@ Structured data means fewer tokens consumed and better error diagnosis.
 | Category.transactions | AccountTransaction.category | nullify |
 | Category.budgets | Budget.category | cascade (a budget without its category would silently become "all spending") |
 | AccountTransaction.incomingHalf | AccountTransaction.outgoingHalf | nullify (transfer pair) |
+| Account.recurringTransactions | RecurringTransaction.account | cascade |
+| Account.recurringTransfersIn | RecurringTransaction.otherAccount | nullify (the rule stops and shows a problem) |
+| Category.recurringTransactions | RecurringTransaction.category | nullify |
+| RecurringTransaction.transactions | AccountTransaction.recurrence | nullify (added transactions stay when the rule is deleted) |
 
 - Keep models CloudKit-compatible so sync can be turned on later without a migration: every stored property has a default or is optional, every relationship is optional, no `@Attribute(.unique)`.
 - Declare `inverse:` on one side only.
@@ -161,7 +184,9 @@ Structured data means fewer tokens consumed and better error diagnosis.
   (`XcodeNewTarget`, `AddInfoPlist`, `AddEntitlement`) were used to add the widget target, App Group and
   `NSFaceIDUsageDescription`. Approved for Phase 7: the Watch app and complications targets, their App Group, display
   names and Swift version, and (made by hand in Xcode) the `Shared/` folder membership and the Watch app's iOS platform
-  filters. Ask before any further project change.
+  filters. Approved for Phase 10 (made with `AddInfoPlist`): `UIBackgroundModes` = `fetch` and
+  `BGTaskSchedulerPermittedIdentifiers` = `net.s-church.stirlingmoney.recurring` on the app target, which put them in
+  `Stirling-Money-Info.plist` (merged with the generated Info.plist keys). Ask before any further project change.
 - NEVER use ObservableObject — use @Observable
 - NEVER use NavigationView — use NavigationStack
 - @Model classes are already Observable — do not add @Observable macro

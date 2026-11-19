@@ -13,6 +13,7 @@ It's a re-implementation of [Stirling Money for Windows Phone](https://github.co
 - **Budgets**: weekly, monthly, yearly or custom periods, for one category or all spending
 - **Goals**: savings targets measured against an account's balance, with days left
 - **Reports** (Swift Charts): net income, spending by category, one category over time, budget history
+- **Recurring transactions**: rent, pay, subscriptions and regular transfers, weekly, monthly, twice a month or yearly. They're added on schedule as unposted transactions (in the background on iPhone and iPad when iOS allows, otherwise when the app opens), and the widgets and Watch count them from the day they fall due. Manage them in each account's Upcoming section or the Recurring screen
 - **Widgets**: an account's balance (or the total), a goal's progress, one budget's spending (also on the iPhone Lock Screen) and All Budgets; tapping an account's widget opens its transactions, a budget widget opens Budgets
 - **Apple Watch** (read-only): accounts, budgets and goals, plus Balance (the total or one account), Goal and Budget complications, chosen when you edit a watch face. The iPhone sends the Watch a summary whenever something changes
 - **App lock**: Face ID, Touch ID or the device passcode
@@ -40,6 +41,14 @@ With automatic signing, sign in to Xcode (**Settings → Accounts**) with an acc
 
 To install on a real Apple Watch, Xcode has to see the Watch (paired with a connected iPhone, unlocked, Developer Mode on) so it can register it with the team; otherwise the Watch refuses the app.
 
+### Background refresh
+
+Recurring transactions are added in the background through `BGTaskScheduler` (`net.s-church.stirlingmoney.recurring`, listed in `Stirling-Money-Info.plist`, with the Background fetch mode). iOS decides when that runs; the simulator never does. To trigger it on a device, pause the app in Xcode's debugger and run:
+
+```
+e -l objc -- (void)[[BGTaskScheduler sharedScheduler] _simulateLaunchForTaskWithIdentifier:@"net.s-church.stirlingmoney.recurring"]
+```
+
 ### Sample data
 
 In Debug builds, launch with the argument `-UseSampleData` (Product → Scheme → Edit Scheme → Arguments) to use a set of sample accounts, transactions, budgets and goals held in memory. Your real data isn't touched.
@@ -63,10 +72,10 @@ The iPhone UI tests launch the app with `-UITesting`, which uses the sample data
 | Folder | Contents |
 |---|---|
 | `Stirling Money/Models` | SwiftData models (`Account`, `AccountTransaction`, `Category`, `Budget`, `Goal`) and the logic around them |
-| `Stirling Money/Managers` | `Ledger` (creating and editing transactions and transfers), the app lock, the widget snapshot writer, `WatchSync` (sending the summary to the Watch) |
+| `Stirling Money/Managers` | `Ledger` (creating and editing transactions and transfers), the app lock, the widget snapshot writer, `WatchSync` (sending the summary to the Watch), `RecurringScheduler` and `RecurringRunner` (adding recurring transactions when they fall due) |
 | `Stirling Money/Views` | Screens, `Reports/` and `Components/` |
 | `Stirling Money/Extensions` | Money formatting and parsing, chart colors, macOS-safe view helpers |
-| `Shared` | Code and resources used by the app, the widgets and the Watch targets: the summary, the budget card, the widget pickers, the currency format, PaymentFont |
+| `Shared` | Code and resources used by the app, the widgets and the Watch targets: the summary and its projection of upcoming recurring transactions, the budget card, the widget pickers, the currency format, PaymentFont |
 | `StirlingMoneyWidgets` | The widget extension: Balance, Goal, Budget and All Budgets |
 | `StirlingMoney Watch App`, `StirlingMoneyWatchWidgets` | The Apple Watch app and its complications |
 | `Stirling MoneyTests`, `StirlingMoney Watch AppTests` | Unit tests |

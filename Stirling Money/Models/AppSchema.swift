@@ -7,5 +7,6 @@ enum AppSchema {
         Category.self,
         Budget.self,
         Goal.self,
+        RecurringTransaction.self,
     ]
 }

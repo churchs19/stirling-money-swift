@@ -6,18 +6,8 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if let snapshot = store.snapshot {
-                NavigationStack {
-                    TabView {
-                        AccountsPage(snapshot: snapshot)
-                        BudgetsPage(budgets: snapshot.budgets)
-                        GoalsPage(goals: snapshot.goals)
-                    }
-                    .tabViewStyle(.verticalPage)
-                    .navigationDestination(for: WidgetSnapshot.AccountSummary.self) { account in
-                        AccountDetailView(account: account)
-                    }
-                }
+            if let summary = store.current {
+                pages(summary)
             } else {
                 ContentUnavailableView(
                     "No Data Yet",
@@ -27,6 +17,21 @@ struct ContentView: View {
             }
         }
         .tint(store.accent)
+    }
+
+    /// Accounts, Budgets and Goals as vertical pages.
+    private func pages(_ snapshot: WidgetSnapshot) -> some View {
+        NavigationStack {
+            TabView {
+                AccountsPage(snapshot: snapshot)
+                BudgetsPage(budgets: snapshot.budgets)
+                GoalsPage(goals: snapshot.goals)
+            }
+            .tabViewStyle(.verticalPage)
+            .navigationDestination(for: WidgetSnapshot.AccountSummary.self) { account in
+                AccountDetailView(account: account)
+            }
+        }
     }
 }
 
