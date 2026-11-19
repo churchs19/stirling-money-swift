@@ -809,6 +809,15 @@ change balances without opening the app.
      "settings". The unused identifiers on those menu items are removed.
 9. [ ] Check on the simulators, the Mac, and the real iPhone and Watch. The background run needs a few days on the
    iPhone to see iOS's timing.
+   - [x] Simulators: done along the way (steps 5, 7 and 8).
+   - [x] Real iPhone and Watch (Nov 19, 2026): installed. The iPhone's existing store upgraded with the user's data (the
+     app opened and kept running). `runInBackground` logs "Background run for recurring transactions" at notice level,
+     so a collected device log can show whether iOS woke the app.
+   - Note: once a store has upgraded, a build without `RecurringTransaction` (such as `main` before this phase is
+     merged) can't open it. Merge before installing an older build on that device.
+   - [ ] Over a day or two: a rule starting tomorrow shows in the widgets and on the Watch from midnight, and is added
+     before the app is opened if iOS ran it in the background (check with `sudo log collect --device-udid … --last 2d`).
+   - [x] The Mac with its real data (Nov 19, 2026): the store upgraded and the app opened and kept running.
 10. [ ] README, CLAUDE.md and this plan.
 
 **Risks and questions**

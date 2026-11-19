@@ -64,6 +64,8 @@ enum RecurringRunner {
     /// The background run: add what's due and write the widget summary straight away, before iOS suspends the app
     /// (the usual write waits a second after the save).
     static func runInBackground() {
+        // Logged at notice level so it shows in a collected device log: proof that iOS woke the app.
+        log.notice("Background run for recurring transactions")
         run()
         WidgetSnapshotWriter.updateNow()
     }
