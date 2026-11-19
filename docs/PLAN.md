@@ -744,8 +744,34 @@ change balances without opening the app.
      background run. The simulator doesn't run BGTasks, so on the device use the debugger:
      `e -l objc -- (void)[[BGTaskScheduler sharedScheduler] _simulateLaunchForTaskWithIdentifier:@"net.s-church.stirlingmoney.recurring"]`
      (step 9).
-5. [ ] `RecurringDraft` and `RecurringFormView`, the register's Upcoming section, "Make Recurring…", and the
+5. [x] `RecurringDraft` and `RecurringFormView`, the register's Upcoming section, "Make Recurring…", and the
    Recurring screen. Sample-data rules. Form tests like the other drafts'.
+   - **Draft** (`Models/RecurringDraft.swift`):
+     - Validation: amount, payee or another account, every 1–99, two different days, an end after the start, a count
+       above zero.
+     - A preview of the next three dates.
+     - `init(from:)` for "Make Recurring…": a month after the transaction; either half of a transfer moves money from
+       the source.
+     - Saving: editing the schedule recomputes `nextDate` from today, so past occurrences aren't added again.
+     - `RecurringDraftTests`: 14 tests.
+   - **Screens:**
+     - `RecurringFormView`: type, amount, account (a picker, so the Recurring screen can add too), payee or "To
+       Account", category; then the schedule with its preview, the end, a note, and Delete when editing. Saving runs
+       `RecurringRunner.run()`, so a rule starting today is added at once.
+     - `RecurringRow` and `recurringRowActions`: Edit, Skip Next, Add Now and Delete, as swipes and a context menu.
+     - The register's Upcoming section (the account's rules, plus transfers into it, read as "Transfer from …"),
+       hidden while searching.
+     - "Make Recurring…" or "Edit Recurring…" on each transaction, and a repeat icon on transactions a rule added.
+     - `RecurringListView`, grouped by account or by next date, from "Recurring" in the Accounts ⋯ menu.
+   - **Changed from the plan:** "Add Recurring Transaction" is in the register's ⋯ menu instead of turning + into a
+     menu, so adding an ordinary transaction stays one tap (and the existing UI tests didn't change).
+   - **Sample data:** rent (check, monthly), pay (twice a month), $400 to Savings monthly, and a yearly
+     subscription on the Credit Card. All start in the future, so the sample balances don't change by date.
+   - **Checked on the simulator:**
+     - Upcoming, the form and its preview, and the Recurring screen.
+     - Saving a $15 "Gym" rule starting today added it straight away (unposted, with the repeat icon; Checking went
+       from $10,229.11 to $10,214.11), and its next date moved to a month later. This is also step 4's pending check.
+   - The 11 iPhone UI tests still pass, and the Mac builds.
 6. [ ] `upcoming` in the summary and `WidgetSnapshot.projected(on:)`, with tests for:
    - balances and the total;
    - transfers (the total doesn't change);

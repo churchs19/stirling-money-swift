@@ -11,6 +11,7 @@ struct AccountsView: View {
 
     @State private var isAddingAccount = false
     @State private var isShowingCategories = false
+    @State private var isShowingRecurring = false
     @State private var isShowingSettings = false
     @State private var accountPendingDeletion: Account?
 
@@ -55,6 +56,12 @@ struct AccountsView: View {
                     .accessibilityIdentifier("toggleLayout")
                 }
                 ToolbarItem(placement: .secondaryAction) {
+                    Button("Recurring", systemImage: "repeat") {
+                        isShowingRecurring = true
+                    }
+                    .accessibilityIdentifier("recurringTransactions")
+                }
+                ToolbarItem(placement: .secondaryAction) {
                     Button("Categories", systemImage: "tag") {
                         isShowingCategories = true
                     }
@@ -92,6 +99,19 @@ struct AccountsView: View {
                             }
                         }
                 }
+            }
+            .sheet(isPresented: $isShowingRecurring) {
+                NavigationStack {
+                    RecurringListView()
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Done") { isShowingRecurring = false }
+                            }
+                        }
+                }
+                #if os(macOS)
+                .frame(minWidth: 460, minHeight: 420)
+                #endif
             }
             .sheet(isPresented: $isShowingCategories) {
                 NavigationStack {

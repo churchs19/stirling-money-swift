@@ -103,8 +103,25 @@ final class RecurringTransaction {
 
     /// The payee for display. Transfers name the other account, as transfer transactions do.
     var displayPayee: String {
+        displayPayee(in: account)
+    }
+
+    /// The payee as seen from `viewer`: an incoming transfer reads "Transfer from …" in the account it goes to.
+    func displayPayee(in viewer: Account?) -> String {
         guard kind == .transfer else { return payee }
+        if let viewer, viewer === otherAccount {
+            return String(localized: "Transfer from \(account?.name ?? "")")
+        }
         guard let otherAccount else { return String(localized: "Transfer") }
         return String(localized: "Transfer to \(otherAccount.name)")
+    }
+
+    /// The amount each occurrence adds to `viewer`'s balance: negative when money leaves it.
+    func signedAmount(in viewer: Account?) -> Decimal {
+        switch kind {
+        case .deposit: amount
+        case .withdrawal, .check: -amount
+        case .transfer: viewer != nil && viewer === otherAccount ? amount : -amount
+        }
     }
 }

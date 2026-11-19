@@ -10,6 +10,33 @@ struct AccountRegisterView: View {
     @State private var isEditingAccount = false
     @State private var isAddingTransaction = false
     @State private var editingTransaction: AccountTransaction?
+    @State private var recurringForm: RecurringForm?
+
+    /// Which recurring form is open.
+    enum RecurringForm: Identifiable {
+        case new
+        case edit(RecurringTransaction)
+        case madeFrom(AccountTransaction)
+
+        var id: String {
+            switch self {
+            case .new: "new"
+            case let .edit(rule): "edit-\(ObjectIdentifier(rule).hashValue)"
+            case let .madeFrom(transaction): "from-\(ObjectIdentifier(transaction).hashValue)"
+            }
+        }
+    }
+
+    /// The account's recurring transactions, including transfers into it: active ones by next date, then ended ones.
+    private var upcoming: [RecurringTransaction] {
+        ((account.recurringTransactions ?? []) + (account.recurringTransfersIn ?? []))
+            .sorted { lhs, rhs in
+                if lhs.hasEnded() != rhs.hasEnded() {
+                    return !lhs.hasEnded()
+                }
+                return lhs.nextDate < rhs.nextDate
+            }
+    }
 
     private var visibleTransactions: [AccountTransaction] {
         (account.transactions ?? [])
@@ -30,6 +57,18 @@ struct AccountRegisterView: View {
                     AmountText(account.postedBalance)
                 }
                 .accessibilityIdentifier("postedBalance")
+            }
+
+            if searchText.isEmpty, !upcoming.isEmpty {
+                Section("Upcoming") {
+                    ForEach(upcoming) { rule in
+                        RecurringRow(rule: rule, account: account)
+                            .accessibilityIdentifier("recurring.\(rule.displayPayee(in: account))")
+                            .recurringRowActions(rule, context: modelContext) {
+                                recurringForm = .edit(rule)
+                            }
+                    }
+                }
             }
 
             Section {
@@ -62,6 +101,8 @@ struct AccountRegisterView: View {
                                     transaction.isPosted.toggle()
                                 }
                                 .tint(.green)
+                                recurringButton(for: transaction)
+                                    .tint(.purple)
                             }
                             .swipeActions(edge: .trailing) {
                                 Button("Delete", systemImage: "trash", role: .destructive) {
@@ -79,6 +120,7 @@ struct AccountRegisterView: View {
                                 ) {
                                     transaction.isPosted.toggle()
                                 }
+                                recurringButton(for: transaction, afterMenu: true)
                                 Button("Delete", systemImage: "trash", role: .destructive) {
                                     delete(transaction)
                                 }
@@ -97,6 +139,12 @@ struct AccountRegisterView: View {
                 .accessibilityIdentifier("addTransaction")
             }
             ToolbarItem(placement: .secondaryAction) {
+                Button("Add Recurring Transaction", systemImage: "repeat") {
+                    recurringForm = .new
+                }
+                .accessibilityIdentifier("addRecurring")
+            }
+            ToolbarItem(placement: .secondaryAction) {
                 Button("Edit Account", systemImage: "pencil") {
                     isEditingAccount = true
                 }
@@ -110,6 +158,31 @@ struct AccountRegisterView: View {
         }
         .sheet(item: $editingTransaction) { transaction in
             TransactionFormView(account: account, transaction: transaction)
+        }
+        .sheet(item: $recurringForm) { form in
+            switch form {
+            case .new:
+                RecurringFormView(draft: RecurringDraft(account: account))
+            case let .edit(rule):
+                RecurringFormView(editing: rule)
+            case let .madeFrom(transaction):
+                RecurringFormView(draft: RecurringDraft(from: transaction), madeFrom: transaction)
+            }
+        }
+    }
+
+    /// "Edit Recurring…" for a transaction a rule added, otherwise "Make Recurring…".
+    private func recurringButton(for transaction: AccountTransaction, afterMenu: Bool = false) -> some View {
+        let form: RecurringForm = transaction.recurrence.map { .edit($0) } ?? .madeFrom(transaction)
+        return Button(
+            transaction.recurrence == nil ? "Make Recurring…" : "Edit Recurring…",
+            systemImage: "repeat"
+        ) {
+            if afterMenu {
+                afterMenuCloses { recurringForm = form }
+            } else {
+                recurringForm = form
+            }
         }
     }
 
