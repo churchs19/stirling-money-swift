@@ -17,7 +17,7 @@ as a SwiftUI + SwiftData app for iOS, iPadOS and macOS.
 | 7 | Apple Watch app (read-only) and complications | Done; checked on simulators and a real iPhone and Watch |
 | 8 | Budget widgets (iPhone, iPad, Mac, Lock Screen, Watch) | Done; checked on simulators and a real iPhone, Watch and Mac |
 | 9 | Test coverage: isolated unit tests, real UI tests, testable widget, lock and writer logic | Done |
-| 10 | Recurring transactions, added on schedule; widgets and the Watch show them on the day | Planned |
+| 10 | Recurring transactions, added on schedule; widgets and the Watch show them on the day | Done; background timing still to watch on the iPhone |
 
 ## Decisions
 
@@ -590,7 +590,7 @@ better.
 - **Locale tests** depend on Foundation's formatting data. Assert that values round-trip, not exact strings, except
   where the separator is the point of the test.
 
-### Phase 10: Recurring transactions (planned)
+### Phase 10: Recurring transactions (done, except the background-timing check)
 
 Recurring transactions (rent, pay, subscriptions, regular transfers) are created automatically on their schedule and
 change balances without opening the app.
@@ -818,7 +818,10 @@ change balances without opening the app.
    - [ ] Over a day or two: a rule starting tomorrow shows in the widgets and on the Watch from midnight, and is added
      before the app is opened if iOS ran it in the background (check with `sudo log collect --device-udid … --last 2d`).
    - [x] The Mac with its real data (Nov 19, 2026): the store upgraded and the app opened and kept running.
-10. [ ] README, CLAUDE.md and this plan.
+10. [x] README, CLAUDE.md and this plan.
+    - README: the feature, background refresh (with the debugger command to trigger it) and the layout. CLAUDE.md: the
+      new files, relationships, how recurring transactions are added and projected, and two lessons for tests (overflow
+      menu items lose identifiers; a screen-wide `TimelineView` keeps an app from going idle).
 
 **Risks and questions**
 - **Background timing:** iOS decides when, and how often, it wakes the app (less often for apps used rarely, and not
