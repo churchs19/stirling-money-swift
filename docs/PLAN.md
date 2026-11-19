@@ -689,8 +689,14 @@ change balances without opening the app.
   optional relationships, which also stays CloudKit-compatible.
 
 **Order of work**
-1. [ ] `RecurrenceSchedule` (weekly with interval, monthly with clamping, twice a month, yearly with Feb 29) and its
+1. [x] `RecurrenceSchedule` (weekly with interval, monthly with clamping, twice a month, yearly with Feb 29) and its
    tests.
+   - Done: `Models/RecurrenceSchedule.swift` has `RecurrenceFrequency` and `RecurrenceSchedule`:
+     `next(onOrAfter:)`, `next(after:)`, `occurrences(from:through:limit:)`, and `summary()` ("Every 2 weeks on Friday").
+   - Occurrences are counted from the start date, so a clamped Feb 28 doesn't drag later months.
+   - Twice a month uses the start's day plus `secondDay`, leaving out a day before the start. A day past the month's
+     end means its last day.
+   - `RecurrenceScheduleTests`: 15 tests (18 runs with the per-frequency arguments).
 2. [ ] `RecurringTransaction` and the relationships, in `AppSchema`. Tests for the delete rules (an account, the other
    account, a category, a rule).
 3. [ ] `RecurringScheduler.addDue`. Tests for:
