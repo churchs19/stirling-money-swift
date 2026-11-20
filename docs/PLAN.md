@@ -17,7 +17,7 @@ as a SwiftUI + SwiftData app for iOS, iPadOS and macOS.
 | 7 | Apple Watch app (read-only) and complications | Done; checked on simulators and a real iPhone and Watch |
 | 8 | Budget widgets (iPhone, iPad, Mac, Lock Screen, Watch) | Done; checked on simulators and a real iPhone, Watch and Mac |
 | 9 | Test coverage: isolated unit tests, real UI tests, testable widget, lock and writer logic | Done |
-| 10 | Recurring transactions, added on schedule; widgets and the Watch show them on the day | Done; background timing still to watch on the iPhone |
+| 10 | Recurring transactions, added on schedule; widgets and the Watch show them on the day | Done; checked on simulators, a real iPhone and Watch, and the Mac, including a background run |
 
 ## Decisions
 
@@ -590,7 +590,7 @@ better.
 - **Locale tests** depend on Foundation's formatting data. Assert that values round-trip, not exact strings, except
   where the separator is the point of the test.
 
-### Phase 10: Recurring transactions (done, except the background-timing check)
+### Phase 10: Recurring transactions (done)
 
 Recurring transactions (rent, pay, subscriptions, regular transfers) are created automatically on their schedule and
 change balances without opening the app.
@@ -807,7 +807,7 @@ change balances without opening the app.
    - Found: items in a toolbar's ⋯ menu lose their accessibility identifiers, so tests find them by label
      (`menuItem(_:)`). The Settings test had only passed because its gear icon's accessibility label happened to be
      "settings". The unused identifiers on those menu items are removed.
-9. [ ] Check on the simulators, the Mac, and the real iPhone and Watch. The background run needs a few days on the
+9. [x] Check on the simulators, the Mac, and the real iPhone and Watch. The background run needs a few days on the
    iPhone to see iOS's timing.
    - [x] Simulators: done along the way (steps 5, 7 and 8).
    - [x] Real iPhone and Watch (Nov 19, 2026): installed. The iPhone's existing store upgraded with the user's data (the
@@ -815,8 +815,10 @@ change balances without opening the app.
      so a collected device log can show whether iOS woke the app.
    - Note: once a store has upgraded, a build without `RecurringTransaction` (such as `main` before this phase is
      merged) can't open it. Merge before installing an older build on that device.
-   - [ ] Over a day or two: a rule starting tomorrow shows in the widgets and on the Watch from midnight, and is added
+   - [x] Over a day or two: a rule starting tomorrow shows in the widgets and on the Watch from midnight, and is added
      before the app is opened if iOS ran it in the background (check with `sudo log collect --device-udid … --last 2d`).
+     Confirmed on the real iPhone (Nov 20, 2026): iOS ran the background task and added the transaction before the app
+     was opened.
    - [x] The Mac with its real data (Nov 19, 2026): the store upgraded and the app opened and kept running.
 10. [x] README, CLAUDE.md and this plan.
     - README: the feature, background refresh (with the debugger command to trigger it) and the layout. CLAUDE.md: the
