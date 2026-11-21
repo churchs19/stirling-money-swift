@@ -85,7 +85,33 @@
             toSavings.otherAccount = savings
             subscription.account = creditCard
 
+            // Everything above goes into the first book. A second, smaller book to switch to.
+            try! Books.prepare(in: context)
+            let household = Book(name: "Household", createdAt: .now.addingTimeInterval(1))
+            context.insert(household)
+            let joint = Account(name: "Joint Checking", initialBalance: 640, iconName: "house")
+            context.insert(joint)
+            joint.book = household
+            let essentials = try! Ledger.category(named: "Essentials", book: household, in: context)
+            Ledger.addTransaction(.withdrawal, amount: 120, to: joint, date: daysAgo(2), payee: "Hardware Store", category: essentials, in: context)
+            try! context.save()
+
             return container
         }()
+
+        /// An in-memory store with one empty book, for previews of empty screens.
+        static var emptyPreview: ModelContainer {
+            let container = try! ModelContainer(
+                for: Schema(AppSchema.models),
+                configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+            )
+            try! Books.prepare(in: container.mainContext)
+            return container
+        }
+
+        /// The first book, for previews of screens that show one book.
+        var firstBook: Book {
+            try! mainContext.fetch(FetchDescriptor<Book>(sortBy: Book.order)).first!
+        }
     }
 #endif

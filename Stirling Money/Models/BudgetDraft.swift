@@ -60,9 +60,9 @@ struct BudgetDraft {
         !trimmedName.isEmpty && amount != nil && !hasEndBeforeStart()
     }
 
-    /// Creates a budget, or updates `existing`. Returns nil if the draft isn't valid.
+    /// Creates a budget in `book`, or updates `existing`. Returns nil if the draft isn't valid.
     @discardableResult
-    func save(editing existing: Budget? = nil, in context: ModelContext) -> Budget? {
+    func save(editing existing: Budget? = nil, book: Book? = nil, in context: ModelContext) -> Budget? {
         guard isValid, let amount else { return nil }
         let budget: Budget
         if let existing {
@@ -75,6 +75,7 @@ struct BudgetDraft {
         } else {
             budget = Budget(name: trimmedName, amount: amount, period: period, startDate: startDate, endDate: effectiveEndDate)
             context.insert(budget)
+            budget.book = book
         }
         budget.category = category
         return budget

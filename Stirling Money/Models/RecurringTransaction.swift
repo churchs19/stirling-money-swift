@@ -8,6 +8,13 @@ import SwiftData
 /// added are ordinary transactions and stay when the rule is deleted.
 @Model
 final class RecurringTransaction {
+    /// Its identity across devices (the CloudKit record name). Kept on deletion so the history tombstone says what
+    /// was deleted.
+    @Attribute(.preserveValueOnDeletion)
+    var syncID: String = UUID().uuidString
+    /// The book it belongs to. Set when it's created; see `Books`.
+    var book: Book?
+
     var kindRawValue: String = TransactionKind.withdrawal.rawValue
     /// A positive amount; the kind decides the sign, as in `Ledger`.
     var amount: Decimal = 0

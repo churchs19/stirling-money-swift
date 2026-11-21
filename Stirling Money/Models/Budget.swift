@@ -3,6 +3,13 @@ import SwiftData
 
 @Model
 final class Budget {
+    /// Its identity across devices (the CloudKit record name). Kept on deletion so the history tombstone says what
+    /// was deleted.
+    @Attribute(.preserveValueOnDeletion)
+    var syncID: String = UUID().uuidString
+    /// The book it belongs to. Set when it's created; see `Books`.
+    var book: Book?
+
     var name: String = ""
     /// The spending limit per period, as a positive amount.
     var amount: Decimal = 0

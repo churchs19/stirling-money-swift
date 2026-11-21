@@ -5,6 +5,10 @@ import SwiftUI
 /// A donut of spending by category over the chosen months.
 struct CategorySpendingReportView: View {
     @Query private var transactions: [AccountTransaction]
+
+    init(book: Book) {
+        _transactions = Query(filter: AccountTransaction.inBook(book))
+    }
     @AppStorage("reportRange") private var range: ReportRange = .sixMonths
     @State private var selectedAngle: Double?
 
@@ -123,7 +127,7 @@ extension DateInterval {
 
 #Preview {
     NavigationStack {
-        CategorySpendingReportView()
+        CategorySpendingReportView(book: ModelContainer.preview.firstBook)
     }
     .modelContainer(.preview)
 }

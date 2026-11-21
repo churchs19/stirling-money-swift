@@ -6,6 +6,11 @@ struct RecurringListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var rules: [RecurringTransaction]
     @Query private var accounts: [Account]
+
+    init(book: Book) {
+        _rules = Query(filter: RecurringTransaction.inBook(book))
+        _accounts = Query(filter: Account.inBook(book))
+    }
     @AppStorage("recurringGrouping") private var grouping: Grouping = .account
 
     @State private var editingRule: RecurringTransaction?
@@ -99,7 +104,7 @@ struct RecurringListView: View {
 
 #Preview {
     NavigationStack {
-        RecurringListView()
+        RecurringListView(book: ModelContainer.preview.firstBook)
     }
     .modelContainer(.preview)
 }

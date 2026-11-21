@@ -9,6 +9,10 @@ struct CategoryTrendReportView: View {
     @State private var category: Category?
     @State private var selectedDate: Date?
 
+    init(book: Book) {
+        _categories = Query(filter: Category.inBook(book))
+    }
+
     private var sortedCategories: [Category] {
         categories.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
@@ -96,7 +100,7 @@ struct CategoryTrendReportView: View {
 
 #Preview {
     NavigationStack {
-        CategoryTrendReportView()
+        CategoryTrendReportView(book: ModelContainer.preview.firstBook)
     }
     .modelContainer(.preview)
 }

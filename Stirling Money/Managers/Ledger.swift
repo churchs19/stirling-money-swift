@@ -29,6 +29,7 @@ enum Ledger {
             checkNumber: kind == .check ? checkNumber : nil
         )
         context.insert(transaction)
+        transaction.book = account.book
         transaction.account = account
         transaction.category = category
         return transaction
@@ -50,6 +51,8 @@ enum Ledger {
         let incoming = AccountTransaction(kind: .transfer, amount: magnitude, date: date, note: note, isPosted: isPosted)
         context.insert(outgoing)
         context.insert(incoming)
+        outgoing.book = source.book
+        incoming.book = destination.book
         outgoing.account = source
         incoming.account = destination
         outgoing.incomingHalf = incoming
@@ -64,31 +67,35 @@ enum Ledger {
         context.delete(transaction)
     }
 
-    /// Finds a category by name, ignoring case and surrounding spaces, or creates it.
+    /// Finds a category in `book` by name, ignoring case and surrounding spaces, or creates it there.
     /// Returns nil for a blank name, meaning "no category".
-    static func category(named name: String, in context: ModelContext) throws -> Category? {
+    static func category(named name: String, book: Book? = nil, in context: ModelContext) throws -> Category? {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
 
-        if let match = try existingCategory(named: trimmed, in: context) {
+        if let match = try existingCategory(named: trimmed, book: book, in: context) {
             return match
         }
         let category = Category(name: trimmed)
         context.insert(category)
+        category.book = book
         return category
     }
 
-    /// The category with this name, ignoring case and surrounding spaces, other than `excluded`.
-    /// Used to stop a rename from creating two categories with the same name.
+    /// The category in `book` with this name, ignoring case and surrounding spaces, other than `excluded`.
+    /// Used to stop a rename from creating two categories with the same name. Other books may use the same names.
     static func existingCategory(
         named name: String,
         excluding excluded: Category? = nil,
+        book: Book? = nil,
         in context: ModelContext
     ) throws -> Category? {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
+        let bookID = book?.persistentModelID
         return try context.fetch(FetchDescriptor<Category>()).first {
-            $0 !== excluded && $0.name.compare(trimmed, options: .caseInsensitive) == .orderedSame
+            $0 !== excluded && $0.book?.persistentModelID == bookID
+                && $0.name.compare(trimmed, options: .caseInsensitive) == .orderedSame
         }
     }
 
@@ -189,6 +196,7 @@ extension Ledger {
             note: draft.trimmedNote, isPosted: draft.isPosted
         )
         context.insert(counterpart)
+        counterpart.book = otherAccount.book
         counterpart.account = otherAccount
         if isIncoming {
             counterpart.incomingHalf = half

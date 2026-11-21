@@ -28,6 +28,13 @@ nonisolated enum TransactionKind: String, Codable, CaseIterable, Identifiable {
 /// Create and delete entries through `Ledger` so signs and transfer pairs stay consistent.
 @Model
 final class AccountTransaction {
+    /// Its identity across devices (the CloudKit record name). Kept on deletion so the history tombstone says what
+    /// was deleted.
+    @Attribute(.preserveValueOnDeletion)
+    var syncID: String = UUID().uuidString
+    /// The book it belongs to. Set when it's created; see `Books`.
+    var book: Book?
+
     var date: Date = Date.now
     var amount: Decimal = 0
     var payee: String = ""

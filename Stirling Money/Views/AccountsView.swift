@@ -5,6 +5,7 @@ struct AccountsView: View {
     @Environment(\.modelContext) private var modelContext
     /// The accounts open in the stack, so a widget link can open one directly.
     @Binding var path: [Account]
+    let book: Book
     @Query private var accounts: [Account]
     @AppStorage("accountSort") private var sort: AccountSort = .name
     @AppStorage("accountLayout") private var layout: AccountLayout = .tiles
@@ -14,6 +15,12 @@ struct AccountsView: View {
     @State private var isShowingRecurring = false
     @State private var isShowingSettings = false
     @State private var accountPendingDeletion: Account?
+
+    init(book: Book, path: Binding<[Account]>) {
+        self.book = book
+        _path = path
+        _accounts = Query(filter: Account.inBook(book))
+    }
 
     var body: some View {
         let sortedAccounts = sort.sorted(accounts)
@@ -35,6 +42,7 @@ struct AccountsView: View {
                 }
             }
             .navigationTitle("Accounts")
+            .bookSwitcher(book)
             .navigationDestination(for: Account.self) { account in
                 AccountRegisterView(account: account)
             }
@@ -86,7 +94,7 @@ struct AccountsView: View {
                 }
             }
             .sheet(isPresented: $isAddingAccount) {
-                NewAccountView()
+                NewAccountView(book: book)
             }
             .sheet(isPresented: $isShowingSettings) {
                 NavigationStack {
@@ -100,7 +108,7 @@ struct AccountsView: View {
             }
             .sheet(isPresented: $isShowingRecurring) {
                 NavigationStack {
-                    RecurringListView()
+                    RecurringListView(book: book)
                         .toolbar {
                             ToolbarItem(placement: .confirmationAction) {
                                 Button("Done") { isShowingRecurring = false }
@@ -113,7 +121,7 @@ struct AccountsView: View {
             }
             .sheet(isPresented: $isShowingCategories) {
                 NavigationStack {
-                    CategoriesView()
+                    CategoriesView(book: book)
                         .toolbar {
                             ToolbarItem(placement: .confirmationAction) {
                                 Button("Done") { isShowingCategories = false }
@@ -241,13 +249,14 @@ struct AccountsView: View {
 
 #Preview("With Accounts") {
     @Previewable @State var path: [Account] = []
-    AccountsView(path: $path)
+    AccountsView(book: ModelContainer.preview.firstBook, path: $path)
         .environment(AppLock())
         .modelContainer(.preview)
 }
 
 #Preview("Empty") {
     @Previewable @State var path: [Account] = []
-    AccountsView(path: $path)
-        .modelContainer(for: AppSchema.models, inMemory: true)
+    let container = ModelContainer.emptyPreview
+    AccountsView(book: container.firstBook, path: $path)
+        .modelContainer(container)
 }

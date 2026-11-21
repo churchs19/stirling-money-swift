@@ -2,9 +2,13 @@ import Charts
 import SwiftData
 import SwiftUI
 
-/// Income vs. expenses per month, across all accounts.
+/// Income vs. expenses per month, across the book's accounts.
 struct NetIncomeReportView: View {
     @Query private var transactions: [AccountTransaction]
+
+    init(book: Book) {
+        _transactions = Query(filter: AccountTransaction.inBook(book))
+    }
     @AppStorage("reportRange") private var range: ReportRange = .sixMonths
     @State private var selectedDate: Date?
 
@@ -107,7 +111,7 @@ struct NetIncomeReportView: View {
 
 #Preview {
     NavigationStack {
-        NetIncomeReportView()
+        NetIncomeReportView(book: ModelContainer.preview.firstBook)
     }
     .modelContainer(.preview)
 }

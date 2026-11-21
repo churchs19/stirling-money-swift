@@ -13,8 +13,10 @@ struct GoalFormView: View {
     @State private var draft: GoalDraft
     @State private var isConfirmingDelete = false
 
-    init(goal: Goal? = nil) {
+    /// - Parameter book: the book whose accounts are offered.
+    init(book: Book, goal: Goal? = nil) {
         self.goal = goal
+        _accounts = Query(filter: Account.inBook(book))
         _draft = State(initialValue: goal.map(GoalDraft.init(editing:)) ?? GoalDraft())
     }
 
@@ -115,13 +117,13 @@ struct GoalFormView: View {
 }
 
 #Preview("New") {
-    GoalFormView()
+    GoalFormView(book: ModelContainer.preview.firstBook)
         .modelContainer(.preview)
 }
 
 #Preview("Edit") {
     let container = ModelContainer.preview
     let goal = try! container.mainContext.fetch(FetchDescriptor<Goal>()).first!
-    return GoalFormView(goal: goal)
+    return GoalFormView(book: container.firstBook, goal: goal)
         .modelContainer(container)
 }

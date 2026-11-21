@@ -12,7 +12,8 @@ struct SettingsView: View {
     @AppStorage(AccentChoice.key, store: AccentChoice.store) private var accentChoice: AccentChoice = .standard
     @AppStorage(AccentChoice.customColorKey, store: AccentChoice.store) private var customAccent = ""
     @Environment(\.self) private var environment
-    @Query private var transactions: [AccountTransaction]
+    @Query(sort: Book.order) private var books: [Book]
+    @AppStorage(Books.currentKey) private var currentBookID = ""
 
     private var version: String {
         let info = Bundle.main.infoDictionary
@@ -69,18 +70,9 @@ struct SettingsView: View {
                 }
             }
 
-            Section {
-                ShareLink(
-                    item: CSVExportFile(text: TransactionCSV.make(transactions), filename: exportFilename),
-                    preview: SharePreview("Stirling Money Transactions", image: Image(systemName: "tablecells"))
-                ) {
-                    Label("Export Transactions", systemImage: "square.and.arrow.up")
-                }
-                .disabled(transactions.isEmpty)
-            } header: {
-                Text("Data")
-            } footer: {
-                Text("A CSV file of every transaction, for a spreadsheet or a backup.")
+            if let book = Books.current(id: currentBookID, in: books) {
+                ExportSection(book: book, showsBookName: books.count > 1)
+                    .id(book.syncID)
             }
 
             Section("About") {
@@ -101,10 +93,6 @@ struct SettingsView: View {
             WidgetSnapshotWriter.scheduleUpdate()
         }
         .navigationTitle("Settings")
-    }
-
-    private var exportFilename: String {
-        "Stirling Money Transactions \(Date.now.formatted(.iso8601.year().month().day())).csv"
     }
 
     /// The custom accent color; it starts from the default until one is picked.
@@ -131,6 +119,47 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+}
+
+/// Exports the current book's transactions.
+private struct ExportSection: View {
+    @Query private var transactions: [AccountTransaction]
+    let book: Book
+    /// Whether to name the book, when there's more than one.
+    let showsBookName: Bool
+
+    init(book: Book, showsBookName: Bool) {
+        self.book = book
+        self.showsBookName = showsBookName
+        _transactions = Query(filter: AccountTransaction.inBook(book))
+    }
+
+    var body: some View {
+        Section {
+            ShareLink(
+                item: CSVExportFile(text: TransactionCSV.make(transactions), filename: filename),
+                preview: SharePreview("Stirling Money Transactions", image: Image(systemName: "tablecells"))
+            ) {
+                Label("Export Transactions", systemImage: "square.and.arrow.up")
+            }
+            .disabled(transactions.isEmpty)
+        } header: {
+            Text("Data")
+        } footer: {
+            if showsBookName {
+                Text("A CSV file of every transaction in \(book.name), for a spreadsheet or a backup.")
+            } else {
+                Text("A CSV file of every transaction, for a spreadsheet or a backup.")
+            }
+        }
+    }
+
+    private var filename: String {
+        let date = Date.now.formatted(.iso8601.year().month().day())
+        return showsBookName
+            ? "Stirling Money \(book.name.replacing("/", with: "-")) \(date).csv"
+            : "Stirling Money Transactions \(date).csv"
     }
 }
 

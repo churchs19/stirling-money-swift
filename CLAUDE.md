@@ -18,6 +18,7 @@ Stirling Money/
 ├── Localizable.xcstrings          # String catalog (English); Xcode fills it in when it builds
 ├── Models/
 │   ├── AppSchema.swift            # List of all @Model types for the container
+│   ├── Book.swift                 # @Model: a set of accounts (the unit of sharing); + Model.inBook(_:) predicates
 │   ├── Account.swift              # @Model: balance, posted balance, next check number, optional icon (+ icon choices)
 │   ├── AccentChoice.swift         # Accent color setting: default purple (#7B2CBF, #9D4EDD in dark mode), system (Mac only), or custom; stored in the App Group defaults (StirlingMoneyWidgets/WidgetAccent.swift reads it; keep in step)
 │   ├── AccountLayout.swift        # Tiles (default) / list layout for the accounts screen
@@ -55,9 +56,10 @@ Stirling Money/
 │   ├── RecurringFormView.swift / RecurringListView.swift  # Recurring add/edit sheet; all-accounts Recurring screen (Accounts ⋯ menu)
 │   ├── Reports/                   # ReportsView list + one view per Swift Charts report; ReportSupport.swift
 │   ├── PreviewData.swift          # ModelContainer.preview sample data (DEBUG only)
-│   └── Components/                # AmountText, CurrencyField, TransactionRow, BudgetRow, GoalRow, PostedCheckmark (+ .posted toggle style), AccountTile, AccountIconPicker, AccountIconView (SF Symbol or PaymentFont glyph), NavigationRow, RecurringRow (+ recurringRowActions: Edit, Skip Next, Add Now, Delete)
+│   └── Components/                # BookSwitcher (.bookSwitcher toolbar menu), AmountText, CurrencyField, TransactionRow, BudgetRow, GoalRow, PostedCheckmark (+ .posted toggle style), AccountTile, AccountIconPicker, AccountIconView (SF Symbol or PaymentFont glyph), NavigationRow, RecurringRow (+ recurringRowActions: Edit, Skip Next, Add Now, Delete)
 ├── Managers/
-│   ├── Ledger.swift               # Create/edit/delete transactions and transfers; categories
+│   ├── Ledger.swift               # Create/edit/delete transactions and transfers; categories (per book)
+│   ├── Books.swift                # prepare (first book, data from before books), current book, create, delete
 │   ├── AppLock.swift              # Face ID / Touch ID / passcode lock (LocalAuthentication)
 │   ├── WidgetSnapshotWriter.swift # Writes the snapshot to the App Group, reloads widgets, sends it to the Watch
 │   ├── WatchSync.swift            # iPhone only: WCSession; sends the snapshot as application context, answers Watch requests
@@ -176,6 +178,9 @@ Structured data means fewer tokens consumed and better error diagnosis.
 - Money is `Decimal`, never `Double`. `AccountTransaction.amount` is signed: negative leaves the account.
 - Enums are stored as raw-value strings (`kindRawValue`, `periodRawValue`) with a computed typed property, so they work in `#Predicate`.
 - Create and delete transactions through `Ledger`, not directly, so signs stay right and transfer pairs are created and deleted together.
+- Everything belongs to a `Book`: set `book` when creating a model (`Ledger` and the drafts take it from the account),
+  and filter every `@Query` and fetch with `Model.inBook(book)`. The current book's `syncID` is in settings
+  (`Books.currentKey`); screens get the book in their initializer. Every model has a `syncID` (`preserveValueOnDeletion`).
 - Insert a model into the context before setting its relationships.
 
 ## Rules

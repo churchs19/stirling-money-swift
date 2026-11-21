@@ -20,6 +20,10 @@ struct RecurringFormView: View {
         _draft = State(initialValue: draft)
         self.rule = rule
         self.madeFrom = madeFrom
+        // Accounts and categories from the rule's book.
+        let book = rule?.book ?? draft.account?.book
+        _accounts = Query(filter: Account.inBook(book))
+        _categories = Query(filter: Category.inBook(book))
     }
 
     /// Editing `rule`.

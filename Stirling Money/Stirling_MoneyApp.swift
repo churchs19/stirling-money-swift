@@ -37,6 +37,10 @@ struct Stirling_MoneyApp: App {
     }()
 
     init() {
+        guard !LaunchMode.isHostingUnitTests else { return }
+        // Before anything reads the data: data from before books goes into the first book. If this fails, the
+        // next launch tries again (and RootView makes a book if there's none).
+        _ = try? Books.prepare(in: sharedModelContainer.mainContext)
         guard !LaunchMode.isTesting else { return }
         #if os(iOS)
             // Before the writer starts, so its first summary can go straight to the Watch.

@@ -7,14 +7,18 @@ struct BudgetFormView: View {
     @Environment(\.dismiss) private var dismiss
     @Query private var categories: [Category]
 
+    /// The book a new budget goes in; its categories are offered.
+    let book: Book
     /// The budget being edited, or nil for a new one.
     let budget: Budget?
 
     @State private var draft: BudgetDraft
     @State private var isConfirmingDelete = false
 
-    init(budget: Budget? = nil) {
+    init(book: Book, budget: Budget? = nil) {
+        self.book = book
         self.budget = budget
+        _categories = Query(filter: Category.inBook(book))
         _draft = State(initialValue: budget.map { BudgetDraft(editing: $0) } ?? BudgetDraft())
     }
 
@@ -116,7 +120,7 @@ struct BudgetFormView: View {
 
     private func save() {
         withAnimation {
-            _ = draft.save(editing: budget, in: modelContext)
+            _ = draft.save(editing: budget, book: book, in: modelContext)
         }
         dismiss()
     }
@@ -131,13 +135,13 @@ struct BudgetFormView: View {
 }
 
 #Preview("New") {
-    BudgetFormView()
+    BudgetFormView(book: ModelContainer.preview.firstBook)
         .modelContainer(.preview)
 }
 
 #Preview("Edit") {
     let container = ModelContainer.preview
     let budget = try! container.mainContext.fetch(FetchDescriptor<Budget>()).first!
-    return BudgetFormView(budget: budget)
+    return BudgetFormView(book: container.firstBook, budget: budget)
         .modelContainer(container)
 }

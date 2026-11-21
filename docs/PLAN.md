@@ -17,7 +17,7 @@ as a SwiftUI + SwiftData app for iOS, iPadOS and macOS.
 | 7 | Apple Watch app (read-only) and complications | Done; checked on simulators and a real iPhone and Watch |
 | 8 | Budget widgets (iPhone, iPad, Mac, Lock Screen, Watch) | Done; checked on simulators and a real iPhone, Watch and Mac |
 | 9 | Test coverage: isolated unit tests, real UI tests, testable widget, lock and writer logic | Done |
-| 10 | Recurring transactions, added on schedule; widgets and the Watch show them on the day | Done; background timing still to watch on the iPhone |
+| 10 | Recurring transactions, added on schedule; widgets and the Watch show them on the day | Done; checked on simulators, a real iPhone and Watch, and the Mac, including a background run |
 | 11 | iCloud sync and sharing books with other Apple IDs (CKSyncEngine) | Planned |
 
 ## Decisions
@@ -591,7 +591,7 @@ better.
 - **Locale tests** depend on Foundation's formatting data. Assert that values round-trip, not exact strings, except
   where the separator is the point of the test.
 
-### Phase 10: Recurring transactions (done, except the background-timing check)
+### Phase 10: Recurring transactions (done)
 
 Recurring transactions (rent, pay, subscriptions, regular transfers) are created automatically on their schedule and
 change balances without opening the app.
@@ -808,7 +808,7 @@ change balances without opening the app.
    - Found: items in a toolbar's ⋯ menu lose their accessibility identifiers, so tests find them by label
      (`menuItem(_:)`). The Settings test had only passed because its gear icon's accessibility label happened to be
      "settings". The unused identifiers on those menu items are removed.
-9. [ ] Check on the simulators, the Mac, and the real iPhone and Watch. The background run needs a few days on the
+9. [x] Check on the simulators, the Mac, and the real iPhone and Watch. The background run needs a few days on the
    iPhone to see iOS's timing.
    - [x] Simulators: done along the way (steps 5, 7 and 8).
    - [x] Real iPhone and Watch (Nov 19, 2026): installed. The iPhone's existing store upgraded with the user's data (the
@@ -816,8 +816,10 @@ change balances without opening the app.
      so a collected device log can show whether iOS woke the app.
    - Note: once a store has upgraded, a build without `RecurringTransaction` (such as `main` before this phase is
      merged) can't open it. Merge before installing an older build on that device.
-   - [ ] Over a day or two: a rule starting tomorrow shows in the widgets and on the Watch from midnight, and is added
+   - [x] Over a day or two: a rule starting tomorrow shows in the widgets and on the Watch from midnight, and is added
      before the app is opened if iOS ran it in the background (check with `sudo log collect --device-udid … --last 2d`).
+     Confirmed on the real iPhone (Nov 20, 2026): iOS ran the background task and added the transaction before the app
+     was opened.
    - [x] The Mac with its real data (Nov 19, 2026): the store upgraded and the app opened and kept running.
 10. [x] README, CLAUDE.md and this plan.
     - README: the feature, background refresh (with the debugger command to trigger it) and the layout. CLAUDE.md: the
@@ -956,9 +958,22 @@ Its category merging, status UI and notes will be reused, and the branch deleted
    build, and only add to it afterwards (never rename or remove fields).
 
 #### Order of work
-1. [ ] Books: the `Book` model, `book` and `syncID` on every model, "My Book" for existing data, the switcher, and
+1. [x] Books: the `Book` model, `book` and `syncID` on every model, "My Book" for existing data, the switcher, and
    per-book queries everywhere (the reports and the widget summary too). Tests for upgrading an existing store and for
    per-book totals. No CloudKit yet: usable on its own.
+   - **Done (Nov 20, 2026).** `Books.prepare` runs at launch. It makes "My Book" if there's no book, and puts anything
+     without a book into the oldest one. Each of those records gets a new `syncID`, because the store's migration gives
+     every existing row the same default. A test upgrades a real on-disk store from before books.
+   - The switcher is a toolbar menu on every tab (`bookSwitcher`): pick, New, Rename, Delete. Deleting the last book
+     isn't allowed. With more than one book, the book's name shows under each title.
+   - Screens take the book in their initializer and build their `@Query` from `Model.inBook(_:)`. Each tab is rebuilt
+     (`.id`) when the book changes. Forms with an account use its book. A `\.currentBook` environment value wasn't
+     needed.
+   - Each book has its own categories (the same name can be in two books). Settings exports the current book. The
+     widget summary is for the current book, and is rewritten on switching.
+   - A widget link to an account in another book switches to that book.
+   - Recurring rules in every book are still added; only the summary is per book.
+   - The sample data has a second book, "Household". 214 unit tests and 16 UI tests pass, and the Mac builds.
 2. [ ] Record mapping: each model to and from a `CKRecord`, with deterministic names, `Decimal` as a string and
    references. Round-trip tests with no network.
 3. [ ] The project changes above (with approval), then the private engine: upload, fetch, apply, conflicts and deletes

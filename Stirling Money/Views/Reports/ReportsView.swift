@@ -3,6 +3,8 @@ import SwiftUI
 
 /// The list of reports. Every report leaves out transfers between your own accounts.
 struct ReportsView: View {
+    /// The book reported on.
+    let book: Book
     @State private var path: [Report] = []
 
     enum Report: Hashable {
@@ -30,12 +32,13 @@ struct ReportsView: View {
                 .accessibilityIdentifier("report.budgetHistory")
             }
             .navigationTitle("Reports")
+            .bookSwitcher(book)
             .navigationDestination(for: Report.self) { report in
                 switch report {
-                case .netIncome: NetIncomeReportView()
-                case .categorySpending: CategorySpendingReportView()
-                case .categoryTrend: CategoryTrendReportView()
-                case .budgetHistory: BudgetHistoryReportView()
+                case .netIncome: NetIncomeReportView(book: book)
+                case .categorySpending: CategorySpendingReportView(book: book)
+                case .categoryTrend: CategoryTrendReportView(book: book)
+                case .budgetHistory: BudgetHistoryReportView(book: book)
                 }
             }
         }
@@ -56,6 +59,6 @@ struct ReportsView: View {
 }
 
 #Preview {
-    ReportsView()
+    ReportsView(book: ModelContainer.preview.firstBook)
         .modelContainer(.preview)
 }

@@ -4,6 +4,7 @@ import SwiftUI
 /// Lists categories with how many transactions use each; add, rename and delete.
 struct CategoriesView: View {
     @Environment(\.modelContext) private var modelContext
+    let book: Book
     @Query private var categories: [Category]
 
     /// The category being renamed, or nil while adding a new one.
@@ -11,6 +12,11 @@ struct CategoriesView: View {
     @State private var isNaming = false
     @State private var name = ""
     @State private var pendingDeletion: Category?
+
+    init(book: Book) {
+        self.book = book
+        _categories = Query(filter: Category.inBook(book))
+    }
 
     private var sortedCategories: [Category] {
         categories.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
@@ -22,7 +28,7 @@ struct CategoriesView: View {
 
     /// Two categories with the same name would be indistinguishable in pickers.
     private var nameIsTaken: Bool {
-        (try? Ledger.existingCategory(named: trimmedName, excluding: renaming, in: modelContext)) != nil
+        (try? Ledger.existingCategory(named: trimmedName, excluding: renaming, book: book, in: modelContext)) != nil
     }
 
     var body: some View {
@@ -117,7 +123,9 @@ struct CategoriesView: View {
             renaming.name = trimmedName
         } else {
             withAnimation {
-                modelContext.insert(Category(name: trimmedName))
+                let category = Category(name: trimmedName)
+                modelContext.insert(category)
+                category.book = book
             }
         }
     }
@@ -134,14 +142,15 @@ struct CategoriesView: View {
 
 #Preview("With Categories") {
     NavigationStack {
-        CategoriesView()
+        CategoriesView(book: ModelContainer.preview.firstBook)
     }
     .modelContainer(.preview)
 }
 
 #Preview("Empty") {
+    let container = ModelContainer.emptyPreview
     NavigationStack {
-        CategoriesView()
+        CategoriesView(book: container.firstBook)
     }
-    .modelContainer(for: AppSchema.models, inMemory: true)
+    .modelContainer(container)
 }

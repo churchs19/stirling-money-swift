@@ -1,8 +1,8 @@
 import XCTest
 
 /// End-to-end checks on the iPhone simulator. Each test launches the app with `-UITesting`: the sample data in memory
-/// (Checking $10,229.11, Credit Card -$1,068.38, Savings $10,500.00; total $19,660.73), fresh settings, and no widget
-/// summary or Watch. US English, so amounts read the same whatever the simulator's language.
+/// (Checking $10,229.11, Credit Card -$1,068.38, Savings $10,500.00; total $19,660.73; and a second book, Household,
+/// with Joint Checking $520.00), fresh settings, and no widget summary or Watch. US English, so amounts read the same whatever the simulator's language.
 @MainActor
 final class Stirling_MoneyUITests: XCTestCase {
     private var app: XCUIApplication!
@@ -97,6 +97,35 @@ final class Stirling_MoneyUITests: XCTestCase {
 
         expectLabel(of: "account.Holiday Fund", toContain: "$100.00")
         expectLabel(of: "accountsTotal", toContain: "$19,760.73")
+    }
+
+    // MARK: Books
+
+    func testSwitchingBooksShowsOnlyThatBooksAccounts() {
+        expectLabel(of: "accountsTotal", toContain: "$19,660.73")
+
+        waitFor(element("bookMenu")).tap()
+        waitFor(app.buttons["Household"].firstMatch).tap()
+
+        // The sample's second book: Joint Checking, $640 less a $120 purchase.
+        expectLabel(of: "account.Joint Checking", toContain: "$520.00")
+        expectLabel(of: "accountsTotal", toContain: "$520.00")
+        XCTAssertFalse(element("account.Checking").exists)
+
+        // Every tab shows the same book: Household has no budgets.
+        tab("Budgets")
+        XCTAssertTrue(app.staticTexts["No Budgets"].waitForExistence(timeout: 5))
+    }
+
+    func testANewBookStartsEmpty() {
+        waitFor(element("bookMenu")).tap()
+        waitFor(menuItem("New Book…")).tap()
+        let name = waitFor(app.alerts.textFields.firstMatch)
+        name.typeText("Trip")
+        app.alerts.buttons["Add"].tap()
+
+        XCTAssertTrue(app.staticTexts["No Accounts"].waitForExistence(timeout: 5))
+        XCTAssertFalse(element("accountsTotal").exists)
     }
 
     // MARK: Register

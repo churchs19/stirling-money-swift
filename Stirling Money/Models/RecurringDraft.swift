@@ -219,6 +219,7 @@ struct RecurringDraft {
         target.secondDay = secondDay
         target.endDate = end == .onDate ? calendar.startOfDay(for: endDate) : nil
         target.remainingCount = end == .afterCount ? count : nil
+        target.book = account.book
         target.account = account
         target.otherAccount = kind == .transfer ? otherAccount : nil
         target.category = kind == .transfer ? nil : category

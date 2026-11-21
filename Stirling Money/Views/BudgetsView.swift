@@ -4,12 +4,19 @@ import SwiftUI
 /// Every budget with what's been spent in its current period.
 struct BudgetsView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Budget.name) private var budgets: [Budget]
-    /// Needed for all-spending budgets, which count every account.
+    let book: Book
+    @Query private var budgets: [Budget]
+    /// Needed for all-spending budgets, which count every account in the book.
     @Query private var transactions: [AccountTransaction]
 
     @State private var isAddingBudget = false
     @State private var editingBudget: Budget?
+
+    init(book: Book) {
+        self.book = book
+        _budgets = Query(filter: Budget.inBook(book), sort: \Budget.name)
+        _transactions = Query(filter: AccountTransaction.inBook(book))
+    }
 
     var body: some View {
         NavigationStack {
@@ -48,6 +55,7 @@ struct BudgetsView: View {
                 }
             }
             .navigationTitle("Budgets")
+            .bookSwitcher(book)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button("Add Budget", systemImage: "plus") {
@@ -57,10 +65,10 @@ struct BudgetsView: View {
                 }
             }
             .sheet(isPresented: $isAddingBudget) {
-                BudgetFormView()
+                BudgetFormView(book: book)
             }
             .sheet(item: $editingBudget) { budget in
-                BudgetFormView(budget: budget)
+                BudgetFormView(book: book, budget: budget)
             }
         }
     }
@@ -73,11 +81,12 @@ struct BudgetsView: View {
 }
 
 #Preview("With Budgets") {
-    BudgetsView()
+    BudgetsView(book: ModelContainer.preview.firstBook)
         .modelContainer(.preview)
 }
 
 #Preview("Empty") {
-    BudgetsView()
-        .modelContainer(for: AppSchema.models, inMemory: true)
+    let container = ModelContainer.emptyPreview
+    BudgetsView(book: container.firstBook)
+        .modelContainer(container)
 }
