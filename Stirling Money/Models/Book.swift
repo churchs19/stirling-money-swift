@@ -24,6 +24,11 @@ final class Book {
     var canEdit: Bool = true
     /// The owner's name, for a book shared with this user.
     var ownerName: String?
+    /// The CloudKit user record name of the zone's owner, for a book shared with this user. nil for the user's own
+    /// books (`CKCurrentUserDefaultName`).
+    var zoneOwnerName: String?
+    /// The book record's system fields from the last sync. See `Account.ckSystemFields`.
+    var ckSystemFields: Data?
 
     @Relationship(deleteRule: .cascade, inverse: \Account.book)
     var accounts: [Account]? = []

@@ -63,6 +63,7 @@ Stirling Money/
 │   ├── AppLock.swift              # Face ID / Touch ID / passcode lock (LocalAuthentication)
 │   ├── WidgetSnapshotWriter.swift # Writes the snapshot to the App Group, reloads widgets, sends it to the Watch
 │   ├── WatchSync.swift            # iPhone only: WCSession; sends the snapshot as application context, answers Watch requests
+│   ├── Sync/                      # CloudRecords (each model ↔ CKRecord, encrypted values, zones), RecordImporter
 │   ├── RecurringScheduler.swift   # addDue (adds due occurrences through Ledger, catching up), addNow, skipNext, nextDueDate
 │   └── RecurringRunner.swift      # When addDue runs: launch, active, midnight, hourly + wake on the Mac, BGAppRefreshTask on iOS
 └── Extensions/

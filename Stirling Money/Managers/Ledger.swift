@@ -16,6 +16,7 @@ enum Ledger {
         isPosted: Bool = false,
         checkNumber: Int? = nil,
         category: Category? = nil,
+        syncID: String? = nil,
         in context: ModelContext
     ) -> AccountTransaction {
         precondition(kind != .transfer, "Use Ledger.addTransfer for transfers")
@@ -28,6 +29,9 @@ enum Ledger {
             isPosted: isPosted,
             checkNumber: kind == .check ? checkNumber : nil
         )
+        if let syncID {
+            transaction.syncID = syncID
+        }
         context.insert(transaction)
         transaction.book = account.book
         transaction.account = account
@@ -36,6 +40,8 @@ enum Ledger {
     }
 
     /// Moves money between two accounts as a linked pair: money out of `source`, into `destination`.
+    ///
+    /// The halves' `syncID`s are `"<pairID>:out"` and `"<pairID>:in"`, so each half can name the other.
     @discardableResult
     static func addTransfer(
         amount: Decimal,
@@ -44,11 +50,14 @@ enum Ledger {
         date: Date = .now,
         note: String = "",
         isPosted: Bool = false,
+        pairID: String = UUID().uuidString,
         in context: ModelContext
     ) -> (outgoing: AccountTransaction, incoming: AccountTransaction) {
         let magnitude = abs(amount)
         let outgoing = AccountTransaction(kind: .transfer, amount: -magnitude, date: date, note: note, isPosted: isPosted)
         let incoming = AccountTransaction(kind: .transfer, amount: magnitude, date: date, note: note, isPosted: isPosted)
+        outgoing.syncID = pairID + outgoingSuffix
+        incoming.syncID = pairID + incomingSuffix
         context.insert(outgoing)
         context.insert(incoming)
         outgoing.book = source.book
@@ -97,6 +106,19 @@ enum Ledger {
             $0 !== excluded && $0.book?.persistentModelID == bookID
                 && $0.name.compare(trimmed, options: .caseInsensitive) == .orderedSame
         }
+    }
+
+    static let outgoingSuffix = ":out"
+    static let incomingSuffix = ":in"
+
+    /// The `syncID` for the other half of the transfer half with `syncID`: `:out` and `:in` swapped, or for a half
+    /// made before transfers were named in pairs, its own ID with a suffix.
+    static func counterpartSyncID(of syncID: String, isIncoming: Bool) -> String {
+        let (own, other) = isIncoming ? (incomingSuffix, outgoingSuffix) : (outgoingSuffix, incomingSuffix)
+        if syncID.hasSuffix(own) {
+            return String(syncID.dropLast(own.count)) + other
+        }
+        return syncID + other
     }
 
     /// Deposits are positive; everything else takes money out of the account.
@@ -195,6 +217,7 @@ extension Ledger {
             kind: .transfer, amount: -half.amount, date: draft.date,
             note: draft.trimmedNote, isPosted: draft.isPosted
         )
+        counterpart.syncID = counterpartSyncID(of: half.syncID, isIncoming: isIncoming)
         context.insert(counterpart)
         counterpart.book = otherAccount.book
         counterpart.account = otherAccount

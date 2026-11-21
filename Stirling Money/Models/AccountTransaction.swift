@@ -34,6 +34,9 @@ final class AccountTransaction {
     var syncID: String = UUID().uuidString
     /// The book it belongs to. Set when it's created; see `Books`.
     var book: Book?
+    /// The CloudKit record's system fields (change tag and so on) from the last sync, so the next save is checked
+    /// against the server's copy. nil until first synced.
+    var ckSystemFields: Data?
 
     var date: Date = Date.now
     var amount: Decimal = 0

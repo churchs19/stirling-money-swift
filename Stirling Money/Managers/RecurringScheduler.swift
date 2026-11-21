@@ -19,7 +19,7 @@ enum RecurringScheduler {
         for rule in try context.fetch(FetchDescriptor<RecurringTransaction>()) where rule.problem == nil {
             var count = 0
             while count < catchUpLimit, !rule.hasEnded(calendar: calendar), calendar.startOfDay(for: rule.nextDate) <= today {
-                addOccurrence(of: rule, on: rule.nextDate, in: context)
+                addOccurrence(of: rule, on: rule.nextDate, occurrence: rule.nextDate, in: context, calendar: calendar)
                 advance(rule, calendar: calendar)
                 count += 1
             }
@@ -41,7 +41,10 @@ enum RecurringScheduler {
         calendar: Calendar = .current
     ) -> AccountTransaction? {
         guard rule.problem == nil, !rule.hasEnded(calendar: calendar) else { return nil }
-        let transaction = addOccurrence(of: rule, on: calendar.startOfDay(for: now), in: context)
+        // Named for the occurrence it stands in for, so a device adding it on its due date writes the same record.
+        let transaction = addOccurrence(
+            of: rule, on: calendar.startOfDay(for: now), occurrence: rule.nextDate, in: context, calendar: calendar
+        )
         advance(rule, calendar: calendar)
         return transaction
     }
@@ -62,14 +65,32 @@ enum RecurringScheduler {
 
     // MARK: Adding one
 
-    /// Adds one occurrence on `date` and links it to the rule. Returns the transaction in the rule's account.
+    /// The `syncID` of a rule's occurrence that falls due on `date`: `"<rule syncID>:<yyyy-MM-dd>"`. Every device
+    /// adding that occurrence gives it this name, so CloudKit keeps one record: no duplicates.
+    static func occurrenceSyncID(of rule: RecurringTransaction, on date: Date, calendar: Calendar = .current) -> String {
+        let day = calendar.dateComponents([.year, .month, .day], from: date)
+        let text = String(format: "%04d-%02d-%02d", day.year ?? 0, day.month ?? 0, day.day ?? 0)
+        return "\(rule.syncID):\(text)"
+    }
+
+    /// Adds the occurrence due on `occurrence`, dated `date`, and links it to the rule. Returns the transaction in the
+    /// rule's account.
     @discardableResult
-    private static func addOccurrence(of rule: RecurringTransaction, on date: Date, in context: ModelContext) -> AccountTransaction? {
+    private static func addOccurrence(
+        of rule: RecurringTransaction,
+        on date: Date,
+        occurrence: Date,
+        in context: ModelContext,
+        calendar: Calendar
+    ) -> AccountTransaction? {
         guard let account = rule.account else { return nil }
+        let syncID = occurrenceSyncID(of: rule, on: occurrence, calendar: calendar)
         switch rule.kind {
         case .transfer:
             guard let destination = rule.otherAccount else { return nil }
-            let pair = Ledger.addTransfer(amount: rule.amount, from: account, to: destination, date: date, note: rule.note, in: context)
+            let pair = Ledger.addTransfer(
+                amount: rule.amount, from: account, to: destination, date: date, note: rule.note, pairID: syncID, in: context
+            )
             // Both halves, so either one opens the rule.
             pair.outgoing.recurrence = rule
             pair.incoming.recurrence = rule
@@ -84,6 +105,7 @@ enum RecurringScheduler {
                 note: rule.note,
                 checkNumber: rule.kind == .check ? account.nextCheckNumber : nil,
                 category: rule.category,
+                syncID: syncID,
                 in: context
             )
             transaction.recurrence = rule

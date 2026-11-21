@@ -974,8 +974,33 @@ Its category merging, status UI and notes will be reused, and the branch deleted
    - A widget link to an account in another book switches to that book.
    - Recurring rules in every book are still added; only the summary is per book.
    - The sample data has a second book, "Household". 214 unit tests and 16 UI tests pass, and the Mac builds.
-2. [ ] Record mapping: each model to and from a `CKRecord`, with deterministic names, `Decimal` as a string and
+2. [x] Record mapping: each model to and from a `CKRecord`, with deterministic names, `Decimal` as a string and
    references. Round-trip tests with no network.
+   - **Done (Nov 20, 2026)**, in `Managers/Sync/`.
+   - **`CloudRecords.swift`:**
+     - Each model has a record type named after it. The book is a `Book` record in its own zone (`Book-<syncID>`),
+       named by its `syncID`.
+     - Values go in `encryptedValues`: names, amounts, payees, notes and dates. References can't be encrypted, so
+       `account`, `category`, `recurrence`, `incomingHalf`, `otherAccount` are plain `CKRecord.Reference`s with
+       action `.none`.
+     - Money is a string in `en_US_POSIX` form. Booleans and whole numbers are `Int64`. Enums use their raw value
+       (`kind`, `period`, `frequency`). The book isn't a field: it's the zone.
+     - `makeRecord(in:)` builds on the saved `ckSystemFields`, and `Book.allRecords()` lists a whole zone.
+   - **`RecordImporter`:** applies a batch to one book.
+     - Models are matched by `syncID` within that book, so a record in another book's zone never matches.
+     - Values are applied first, then references. Records whose targets haven't arrived yet are returned and retried
+       with the next batch.
+     - References are only set when they change. Unknown record types are skipped.
+   - **Deterministic names:**
+     - Transfer halves are `<pair>:out` and `<pair>:in`. A recreated counterpart swaps the suffix.
+     - Recurring occurrences are `<rule>:<yyyy-MM-dd>`, and a transfer occurrence adds `:out`/`:in`. "Add Now" uses the
+       occurrence it stands in for, not today.
+   - **New model fields:** `ckSystemFields` on every model, `Book.zoneOwnerName` (for shared books) and
+     `Category.createdAt` (for merging same-named categories into the oldest).
+   - **Tests:** 11 tests in `CloudRecordTests`. They cover a whole book round-tripped in reverse order, references
+     arriving in a later batch, re-applying as an update, book scoping, encryption and exact money, system fields,
+     zone names, transfer names, and two devices naming the same occurrences the same. 225 unit tests pass, and the
+     Mac builds.
 3. [ ] The project changes above (with approval), then the private engine: upload, fetch, apply, conflicts and deletes
    for the user's own books on their devices. A fake engine delegate in tests; then two devices on one Apple ID.
 4. [ ] Sharing: share, accept, permissions, leave, stop sharing, and the shared engine. Two Apple IDs on two devices (or
