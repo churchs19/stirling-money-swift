@@ -11,7 +11,7 @@ struct Stirling_MoneyApp: App {
             do {
                 return try ModelContainer(
                     for: Schema(AppSchema.models),
-                    configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+                    configurations: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
                 )
             } catch {
                 fatalError("Could not create the in-memory ModelContainer for tests: \(error)")
@@ -21,13 +21,15 @@ struct Stirling_MoneyApp: App {
         #if DEBUG
             // Launch with `-UseSampleData` to review screens with the preview data in memory, as the UI tests
             // (`-UITesting`) do. The real store on disk is left untouched.
-            if ProcessInfo.processInfo.arguments.contains("-UseSampleData") || LaunchMode.isUITesting {
+            if LaunchMode.usesSampleData || LaunchMode.isUITesting {
                 return .preview
             }
         #endif
 
         let schema = Schema(AppSchema.models)
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        // `.none`: SyncCoordinator syncs the store. With the default (`.automatic`), SwiftData would also mirror it to
+        // the app's iCloud container by itself, which has no shared database and would clash with ours.
+        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .none)
 
         do {
             return try ModelContainer(for: schema, configurations: [modelConfiguration])
@@ -47,6 +49,8 @@ struct Stirling_MoneyApp: App {
             WatchSync.start()
         #endif
         WidgetSnapshotWriter.startObserving(sharedModelContainer.mainContext)
+        // iCloud sync, once the app has the capability (SyncCoordinator.isEnabled).
+        SyncCoordinator.start(sharedModelContainer.mainContext)
         // After the writer, so the transactions it adds reach the widgets and the Watch.
         RecurringRunner.start(sharedModelContainer.mainContext)
     }

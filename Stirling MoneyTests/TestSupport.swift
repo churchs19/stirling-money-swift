@@ -7,7 +7,7 @@ import SwiftData
 func makeInMemoryContainer() throws -> ModelContainer {
     try ModelContainer(
         for: Schema(AppSchema.models),
-        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        configurations: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
     )
 }
 

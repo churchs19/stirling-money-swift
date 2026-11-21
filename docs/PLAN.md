@@ -1003,6 +1003,41 @@ Its category merging, status UI and notes will be reused, and the branch deleted
      Mac builds.
 3. [ ] The project changes above (with approval), then the private engine: upload, fetch, apply, conflicts and deletes
    for the user's own books on their devices. A fake engine delegate in tests; then two devices on one Apple ID.
+   - **Engine written and tested (Nov 20, 2026).** The project changes were made with Xcode's tools (approved):
+     - Entitlements: `com.apple.developer.icloud-services` = CloudKit, `com.apple.developer.icloud-container-identifiers`
+       = `iCloud.net.s-church.stirlingmoney`, and `aps-environment` (Xcode also added the Mac's
+       `com.apple.developer.aps-environment`).
+     - `UIBackgroundModes` = fetch and remote-notification.
+     - Signed iOS and Mac builds registered the container; `CKSyncEngine` handles the pushes itself.
+   - **SwiftData's own CloudKit sync is off:** every `ModelConfiguration` passes `cloudKitDatabase: .none`. With the
+     default (`.automatic`), SwiftData starts mirroring the store to the container as soon as the app has the
+     entitlement. The simulator's log showed it doing that.
+   - Sync never runs under tests or `-UseSampleData` (`LaunchMode.usesSampleData`), so sample data never reaches
+     iCloud.
+   - **`SyncProcessor`** holds the sync logic apart from CloudKit:
+     - **Out:** reads history since the last token. Changes authored `"sync"` are skipped, and so are updates that only
+       touch to-many relationships or sync bookkeeping. Changes become zone and record saves and deletes.
+       `ckSystemFields` is kept on deletion (`preserveValueOnDeletion`), so a tombstone names its record. Something
+       added and deleted before it was ever sent cancels the pending save.
+     - **In:** `applyFetched`, `applyDeletedZone`. Changes are saved with the author `"sync"`, after flushing this
+       device's own unsaved changes.
+     - **Results:**
+       - A record whose model was deleted while its save was on the way is deleted from the server.
+       - Conflicts go through `RecordMerger`: a three-way merge against `ckSyncedValues` (the values as of the last
+         sync). Fields changed on one side take that side; both changed, this device wins, except posted wins and a
+         rule's later `nextDate` (with its `remainingCount`) wins.
+       - `unknownItem` deletes locally (deletes win).
+       - `zoneNotFound`: a synced book is deleted locally; a new one gets its zone made.
+   - **`SyncCoordinator`** wraps `CKSyncEngine` on the private database. Its state, the history token and records
+     waiting for references are saved in `Sync-Private.json`. The first run queues every book. Local changes are
+     queued after each save of the main context.
+   - **Tests:** 15 tests in `SyncTests` use a fake server and two on-disk devices. They cover round trips, no echoes,
+     edits and deletes both ways, cascades, book deletion, cancelled saves, two devices adding the same recurring
+     occurrence (one record, one transaction each), conflict merging, deleted records and missing zones.
+     240 unit tests pass, and the Mac builds.
+   - On the simulator (not signed into iCloud) the engine starts, queues the book's zone, saves its state and waits.
+   - **Still to do:** test with two devices on one Apple ID. Each device's existing data is its own "My Book" (each
+     store made its own at the upgrade), so after the first sync both books appear on both devices.
 4. [ ] Sharing: share, accept, permissions, leave, stop sharing, and the shared engine. Two Apple IDs on two devices (or
    a device and a simulator).
 5. [ ] View-only mode across the screens, and UI tests with a view-only book in the sample data.

@@ -19,6 +19,15 @@ nonisolated enum LaunchMode {
         #endif
     }
 
+    /// Launched with `-UseSampleData` (Debug builds only): the sample data in memory instead of the real store.
+    static var usesSampleData: Bool {
+        #if DEBUG
+            ProcessInfo.processInfo.arguments.contains("-UseSampleData")
+        #else
+            false
+        #endif
+    }
+
     /// Whether to leave the widget summary and the Watch alone.
     static var isTesting: Bool {
         isHostingUnitTests || isUITesting

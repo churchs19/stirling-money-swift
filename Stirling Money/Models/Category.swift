@@ -10,8 +10,11 @@ final class Category {
     /// The book it belongs to. Set when it's created; see `Books`.
     var book: Book?
     /// The CloudKit record's system fields (change tag and so on) from the last sync, so the next save is checked
-    /// against the server's copy. nil until first synced.
+    /// against the server's copy. nil until first synced. Kept on deletion: the tombstone's copy names the record.
+    @Attribute(.preserveValueOnDeletion)
     var ckSystemFields: Data?
+    /// The record's values as of the last sync, for merging a conflict (`RecordMerger`).
+    var ckSyncedValues: Data?
 
     var name: String = ""
     /// When two devices make a category with the same name, the copies are merged into the oldest.

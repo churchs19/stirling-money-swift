@@ -63,7 +63,9 @@ Stirling Money/
 │   ├── AppLock.swift              # Face ID / Touch ID / passcode lock (LocalAuthentication)
 │   ├── WidgetSnapshotWriter.swift # Writes the snapshot to the App Group, reloads widgets, sends it to the Watch
 │   ├── WatchSync.swift            # iPhone only: WCSession; sends the snapshot as application context, answers Watch requests
-│   ├── Sync/                      # CloudRecords (each model ↔ CKRecord, encrypted values, zones), RecordImporter
+│   ├── Sync/                      # CloudRecords (each model ↔ CKRecord, encrypted values, zones), RecordImporter,
+│   │                              #   RecordMerger (three-way conflict merge), SyncProcessor (history out, fetched in,
+│   │                              #   results; testable), SyncCoordinator (CKSyncEngine; never under tests or sample data)
 │   ├── RecurringScheduler.swift   # addDue (adds due occurrences through Ledger, catching up), addNow, skipNext, nextDueDate
 │   └── RecurringRunner.swift      # When addDue runs: launch, active, midnight, hourly + wake on the Mac, BGAppRefreshTask on iOS
 └── Extensions/
@@ -173,6 +175,8 @@ Structured data means fewer tokens consumed and better error diagnosis.
 | Category.recurringTransactions | RecurringTransaction.category | nullify |
 | RecurringTransaction.transactions | AccountTransaction.recurrence | nullify (added transactions stay when the rule is deleted) |
 
+- Every `ModelConfiguration` passes `cloudKitDatabase: .none`: our own `SyncCoordinator` syncs the store, and the
+  default would start SwiftData's built-in mirroring too, now that the app has an iCloud container.
 - Keep models CloudKit-compatible so sync can be turned on later without a migration: every stored property has a default or is optional, every relationship is optional, no `@Attribute(.unique)`.
 - Declare `inverse:` on one side only.
 - A property can't be its own inverse (circular macro error), which is why transfers use two properties. Read `transferCounterpart`.

@@ -29,6 +29,8 @@ final class Book {
     var zoneOwnerName: String?
     /// The book record's system fields from the last sync. See `Account.ckSystemFields`.
     var ckSystemFields: Data?
+    /// The book record's values as of the last sync. See `Account.ckSyncedValues`.
+    var ckSyncedValues: Data?
 
     @Relationship(deleteRule: .cascade, inverse: \Account.book)
     var accounts: [Account]? = []

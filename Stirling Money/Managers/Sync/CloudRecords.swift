@@ -18,6 +18,7 @@ protocol CloudRecordMapped: PersistentModel {
     static var recordType: CKRecord.RecordType { get }
     var syncID: String { get set }
     var ckSystemFields: Data? { get set }
+    var ckSyncedValues: Data? { get set }
     /// Writes its values and references into `record`.
     func write(to record: CKRecord)
     /// Reads its values (not references) from `record`.
@@ -40,9 +41,10 @@ extension CloudRecordMapped {
         return record
     }
 
-    /// Keeps the system fields of a record just saved or fetched.
+    /// Keeps the system fields and values of a record just saved or fetched.
     func remember(_ record: CKRecord) {
         ckSystemFields = record.encodedSystemFields
+        ckSyncedValues = RecordMerger.encode(RecordMerger.values(of: record))
     }
 }
 
@@ -167,6 +169,12 @@ extension Book {
         records += (goals ?? []).map { $0.makeRecord(in: zoneID) }
         records += (recurringTransactions ?? []).map { $0.makeRecord(in: zoneID) }
         return records
+    }
+
+    /// Keeps the system fields and values of the book's record, just saved or fetched.
+    func remember(_ record: CKRecord) {
+        ckSystemFields = record.encodedSystemFields
+        ckSyncedValues = RecordMerger.encode(RecordMerger.values(of: record))
     }
 
     /// The book's record in its zone.

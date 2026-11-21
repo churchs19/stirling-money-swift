@@ -206,7 +206,7 @@ struct AccountRegisterView: View {
 #Preview("Empty") {
     let container = try! ModelContainer(
         for: Schema(AppSchema.models),
-        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        configurations: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
     )
     let account = Account(name: "New Account", initialBalance: 100)
     container.mainContext.insert(account)

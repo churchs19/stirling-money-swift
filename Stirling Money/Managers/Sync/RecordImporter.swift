@@ -27,7 +27,7 @@ enum RecordImporter {
         for record in records {
             if record.recordType == Book.recordType {
                 book.read(from: record)
-                book.ckSystemFields = record.encodedSystemFields
+                book.remember(record)
                 continue
             }
             if let model = try upsert(record, in: book, resolver: &resolver) {

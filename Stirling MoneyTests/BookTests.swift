@@ -73,7 +73,7 @@ struct BookTests {
         let url = folder.appending(path: "Upgrade.store")
 
         do {
-            let old = try ModelContainer(for: StoreBeforeBooks.Account.self, configurations: ModelConfiguration(url: url))
+            let old = try ModelContainer(for: StoreBeforeBooks.Account.self, configurations: ModelConfiguration(url: url, cloudKitDatabase: .none))
             old.mainContext.insert(StoreBeforeBooks.Account(name: "Checking", initialBalance: 100))
             old.mainContext.insert(StoreBeforeBooks.Account(name: "Savings", initialBalance: 250))
             try old.mainContext.save()
@@ -81,7 +81,7 @@ struct BookTests {
 
         let container = try ModelContainer(
             for: Schema(AppSchema.models),
-            configurations: ModelConfiguration(url: url)
+            configurations: ModelConfiguration(url: url, cloudKitDatabase: .none)
         )
         let context = container.mainContext
         let book = try Books.prepare(in: context)

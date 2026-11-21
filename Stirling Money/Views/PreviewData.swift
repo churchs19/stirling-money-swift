@@ -8,7 +8,7 @@
         static let preview: ModelContainer = {
             let container = try! ModelContainer(
                 for: Schema(AppSchema.models),
-                configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+                configurations: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
             )
             let context = container.mainContext
 
@@ -103,7 +103,7 @@
         static var emptyPreview: ModelContainer {
             let container = try! ModelContainer(
                 for: Schema(AppSchema.models),
-                configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+                configurations: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
             )
             try! Books.prepare(in: container.mainContext)
             return container
