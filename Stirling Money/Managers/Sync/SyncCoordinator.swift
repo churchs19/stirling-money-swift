@@ -154,17 +154,27 @@ final class SyncCoordinator {
     /// The engine schedules a send for new pending changes only when no sync is under way. Changes added while it's
     /// handling a fetch or a send's results (a merge, a retry after a conflict) would otherwise wait for the next
     /// unrelated save.
+    ///
+    /// The engine stops the app (an assertion) if `sendChanges()` is called from within its event handler, and a
+    /// plain `Task` started there counts as within: it inherits the handler's task context. So the send runs in a
+    /// detached task, after the event has finished.
     private func requestSend() {
-        guard let engine, !isSendRequested else { return }
+        guard engine != nil, !isSendRequested else { return }
         isSendRequested = true
-        Task {
+        Task.detached { [weak self] in
             try? await Task.sleep(for: .milliseconds(500))
-            isSendRequested = false
-            do {
-                try await engine.sendChanges()
-            } catch {
-                log.error("Couldn't send changes: \(error.localizedDescription, privacy: .public)")
-            }
+            await self?.sendPendingChanges()
+        }
+    }
+
+    private func sendPendingChanges() async {
+        isSendRequested = false
+        guard let engine, !engine.state.pendingRecordZoneChanges.isEmpty || !engine.state.pendingDatabaseChanges.isEmpty
+        else { return }
+        do {
+            try await engine.sendChanges()
+        } catch {
+            log.error("Couldn't send changes: \(error.localizedDescription, privacy: .public)")
         }
     }
 

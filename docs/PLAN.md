@@ -1057,6 +1057,9 @@ Its category merging, status UI and notes will be reused, and the branch deleted
      - The engine schedules a send for new pending changes only when no sync is under way. Changes queued while it
        handled a fetch (a merge) or a send's results (a retry after a conflict) waited for the next trigger.
      - `SyncCoordinator.requestSend()` now calls `sendChanges()` half a second after such an event.
+     - **That crashed both apps** (a CloudKit assertion in `requestSend()`, in the Mac's and the iPhone's crash
+       reports). The engine forbids `sendChanges()` from within its event handler, and a plain `Task` started there
+       inherits the handler's task context. The send now runs in `Task.detached`, and only when changes are pending.
    - **Still to do:** test with two devices on one Apple ID. Each device's existing data is its own "My Book" (each
      store made its own at the upgrade), so after the first sync both books appear on both devices.
 4. [ ] Sharing: share, accept, permissions, leave, stop sharing, and the shared engine. Two Apple IDs on two devices (or
