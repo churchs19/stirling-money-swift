@@ -36,7 +36,19 @@ enum RecordMerger {
         data.flatMap { try? JSONDecoder().decode([String: String].self, from: $0) }
     }
 
-    /// The server's record with the merged values written into it, ready to save again.
+    /// For a record fetched while this device has changes to it that haven't gone up yet: the fetched record merged
+    /// with them, as a new copy. nil when there's nothing unsent (this device's values are still the ones it last
+    /// synced), so the fetched record can simply be applied.
+    ///
+    /// The sync engine usually fetches before it sends, so this is where most conflicts are met: without it, the
+    /// fetched values would overwrite this device's edits before they were sent.
+    static func mergeUnsent(local: CKRecord, fetched: CKRecord, syncedValues: Data?) -> CKRecord? {
+        guard let ancestor = decode(syncedValues), values(of: local) != ancestor else { return nil }
+        return merge(local: local, server: fetched.copy() as! CKRecord, ancestor: ancestor)
+    }
+
+    /// The server's record with the merged values written into it, ready to save again. Changes `server`: pass a
+    /// copy if the server's own values are still needed (to keep as the new ancestor).
     static func merge(local: CKRecord, server: CKRecord, ancestor: [String: String]?) -> CKRecord {
         let mine = values(of: local)
         let theirs = values(of: server)
@@ -100,7 +112,8 @@ enum RecordMerger {
         switch value {
         case nil: nil
         case let string as String: "s:" + string
-        case let date as Date: "d:\(date.timeIntervalSinceReferenceDate)"
+        // CloudKit keeps dates to the millisecond, so finer differences aren't changes.
+        case let date as Date: "d:\(Int64((date.timeIntervalSinceReferenceDate * 1000).rounded()))"
         case let number as NSNumber: "n:\(number)"
         case let reference as CKRecord.Reference: "r:" + reference.recordID.recordName
         case let data as Data: "b:" + data.base64EncodedString()

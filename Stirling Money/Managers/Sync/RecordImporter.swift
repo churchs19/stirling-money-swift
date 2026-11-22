@@ -9,7 +9,10 @@ import SwiftData
 /// account. Values are applied first, then references. A record whose references aren't all here yet is returned, to
 /// be passed in again (`retrying`) with the next batch.
 ///
-/// Doesn't save, and doesn't handle deletions or conflicts; the sync engine does (step 3).
+/// A model with changes of this device's own that haven't been sent is merged with the fetched record
+/// (`RecordMerger.mergeUnsent`), not overwritten; its pending save then sends the merged values.
+///
+/// Doesn't save, and doesn't handle deletions; `SyncProcessor` does.
 enum RecordImporter {
     /// Applies `records` to `book`, and retries the references of `pending` records from earlier batches.
     /// Returns the records with references still missing. Records of unknown types (from a newer version) are skipped.
@@ -26,12 +29,13 @@ enum RecordImporter {
         var applied: [(any CloudRecordMapped, CKRecord)] = []
         for record in records {
             if record.recordType == Book.recordType {
-                book.read(from: record)
+                let merged = RecordMerger.mergeUnsent(local: book.makeRecord(), fetched: record, syncedValues: book.ckSyncedValues)
+                book.read(from: merged ?? record)
                 book.remember(record)
                 continue
             }
-            if let model = try upsert(record, in: book, resolver: &resolver) {
-                applied.append((model, record))
+            if let (model, values) = try upsert(record, in: book, resolver: &resolver) {
+                applied.append((model, values))
             }
         }
 
@@ -54,8 +58,11 @@ enum RecordImporter {
         return unresolved
     }
 
-    /// Updates the model with the record's name, or inserts one. Returns nil for an unknown record type.
-    private static func upsert(_ record: CKRecord, in book: Book, resolver: inout RecordResolver) throws -> (any CloudRecordMapped)? {
+    /// Updates the model with the record's name, or inserts one. Returns the model and the record its references come
+    /// from (the fetched one, or its merge with unsent changes), or nil for an unknown record type.
+    private static func upsert(
+        _ record: CKRecord, in book: Book, resolver: inout RecordResolver
+    ) throws -> (any CloudRecordMapped, CKRecord)? {
         switch record.recordType {
         case Account.recordType: try upsert(Account.self, record, in: book, resolver: &resolver)
         case AccountTransaction.recordType: try upsert(AccountTransaction.self, record, in: book, resolver: &resolver)
@@ -69,11 +76,16 @@ enum RecordImporter {
 
     private static func upsert<T: CloudRecordMapped & BookOwned>(
         _: T.Type, _ record: CKRecord, in book: Book, resolver: inout RecordResolver
-    ) throws -> T {
+    ) throws -> (any CloudRecordMapped, CKRecord) {
         let syncID = record.recordID.recordName
         let model: T
+        var values = record
         if let existing: T = try resolver.find(syncID) {
             model = existing
+            let local = existing.makeRecord(in: record.recordID.zoneID)
+            if let merged = RecordMerger.mergeUnsent(local: local, fetched: record, syncedValues: existing.ckSyncedValues) {
+                values = merged
+            }
         } else {
             model = T.makeEmpty()
             model.syncID = syncID
@@ -81,9 +93,10 @@ enum RecordImporter {
             model.book = book
             resolver.remember(model)
         }
-        model.read(from: record)
+        model.read(from: values)
+        // The server's copy is the new common ancestor (and its change tag goes with the next save).
         model.remember(record)
-        return model
+        return (model, values)
     }
 }
 

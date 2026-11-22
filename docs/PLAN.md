@@ -1036,6 +1036,13 @@ Its category merging, status UI and notes will be reused, and the branch deleted
      occurrence (one record, one transaction each), conflict merging, deleted records and missing zones.
      240 unit tests pass, and the Mac builds.
    - On the simulator (not signed into iCloud) the engine starts, queues the book's zone, saves its state and waits.
+   - **Device test, Nov 21, 2026: the offline-edit scenario lost one side's edit; fixed.**
+     - `CKSyncEngine` fetches before it sends, so the other device's copy arrived first and overwrote the edit that
+       hadn't gone up.
+     - `RecordImporter` now merges a fetched record with unsent local changes (`RecordMerger.mergeUnsent`). A model
+       has unsent changes when its values differ from `ckSyncedValues`. The pending save then sends the merge.
+     - Merges now write into a copy of the server's record, so the server's own values stay the new ancestor.
+     - Dates are compared to the millisecond, CloudKit's precision.
    - **Still to do:** test with two devices on one Apple ID. Each device's existing data is its own "My Book" (each
      store made its own at the upgrade), so after the first sync both books appear on both devices.
 4. [ ] Sharing: share, accept, permissions, leave, stop sharing, and the shared engine. Two Apple IDs on two devices (or

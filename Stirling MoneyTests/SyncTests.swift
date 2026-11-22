@@ -360,6 +360,66 @@ struct SyncTests {
         #expect(RecordMerger.merge(local: unposted, server: posted.copy() as! CKRecord, ancestor: ["isPosted": "n:2"]).bool("isPosted") == true)
     }
 
+    /// Your scenario 3: the phone edits offline, the Mac edits the same transaction and sends first, and the phone
+    /// fetches the Mac's copy before sending its own.
+    @Test func anEditNotYetSentSurvivesFetchingAnotherDevicesEdit() throws {
+        let server = FakeServer()
+        let phone = try Device()
+        let mac = try Device()
+        try addBook(to: phone)
+        try phone.send(to: server)
+        try mac.fetch(from: server)
+
+        func purchase(on device: Device) throws -> AccountTransaction {
+            try #require(try device.context.fetch(FetchDescriptor<AccountTransaction>()).first { $0.kind == .withdrawal })
+        }
+
+        // Offline on the phone: a new payee, saved but not sent.
+        try purchase(on: phone).payee = "Corner Grocer"
+        try phone.context.save()
+
+        // On the Mac: a note, sent first.
+        try purchase(on: mac).note = "Weekly shop"
+        try mac.send(to: server)
+
+        // Back online, the phone fetches before it sends.
+        try phone.fetch(from: server)
+        #expect(try purchase(on: phone).payee == "Corner Grocer", "the unsent edit isn't overwritten")
+        #expect(try purchase(on: phone).note == "Weekly shop")
+
+        try phone.send(to: server)
+        try mac.fetch(from: server)
+        #expect(try purchase(on: mac).payee == "Corner Grocer")
+        #expect(try purchase(on: mac).note == "Weekly shop")
+    }
+
+    @Test func aFetchedEditIsAppliedWhenNothingIsUnsent() throws {
+        let server = FakeServer()
+        let phone = try Device()
+        let mac = try Device()
+        try addBook(to: phone)
+        try phone.send(to: server)
+        try mac.fetch(from: server)
+
+        let macPurchase = try #require(try mac.context.fetch(FetchDescriptor<AccountTransaction>()).first { $0.kind == .withdrawal })
+        macPurchase.payee = "Market"
+        try mac.send(to: server)
+        try phone.fetch(from: server)
+
+        let purchase = try #require(try phone.context.fetch(FetchDescriptor<AccountTransaction>()).first { $0.kind == .withdrawal })
+        #expect(purchase.payee == "Market")
+        #expect(try phone.processor.localChanges().isEmpty, "nothing of the phone's own to send")
+    }
+
+    @Test func datesMatchToTheMillisecond() {
+        let date = Date(timeIntervalSinceReferenceDate: 800_000_000.123_4)
+        let local = CKRecord(recordType: "AccountTransaction")
+        local.setValue(date, for: "date")
+        let server = CKRecord(recordType: "AccountTransaction")
+        server.setValue(Date(timeIntervalSinceReferenceDate: 800_000_000.123), for: "date")
+        #expect(RecordMerger.values(of: local) == RecordMerger.values(of: server))
+    }
+
     @Test func aRecurringRulesLaterNextDateWins() {
         let local = CKRecord(recordType: RecurringTransaction.recordType)
         local.setValue(day(2026, 12, 1), for: "nextDate")

@@ -256,12 +256,14 @@ final class SyncProcessor {
             try asSync {
                 if isBook {
                     let ancestor = RecordMerger.decode(book.ckSyncedValues)
-                    let merged = RecordMerger.merge(local: book.makeRecord(), server: server, ancestor: ancestor)
+                    let merged = RecordMerger.merge(local: book.makeRecord(), server: server.copy() as! CKRecord, ancestor: ancestor)
                     book.read(from: merged)
                     book.remember(server)
                 } else if let model {
                     let ancestor = RecordMerger.decode(model.ckSyncedValues)
-                    let merged = RecordMerger.merge(local: model.makeRecord(in: book.zoneID), server: server, ancestor: ancestor)
+                    let merged = RecordMerger.merge(
+                        local: model.makeRecord(in: book.zoneID), server: server.copy() as! CKRecord, ancestor: ancestor
+                    )
                     model.read(from: merged)
                     var resolver = RecordResolver(context: context, book: book)
                     model.readReferences(from: merged, resolver: &resolver)
