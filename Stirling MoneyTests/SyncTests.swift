@@ -51,6 +51,8 @@ final class Device {
     private let folder: URL
     /// How far through the server's log this device has fetched.
     private var fetched = 0
+    /// Saves a fetch asked for (merges made by sync), sent with the next `send`.
+    private var queuedByFetch: [SyncProcessor.Change] = []
 
     var context: ModelContext {
         container.mainContext
@@ -73,7 +75,8 @@ final class Device {
     /// Sends this device's changes, as the engine would: zones, then records built when asked, then the results.
     func send(to server: FakeServer) throws {
         try context.save()
-        var queue = try processor.localChanges()
+        var queue = SyncProcessor.collapse(try processor.localChanges() + queuedByFetch)
+        queuedByFetch = []
         while !queue.isEmpty {
             let changes = queue
             queue = []
@@ -85,7 +88,8 @@ final class Device {
                 case let .saveRecord(recordID):
                     if let record = try processor.record(for: recordID) {
                         server.save(record)
-                        saved.append(record)
+                        // As CloudKit may answer a save: the record's new system fields, without its values.
+                        saved.append(CKRecord.decodingSystemFields(from: record.encodedSystemFields) ?? record)
                     }
                 case let .deleteRecord(recordID): server.delete(recordID)
                 case .cancelSave: break
@@ -111,7 +115,7 @@ final class Device {
             case let .zoneDeleted(zoneID): deletedZones.append(zoneID)
             }
         }
-        try processor.applyFetched(Array(latest.values), deletions: deletions)
+        queuedByFetch += try processor.applyFetched(Array(latest.values), deletions: deletions)
         for zoneID in deletedZones {
             try processor.applyDeletedZone(zoneID)
         }
@@ -393,6 +397,28 @@ struct SyncTests {
         #expect(try purchase(on: mac).note == "Weekly shop")
     }
 
+    @Test func aMergeMadeWhileFetchingIsSentBack() throws {
+        let server = FakeServer()
+        let phone = try Device()
+        let mac = try Device()
+        try addBook(to: phone)
+        try phone.send(to: server)
+        try mac.fetch(from: server)
+
+        let phonePurchase = try #require(try phone.context.fetch(FetchDescriptor<AccountTransaction>()).first { $0.kind == .withdrawal })
+        phonePurchase.payee = "Corner Grocer"
+        try phone.context.save()
+        let macPurchase = try #require(try mac.context.fetch(FetchDescriptor<AccountTransaction>()).first { $0.kind == .withdrawal })
+        macPurchase.note = "Weekly shop"
+        try mac.send(to: server)
+
+        let zoneID = try #require(phonePurchase.book?.zoneID)
+        let recordID = CKRecord.ID(recordName: phonePurchase.syncID, zoneID: zoneID)
+        let fetched = try #require(server.records[recordID]?.copy() as? CKRecord)
+        let changes = try phone.processor.applyFetched([fetched], deletions: [])
+        #expect(changes == [.saveRecord(recordID)])
+    }
+
     @Test func aFetchedEditIsAppliedWhenNothingIsUnsent() throws {
         let server = FakeServer()
         let phone = try Device()
@@ -409,6 +435,28 @@ struct SyncTests {
         let purchase = try #require(try phone.context.fetch(FetchDescriptor<AccountTransaction>()).first { $0.kind == .withdrawal })
         #expect(purchase.payee == "Market")
         #expect(try phone.processor.localChanges().isEmpty, "nothing of the phone's own to send")
+    }
+
+    @Test func anEmptyAncestorFromAnOlderBuildMeansUnknown() throws {
+        #expect(RecordMerger.decode(RecordMerger.encode([:])) == nil)
+
+        // A record synced by an older build, then edited on the Mac: the phone takes the Mac's edit.
+        let server = FakeServer()
+        let phone = try Device()
+        let mac = try Device()
+        try addBook(to: phone)
+        try phone.send(to: server)
+        try mac.fetch(from: server)
+        let phonePurchase = try #require(try phone.context.fetch(FetchDescriptor<AccountTransaction>()).first { $0.kind == .withdrawal })
+        phonePurchase.ckSyncedValues = RecordMerger.encode([:])
+        try phone.context.save()
+        _ = try phone.processor.localChanges()
+
+        let macPurchase = try #require(try mac.context.fetch(FetchDescriptor<AccountTransaction>()).first { $0.kind == .withdrawal })
+        macPurchase.note = "Weekly shop"
+        try mac.send(to: server)
+        try phone.fetch(from: server)
+        #expect(phonePurchase.note == "Weekly shop")
     }
 
     @Test func datesMatchToTheMillisecond() {

@@ -32,8 +32,12 @@ enum RecordMerger {
         try? JSONEncoder().encode(values)
     }
 
+    /// The saved values, or nil if there are none. Builds before Nov 21, 2026 saved the server's answer to a save,
+    /// which has no values; an empty set means "unknown", not "everything was blank".
     nonisolated static func decode(_ data: Data?) -> [String: String]? {
-        data.flatMap { try? JSONDecoder().decode([String: String].self, from: $0) }
+        guard let values = data.flatMap({ try? JSONDecoder().decode([String: String].self, from: $0) }),
+              !values.isEmpty else { return nil }
+        return values
     }
 
     /// For a record fetched while this device has changes to it that haven't gone up yet: the fetched record merged

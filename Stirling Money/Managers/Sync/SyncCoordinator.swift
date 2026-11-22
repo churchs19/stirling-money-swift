@@ -191,10 +191,10 @@ final class SyncCoordinator {
                 }
 
             case let .fetchedRecordZoneChanges(changes):
-                try processor.applyFetched(
+                enqueue(try processor.applyFetched(
                     changes.modifications.map(\.record),
                     deletions: changes.deletions.map { (id: $0.recordID, type: $0.recordType) }
-                )
+                ))
                 saveState()
 
             case let .sentRecordZoneChanges(sent):

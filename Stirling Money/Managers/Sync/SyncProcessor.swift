@@ -177,24 +177,36 @@ final class SyncProcessor {
 
     // MARK: - Records the engine sends
 
+    /// Records on their way to the server, by ID: what each save sent, which becomes the common ancestor once it's
+    /// accepted. The server's answer to a save carries its new system fields but not necessarily its values.
+    private var sent: [CKRecord.ID: CKRecord] = [:]
+
     /// The record to save for `recordID`, built from the model now, or nil if it's gone.
     func record(for recordID: CKRecord.ID) throws -> CKRecord? {
         guard let book = try book(for: recordID.zoneID) else { return nil }
+        let record: CKRecord?
         if recordID.recordName == book.syncID {
-            return book.makeRecord()
+            record = book.makeRecord()
+        } else {
+            record = try model(named: recordID.recordName, in: book)?.makeRecord(in: book.zoneID)
         }
-        return try model(named: recordID.recordName, in: book)?.makeRecord(in: book.zoneID)
+        sent[recordID] = record?.copy() as? CKRecord
+        return record
     }
 
     // MARK: - In
 
-    /// Applies fetched records and deletions, and saves.
-    func applyFetched(_ records: [CKRecord], deletions: [(id: CKRecord.ID, type: CKRecord.RecordType)]) throws {
+    /// Applies fetched records and deletions, and saves. Returns saves for records merged with changes this device
+    /// hadn't sent: the merge was made by sync, so nothing else would send it.
+    @discardableResult
+    func applyFetched(_ records: [CKRecord], deletions: [(id: CKRecord.ID, type: CKRecord.RecordType)]) throws -> [Change] {
+        var changes: [Change] = []
         try asSync {
             for (zoneID, zoneRecords) in Dictionary(grouping: records, by: \.recordID.zoneID) {
                 let book = try book(for: zoneID) ?? makeBook(for: zoneID)
                 let unresolved = try RecordImporter.apply(
-                    zoneRecords, to: book, in: context, retrying: pendingReferences[zoneID] ?? []
+                    zoneRecords, to: book, in: context, retrying: pendingReferences[zoneID] ?? [],
+                    merged: { changes.append(.saveRecord($0)) }
                 )
                 pendingReferences[zoneID] = unresolved.isEmpty ? nil : unresolved
             }
@@ -208,6 +220,7 @@ final class SyncProcessor {
                 }
             }
         }
+        return changes
     }
 
     /// A book's zone was deleted (or a share stopped): the book goes too.
@@ -228,13 +241,17 @@ final class SyncProcessor {
         var changes: [Change] = []
         try asSync {
             for record in records {
+                // The values this device sent are what both sides now agree on.
+                let agreed = RecordMerger.encode(RecordMerger.values(of: sent.removeValue(forKey: record.recordID) ?? record))
                 guard let book = try book(for: record.recordID.zoneID) else {
                     continue
                 }
                 if record.recordID.recordName == book.syncID {
                     book.remember(record)
+                    book.ckSyncedValues = agreed
                 } else if let model = try model(named: record.recordID.recordName, in: book) {
                     model.remember(record)
+                    model.ckSyncedValues = agreed
                 } else {
                     changes.append(.deleteRecord(record.recordID))
                 }
@@ -246,6 +263,7 @@ final class SyncProcessor {
     /// Handles a save the server refused. Returns what to send again.
     func didFail(_ record: CKRecord, error: CKError) throws -> [Change] {
         let recordID = record.recordID
+        sent[recordID] = nil
         guard let book = try book(for: recordID.zoneID) else { return [] }
         let isBook = recordID.recordName == book.syncID
         let model = isBook ? nil : try self.model(named: recordID.recordName, in: book)

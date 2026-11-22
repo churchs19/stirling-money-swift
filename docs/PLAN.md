@@ -1043,6 +1043,15 @@ Its category merging, status UI and notes will be reused, and the branch deleted
        has unsent changes when its values differ from `ckSyncedValues`. The pending save then sends the merge.
      - Merges now write into a copy of the server's record, so the server's own values stay the new ancestor.
      - Dates are compared to the millisecond, CloudKit's precision.
+   - **Device test again: the iPhone's edit won, and the Mac's note stayed only on the Mac; fixed.**
+     - The common ancestor was taken from the server's answer to a save. In practice that answer had no values, so
+       every field looked changed on both sides and each device kept its own.
+     - The ancestor is now the record this device sent (`SyncProcessor.sent`). An empty ancestor saved by the older
+       build counts as unknown.
+     - A merge made during a fetch is now queued for upload (`applyFetched` returns the saves). Before, the merged
+       values stayed on the device that made them.
+     - The fake server now answers saves with system fields only. With the old ancestor, that reproduces the
+       device result (4 tests fail).
    - **Still to do:** test with two devices on one Apple ID. Each device's existing data is its own "My Book" (each
      store made its own at the upgrade), so after the first sync both books appear on both devices.
 4. [ ] Sharing: share, accept, permissions, leave, stop sharing, and the shared engine. Two Apple IDs on two devices (or

@@ -21,7 +21,8 @@ enum RecordImporter {
         _ records: [CKRecord],
         to book: Book,
         in context: ModelContext,
-        retrying pending: [CKRecord] = []
+        retrying pending: [CKRecord] = [],
+        merged: (CKRecord.ID) -> Void = { _ in }
     ) throws -> [CKRecord] {
         var resolver = RecordResolver(context: context, book: book)
 
@@ -29,13 +30,19 @@ enum RecordImporter {
         var applied: [(any CloudRecordMapped, CKRecord)] = []
         for record in records {
             if record.recordType == Book.recordType {
-                let merged = RecordMerger.mergeUnsent(local: book.makeRecord(), fetched: record, syncedValues: book.ckSyncedValues)
-                book.read(from: merged ?? record)
+                let mergedRecord = RecordMerger.mergeUnsent(local: book.makeRecord(), fetched: record, syncedValues: book.ckSyncedValues)
+                book.read(from: mergedRecord ?? record)
+                if mergedRecord != nil {
+                    merged(record.recordID)
+                }
                 book.remember(record)
                 continue
             }
             if let (model, values) = try upsert(record, in: book, resolver: &resolver) {
                 applied.append((model, values))
+                if values !== record {
+                    merged(record.recordID)
+                }
             }
         }
 
