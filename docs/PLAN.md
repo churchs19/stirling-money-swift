@@ -1052,6 +1052,11 @@ Its category merging, status UI and notes will be reused, and the branch deleted
        values stayed on the device that made them.
      - The fake server now answers saves with system fields only. With the old ancestor, that reproduces the
        device result (4 tests fail).
+   - **Device test again: the merged version only went up after an unrelated save (a delete); fixed in code,
+     waiting on a retest.**
+     - The engine schedules a send for new pending changes only when no sync is under way. Changes queued while it
+       handled a fetch (a merge) or a send's results (a retry after a conflict) waited for the next trigger.
+     - `SyncCoordinator.requestSend()` now calls `sendChanges()` half a second after such an event.
    - **Still to do:** test with two devices on one Apple ID. Each device's existing data is its own "My Book" (each
      store made its own at the upgrade), so after the first sync both books appear on both devices.
 4. [ ] Sharing: share, accept, permissions, leave, stop sharing, and the shared engine. Two Apple IDs on two devices (or

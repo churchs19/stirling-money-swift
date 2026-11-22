@@ -119,8 +119,10 @@ final class SyncCoordinator {
         saveState()
     }
 
-    private func enqueue(_ changes: [SyncProcessor.Change]) {
-        guard let engine, !changes.isEmpty else { return }
+    /// Adds changes to the engine's pending changes. Returns whether anything was added to send.
+    @discardableResult
+    private func enqueue(_ changes: [SyncProcessor.Change]) -> Bool {
+        guard let engine, !changes.isEmpty else { return false }
         var database: [CKSyncEngine.PendingDatabaseChange] = []
         var records: [CKSyncEngine.PendingRecordZoneChange] = []
         for change in changes {
@@ -142,6 +144,28 @@ final class SyncCoordinator {
         }
         engine.state.add(pendingDatabaseChanges: database)
         engine.state.add(pendingRecordZoneChanges: records)
+        return !database.isEmpty || !records.isEmpty
+    }
+
+    private var isSendRequested = false
+
+    /// Asks the engine to send, once the event being handled is done.
+    ///
+    /// The engine schedules a send for new pending changes only when no sync is under way. Changes added while it's
+    /// handling a fetch or a send's results (a merge, a retry after a conflict) would otherwise wait for the next
+    /// unrelated save.
+    private func requestSend() {
+        guard let engine, !isSendRequested else { return }
+        isSendRequested = true
+        Task {
+            try? await Task.sleep(for: .milliseconds(500))
+            isSendRequested = false
+            do {
+                try await engine.sendChanges()
+            } catch {
+                log.error("Couldn't send changes: \(error.localizedDescription, privacy: .public)")
+            }
+        }
     }
 
     /// The records for the engine's next send, built from the models now.
@@ -167,6 +191,13 @@ final class SyncCoordinator {
     // MARK: - In
 
     fileprivate func handle(_ event: CKSyncEngine.Event, engine: CKSyncEngine) {
+        // Whether this event added changes to send.
+        var added = false
+        defer {
+            if added {
+                requestSend()
+            }
+        }
         do {
             switch event {
             case let .stateUpdate(update):
@@ -177,7 +208,7 @@ final class SyncCoordinator {
                 switch change.changeType {
                 case .signIn:
                     // Send everything, for a new account (or the same one after signing back in).
-                    try enqueue(processor.allChanges())
+                    added = try enqueue(processor.allChanges())
                 case .signOut, .switchAccounts:
                     // Local data stays. What happens to it on another Apple ID is decided in step 7.
                     log.notice("The iCloud account changed")
@@ -191,16 +222,16 @@ final class SyncCoordinator {
                 }
 
             case let .fetchedRecordZoneChanges(changes):
-                enqueue(try processor.applyFetched(
+                added = try enqueue(processor.applyFetched(
                     changes.modifications.map(\.record),
                     deletions: changes.deletions.map { (id: $0.recordID, type: $0.recordType) }
                 ))
                 saveState()
 
             case let .sentRecordZoneChanges(sent):
-                try enqueue(processor.didSave(sent.savedRecords))
-                for failure in sent.failedRecordSaves {
-                    try enqueue(processor.didFail(failure.record, error: failure.error))
+                added = try enqueue(processor.didSave(sent.savedRecords))
+                for failure in sent.failedRecordSaves where try enqueue(processor.didFail(failure.record, error: failure.error)) {
+                    added = true
                 }
 
             case let .sentDatabaseChanges(sent):
