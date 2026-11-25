@@ -50,6 +50,46 @@ struct SharingTests {
         #expect(try device.processor.localChanges() == [.deleteRecord(SyncProcessor.shareID(in: ownersZone))])
     }
 
+    @Test func leavingABookWithRecordsSendsOnlyTheLeave() throws {
+        let device = try Device()
+        let checking = CKRecord(recordType: Account.recordType, recordID: CKRecord.ID(recordName: "checking", zoneID: ownersZone))
+        checking.setValue("Checking", for: "name")
+        let purchase = CKRecord(recordType: AccountTransaction.recordType, recordID: CKRecord.ID(recordName: "purchase", zoneID: ownersZone))
+        purchase.setValue(Decimal(-5), for: "amount")
+        purchase["account"] = CKRecord.Reference(recordID: checking.recordID, action: .none)
+        try device.processor.applyFetched([CKShare(recordZoneID: ownersZone), checking, purchase], deletions: [])
+        let book = try #require(try device.context.fetch(FetchDescriptor<Book>()).first)
+        #expect(book.accounts?.count == 1)
+        _ = try device.processor.localChanges()
+
+        // Deleting the book deletes its account and transaction here too; none of that may reach the owner's zone.
+        device.context.delete(book)
+        try device.context.save()
+        #expect(try device.context.fetchCount(FetchDescriptor<AccountTransaction>()) == 0)
+        #expect(try device.processor.localChanges() == [.deleteRecord(SyncProcessor.shareID(in: ownersZone))])
+    }
+
+    @Test func deletingAnOwnBookWithRecordsSendsOnlyTheZone() throws {
+        let device = try Device()
+        let book = Book(name: "Personal")
+        device.context.insert(book)
+        let checking = Account(name: "Checking")
+        device.context.insert(checking)
+        checking.book = book
+        Ledger.addTransaction(.withdrawal, amount: 5, to: checking, payee: "Cafe", in: device.context)
+        try device.context.save()
+        _ = try device.processor.localChanges()
+
+        device.context.delete(book)
+        try device.context.save()
+        let changes = try device.processor.localChanges()
+        #expect(changes.contains(.deleteZone(book.zoneID)))
+        // Never-synced records only cancel their pending saves; nothing is sent for them.
+        #expect(!changes.contains { change in
+            if case .deleteRecord = change { true } else if case .saveRecord = change { true } else { false }
+        })
+    }
+
     @Test func deletingAnOwnBookStillDeletesItsZone() throws {
         let device = try Device()
         let book = Book(name: "Personal")

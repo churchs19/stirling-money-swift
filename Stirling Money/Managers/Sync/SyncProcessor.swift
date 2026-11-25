@@ -66,7 +66,33 @@ final class SyncProcessor {
             }
         }
         historyToken = transactions.last?.token ?? historyToken
-        return Self.collapse(changes)
+        return try withoutGoneBooks(Self.collapse(changes))
+    }
+
+    /// Drops changes to the records of books that are no longer here.
+    ///
+    /// Deleting a book deletes everything in it, and each of those deletes is in the history. For the user's own
+    /// book, the zone's deletion already removes them. For a book someone else shared, they must never be sent:
+    /// leaving would otherwise delete the owner's records. Only the share's own deletion (leaving) goes.
+    func withoutGoneBooks(_ changes: [Change]) throws -> [Change] {
+        var bookIsHere: [CKRecordZone.ID: Bool] = [:]
+        return try changes.filter { change in
+            let recordID: CKRecord.ID
+            switch change {
+            case let .saveRecord(id), let .deleteRecord(id): recordID = id
+            case .saveZone, .deleteZone, .cancelSave: return true
+            }
+            if recordID.recordName == CKRecordNameZoneWideShare {
+                return true
+            }
+            let zoneID = recordID.zoneID
+            if let known = bookIsHere[zoneID] {
+                return known
+            }
+            let isHere = try book(for: zoneID) != nil
+            bookIsHere[zoneID] = isHere
+            return isHere
+        }
     }
 
     /// Everything in the user's own books, for the first upload from this device. Books shared with the user are

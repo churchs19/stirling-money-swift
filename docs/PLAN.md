@@ -1106,7 +1106,15 @@ Its category merging, status UI and notes will be reused, and the branch deleted
        database for changes since its own token: one small request per database. Gone zones remove their book;
        changed zones' records are fetched and applied through `applyFetched`, as the engines' are (applying a
        record twice just updates it). Its tokens are saved with the engines' state. The first check only notes
-       where things stand.
+       where things stand. **Retest passed:** after Stop Sharing, the book left the simulator within a minute.
+     - **Re-sharing came back empty for a minute.** The shared engine never learned that the zone went, so it kept
+       its old place there and fetched only the new share. Accepting now downloads the zone directly.
+     - **Leave queued deletes of every record in the owner's zone.** Deleting the book deleted its records here
+       too, and those deletes were read from history as the user's. CloudKit rejected the batch whole ("Atomic
+       failure"), so nothing was deleted; the share's deletion failed with it, so the leave didn't happen either.
+       `SyncProcessor.withoutGoneBooks` now drops changes to records of books that aren't here, except the share's
+       deletion. Deleting the user's own book sends only the zone's deletion. Queued changes for gone books are
+       dropped at launch. Leave still to retest.
 5. [ ] View-only mode across the screens, and UI tests with a view-only book in the sample data.
 6. [ ] Recurring transactions, widgets and the Watch with books and sharing: deterministic occurrence names, and the
    summary per current book.

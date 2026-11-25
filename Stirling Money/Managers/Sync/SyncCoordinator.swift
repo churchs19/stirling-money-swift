@@ -108,6 +108,7 @@ final class SyncCoordinator {
             delegate: delegate
         ))
 
+        dropQueuedChangesForGoneBooks()
         if isFirstRun {
             // Everything goes up once; history before now is covered by that.
             _ = try? processor.localChanges()
@@ -119,6 +120,26 @@ final class SyncCoordinator {
             forName: ModelContext.didSave, object: processor.context, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.enqueueLocalChanges() }
+        }
+    }
+
+    /// Removes queued record changes for books that are no longer here, such as the deletes queued by leaving a
+    /// shared book with a build that sent them (they would delete the owner's records). See `withoutGoneBooks`.
+    private func dropQueuedChangesForGoneBooks() {
+        for engine in engines {
+            let dropped = engine.state.pendingRecordZoneChanges.filter { change in
+                let recordID: CKRecord.ID
+                switch change {
+                case let .saveRecord(id), let .deleteRecord(id): recordID = id
+                @unknown default: return false
+                }
+                guard recordID.recordName != CKRecordNameZoneWideShare else { return false }
+                return (try? processor.book(for: recordID.zoneID)) == nil
+            }
+            if !dropped.isEmpty {
+                engine.state.remove(pendingRecordZoneChanges: dropped)
+                log.notice("Dropped \(dropped.count, privacy: .public) queued changes for books no longer here")
+            }
         }
     }
 
@@ -475,10 +496,18 @@ final class SyncCoordinator {
     }
 
     /// Accepts an invitation the user tapped, then fetches the book. Returns its `syncID`, to switch to it.
+    ///
+    /// The whole zone is fetched directly. The shared engine may still hold its place in this zone from an earlier
+    /// share of the same book (it doesn't always learn that a zone went), and would then fetch only the changes
+    /// since: the new share, but not the book's records.
     func accept(_ metadata: CKShare.Metadata) async throws -> String? {
         _ = try await container.accept(metadata)
-        try await sharedEngine?.fetchChanges()
-        return Book.syncID(ofZone: metadata.share.recordID.zoneID)
+        let zoneID = metadata.share.recordID.zoneID
+        setPollToken(nil, for: zoneKey(zoneID))
+        try await fetchZone(zoneID, from: container.sharedCloudDatabase, apply: true)
+        saveState()
+        try? await sharedEngine?.fetchChanges()
+        return Book.syncID(ofZone: zoneID)
     }
 
     // MARK: - Asking
