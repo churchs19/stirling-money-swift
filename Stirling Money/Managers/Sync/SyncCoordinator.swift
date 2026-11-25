@@ -59,6 +59,9 @@ final class SyncCoordinator {
         var historyToken: DefaultHistoryToken?
         /// `NSKeyedArchiver` data of the records waiting for references.
         var pendingReferences: Data?
+        /// The change tokens of this app's own checks while in front (`poll`), by database and by zone. Separate
+        /// from the engines' own, which they keep to themselves.
+        var pollTokens: [String: Data]?
     }
 
     private var saved = SavedState()
@@ -311,39 +314,121 @@ final class SyncCoordinator {
         engine === sharedEngine ? "Shared" : "Private"
     }
 
-    // MARK: - Fetching while in front
+    // MARK: - Checking for changes while in front
 
     private var pollTask: Task<Void, Never>?
 
-    /// The app came to the front: fetch now, then every minute while it stays there.
+    /// The app came to the front: check for changes now, then every minute while it stays there.
     ///
-    /// Pushes tell the engines about changes made elsewhere, but they aren't guaranteed: the owner of a shared book
-    /// may get none for a participant's changes, simulators get none, and the system can drop or merge them.
-    /// Fetching on a timer while the app is in use keeps both sides of a share current anyway.
+    /// The engines learn about changes made elsewhere from pushes, and those aren't guaranteed: the owner of a
+    /// shared book may get none for a participant's changes, simulators get none, and the system can drop or merge
+    /// them. Without a push, the engines' own `fetchChanges()` doesn't ask the server at all. So while the app is in
+    /// use it asks the server itself (`poll`).
     func appBecameActive() {
         pollTask?.cancel()
         pollTask = Task.detached { [weak self] in
             while !Task.isCancelled {
-                await self?.fetchAll()
+                await self?.pollAll()
                 try? await Task.sleep(for: .seconds(60))
             }
         }
     }
 
-    /// The app left the front: stop fetching on a timer. Pushes and the system's own scheduling still apply.
+    /// The app left the front: stop checking. Pushes and the engines' own scheduling still apply.
     func appResignedActive() {
         pollTask?.cancel()
         pollTask = nil
     }
 
-    private func fetchAll() async {
-        for engine in engines {
+    private func pollAll() async {
+        for (database, name) in [(container.privateCloudDatabase, "private"), (container.sharedCloudDatabase, "shared")] {
             do {
-                try await engine.fetchChanges()
+                try await poll(database, name: name)
             } catch {
-                log.error("Couldn't fetch changes: \(error.localizedDescription, privacy: .public)")
+                log.error("Couldn't check \(name, privacy: .public) for changes: \(error.localizedDescription, privacy: .public)")
             }
         }
+        saveState()
+    }
+
+    /// Asks one database which zones changed or went since the last check, then fetches the changed zones' records
+    /// and applies them like the engines' own fetches. A record applied twice (here and by an engine) just updates
+    /// the same model again.
+    ///
+    /// The first check only notes where things stand (the engines already fetched everything); later ones apply.
+    private func poll(_ database: CKDatabase, name: String) async throws {
+        let databaseKey = "db:\(name)"
+        let isFirstCheck = pollToken(databaseKey) == nil
+        var changedZones: [CKRecordZone.ID] = []
+        var deletedZones: [CKRecordZone.ID] = []
+        var token = pollToken(databaseKey)
+        var moreComing = true
+        while moreComing {
+            let changes = try await database.databaseChanges(since: token)
+            changedZones += changes.modifications.map(\.zoneID)
+            deletedZones += changes.deletions.map(\.zoneID)
+            token = changes.changeToken
+            moreComing = changes.moreComing
+        }
+
+        if !isFirstCheck {
+            for zoneID in deletedZones {
+                try processor.applyDeletedZone(zoneID)
+                setPollToken(nil, for: zoneKey(zoneID))
+            }
+            if !deletedZones.isEmpty {
+                log.notice("Check of \(name, privacy: .public): \(deletedZones.count, privacy: .public) zones gone")
+            }
+        }
+
+        for zoneID in changedZones where Book.syncID(ofZone: zoneID) != nil {
+            try await fetchZone(zoneID, from: database, apply: !isFirstCheck || pollToken(zoneKey(zoneID)) != nil)
+        }
+        setPollToken(token, for: databaseKey)
+    }
+
+    /// Fetches one zone's changes since the last check. With `apply` false, only notes the zone's token, fetching
+    /// no values.
+    private func fetchZone(_ zoneID: CKRecordZone.ID, from database: CKDatabase, apply: Bool) async throws {
+        let key = zoneKey(zoneID)
+        var token = pollToken(key)
+        var records: [CKRecord] = []
+        var deletions: [(id: CKRecord.ID, type: CKRecord.RecordType)] = []
+        var moreComing = true
+        while moreComing {
+            let changes = try await database.recordZoneChanges(
+                inZoneWith: zoneID, since: token, desiredKeys: apply ? nil : []
+            )
+            if apply {
+                records += changes.modificationResultsByID.values.compactMap { try? $0.get().record }
+                deletions += changes.deletions.map { (id: $0.recordID, type: $0.recordType) }
+            }
+            token = changes.changeToken
+            moreComing = changes.moreComing
+        }
+        if apply, !records.isEmpty || !deletions.isEmpty {
+            log.notice("Check of \(zoneID.zoneName, privacy: .public): \(records.count, privacy: .public) records, \(deletions.count, privacy: .public) deletions")
+            if enqueue(try processor.applyFetched(records, deletions: deletions)) {
+                requestSend()
+            }
+        }
+        setPollToken(token, for: key)
+    }
+
+    private func zoneKey(_ zoneID: CKRecordZone.ID) -> String {
+        "zone:\(zoneID.ownerName)/\(zoneID.zoneName)"
+    }
+
+    private func pollToken(_ key: String) -> CKServerChangeToken? {
+        saved.pollTokens?[key].flatMap {
+            try? NSKeyedUnarchiver.unarchivedObject(ofClass: CKServerChangeToken.self, from: $0)
+        }
+    }
+
+    private func setPollToken(_ token: CKServerChangeToken?, for key: String) {
+        var tokens = saved.pollTokens ?? [:]
+        tokens[key] = token.flatMap { try? NSKeyedArchiver.archivedData(withRootObject: $0, requiringSecureCoding: true) }
+        saved.pollTokens = tokens
     }
 
     // MARK: - Sharing

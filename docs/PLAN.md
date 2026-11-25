@@ -1096,7 +1096,17 @@ Its category merging, status UI and notes will be reused, and the branch deleted
        all and fetches only when it comes to the front.
      - The engines now fetch when the app becomes active and every minute while it stays there
        (`appBecameActive`). Fetches, sends and refusals are logged with public counts and error codes, since
-       macOS hides the rest. Waiting on a retest.
+       macOS hides the rest.
+     - **Retest passed:** transactions added on the owner's iPhone and on the participant's simulator both reached
+       the other side, and the owner's Mac.
+     - **Stop Sharing didn't remove the book from the simulator until it restarted.** The logs showed why: without
+       a push, `CKSyncEngine.fetchChanges()` doesn't ask the server at all (each timed fetch started and finished
+       in the same millisecond). Only the engine's own startup or foreground schedule, or a push, fetches.
+     - So the app now checks for itself while in front (`SyncCoordinator.poll`). Every minute it asks each
+       database for changes since its own token: one small request per database. Gone zones remove their book;
+       changed zones' records are fetched and applied through `applyFetched`, as the engines' are (applying a
+       record twice just updates it). Its tokens are saved with the engines' state. The first check only notes
+       where things stand.
 5. [ ] View-only mode across the screens, and UI tests with a view-only book in the sample data.
 6. [ ] Recurring transactions, widgets and the Watch with books and sharing: deterministic occurrence names, and the
    summary per current book.
