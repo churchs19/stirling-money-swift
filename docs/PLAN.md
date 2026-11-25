@@ -1086,6 +1086,17 @@ Its category merging, status UI and notes will be reused, and the branch deleted
      by <owner>".
    - **Tests:** 8 in `SharingTests`. 253 unit tests and 16 UI tests pass, and the Mac builds.
    - **Not yet:** view-only enforcement (step 5) and recurring transactions in shared books (step 6).
+   - **Two-Apple-ID test, Nov 25, 2026 (iPhone owner, simulator participant):**
+     - Inviting from Safari did nothing. The invitation is only for people added to the share, and CloudKit said
+       "share not found" until the second Apple ID was added. Then opening the link (as Messages would) accepted it,
+       and the book came across.
+     - The owner's name arrived empty; an empty name now counts as unknown ("shared with you").
+     - **Edits didn't cross in either direction.** The simulator's transaction reached CloudKit, but the owner's
+       Mac never fetched after it (no push for a participant's change, it seems). The simulator gets no pushes at
+       all and fetches only when it comes to the front.
+     - The engines now fetch when the app becomes active and every minute while it stays there
+       (`appBecameActive`). Fetches, sends and refusals are logged with public counts and error codes, since
+       macOS hides the rest. Waiting on a retest.
 5. [ ] View-only mode across the screens, and UI tests with a view-only book in the sample data.
 6. [ ] Recurring transactions, widgets and the Watch with books and sharing: deterministic occurrence names, and the
    summary per current book.

@@ -260,8 +260,12 @@ final class SyncProcessor {
         book.isShared = true
         let ownedByMe = book.zoneOwnerName == nil
         book.isOwnedByMe = ownedByMe
-        if let name = share.owner.userIdentity.nameComponents {
-            book.ownerName = PersonNameComponentsFormatter.localizedString(from: name, style: .default)
+        // The owner's name, when CloudKit shares it with this user. It often comes as empty components.
+        let name = share.owner.userIdentity.nameComponents
+            .map { PersonNameComponentsFormatter.localizedString(from: $0, style: .default) }
+            .flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
+        if let name {
+            book.ownerName = name
         }
         book.canEdit = ownedByMe || share.currentUserParticipant?.permission == .readWrite
     }

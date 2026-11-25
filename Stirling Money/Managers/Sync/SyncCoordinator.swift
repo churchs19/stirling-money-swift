@@ -132,7 +132,11 @@ final class SyncCoordinator {
 
     private func enqueueLocalChanges() {
         do {
-            try enqueue(processor.localChanges())
+            let changes = try processor.localChanges()
+            if !changes.isEmpty {
+                log.notice("Queued \(changes.count, privacy: .public) local changes")
+            }
+            enqueue(changes)
             try processor.pruneHistory()
         } catch {
             log.error("Couldn't read local changes: \(error.localizedDescription, privacy: .public)")
@@ -265,6 +269,7 @@ final class SyncCoordinator {
                 }
 
             case let .fetchedDatabaseChanges(changes):
+                log.notice("\(self.name(of: engine), privacy: .public): \(changes.modifications.count, privacy: .public) zones changed, \(changes.deletions.count, privacy: .public) deleted")
                 // In the shared database, a deleted zone is a book the owner stopped sharing (or deleted), or one
                 // this user left.
                 for deletion in changes.deletions {
@@ -272,6 +277,7 @@ final class SyncCoordinator {
                 }
 
             case let .fetchedRecordZoneChanges(changes):
+                log.notice("\(self.name(of: engine), privacy: .public): fetched \(changes.modifications.count, privacy: .public) records, \(changes.deletions.count, privacy: .public) deletions")
                 added = try enqueue(processor.applyFetched(
                     changes.modifications.map(\.record),
                     deletions: changes.deletions.map { (id: $0.recordID, type: $0.recordType) }
@@ -279,6 +285,10 @@ final class SyncCoordinator {
                 saveState()
 
             case let .sentRecordZoneChanges(sent):
+                log.notice("\(self.name(of: engine), privacy: .public): saved \(sent.savedRecords.count, privacy: .public), deleted \(sent.deletedRecordIDs.count, privacy: .public), \(sent.failedRecordSaves.count, privacy: .public) saves refused")
+                for failure in sent.failedRecordSaves {
+                    log.notice("Refused \(failure.record.recordType, privacy: .public): \(failure.error.code.rawValue, privacy: .public) \(failure.error.localizedDescription, privacy: .public)")
+                }
                 added = try enqueue(processor.didSave(sent.savedRecords.filter { !($0 is CKShare) }))
                 for failure in sent.failedRecordSaves where try enqueue(processor.didFail(failure.record, error: failure.error)) {
                     added = true
@@ -294,6 +304,45 @@ final class SyncCoordinator {
             }
         } catch {
             log.error("Couldn't apply a sync event: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private func name(of engine: CKSyncEngine) -> String {
+        engine === sharedEngine ? "Shared" : "Private"
+    }
+
+    // MARK: - Fetching while in front
+
+    private var pollTask: Task<Void, Never>?
+
+    /// The app came to the front: fetch now, then every minute while it stays there.
+    ///
+    /// Pushes tell the engines about changes made elsewhere, but they aren't guaranteed: the owner of a shared book
+    /// may get none for a participant's changes, simulators get none, and the system can drop or merge them.
+    /// Fetching on a timer while the app is in use keeps both sides of a share current anyway.
+    func appBecameActive() {
+        pollTask?.cancel()
+        pollTask = Task.detached { [weak self] in
+            while !Task.isCancelled {
+                await self?.fetchAll()
+                try? await Task.sleep(for: .seconds(60))
+            }
+        }
+    }
+
+    /// The app left the front: stop fetching on a timer. Pushes and the system's own scheduling still apply.
+    func appResignedActive() {
+        pollTask?.cancel()
+        pollTask = nil
+    }
+
+    private func fetchAll() async {
+        for engine in engines {
+            do {
+                try await engine.fetchChanges()
+            } catch {
+                log.error("Couldn't fetch changes: \(error.localizedDescription, privacy: .public)")
+            }
         }
     }
 

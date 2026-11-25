@@ -91,10 +91,12 @@ struct Stirling_MoneyApp: App {
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .background:
+                SyncCoordinator.shared?.appResignedActive()
                 appLock.lockIfEnabled()
                 WidgetSnapshotWriter.updateNow()
                 RecurringRunner.scheduleBackgroundRefresh()
             case .active:
+                SyncCoordinator.shared?.appBecameActive()
                 RecurringRunner.run()
                 Task { await appLock.promptIfNeeded() }
             default:

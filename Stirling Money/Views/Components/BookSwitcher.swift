@@ -67,7 +67,11 @@ private struct BookSwitcher: ViewModifier {
                         Text("This deletes its ^[\(book.accounts?.count ?? 0) account](inflect: true) and everything in them, its categories, budgets and goals. This can't be undone.")
                     }
                 } else {
-                    Text("It's removed from your devices. \(book.ownerName ?? "The owner") would have to share it again.")
+                    if let owner = book.ownerName, !owner.isEmpty {
+                        Text("It's removed from your devices. \(owner) would have to share it again.")
+                    } else {
+                        Text("It's removed from your devices. The owner would have to share it again.")
+                    }
                 }
             }
             .confirmationDialog(
@@ -141,7 +145,7 @@ private struct BookSwitcher: ViewModifier {
     private var subtitle: String {
         guard books.count > 1 || book.isShared else { return "" }
         guard !book.isOwnedByMe else { return book.name }
-        if let owner = book.ownerName {
+        if let owner = book.ownerName, !owner.isEmpty {
             return String(localized: "\(book.name), shared by \(owner)")
         }
         return String(localized: "\(book.name), shared with you")

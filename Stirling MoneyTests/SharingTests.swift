@@ -33,6 +33,7 @@ struct SharingTests {
         #expect(book.zoneID == ownersZone)
         #expect(book.isShared)
         #expect(!book.isOwnedByMe)
+        #expect(book.ownerName == nil, "a share without the owner's name leaves it unknown, not empty")
         // Applying the share is sync's own doing: nothing to send back.
         #expect(try device.processor.localChanges().isEmpty)
     }
