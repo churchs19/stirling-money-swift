@@ -15,6 +15,7 @@
 ```
 Stirling Money/
 ├── Stirling_MoneyApp.swift              # App entry, model container, app lock, widget snapshot on background
+├── AppDelegate.swift              # Accepting shared-book invitations (scene delegate on iOS, app delegate on the Mac)
 ├── Localizable.xcstrings          # String catalog (English); Xcode fills it in when it builds
 ├── Models/
 │   ├── AppSchema.swift            # List of all @Model types for the container
@@ -65,7 +66,8 @@ Stirling Money/
 │   ├── WatchSync.swift            # iPhone only: WCSession; sends the snapshot as application context, answers Watch requests
 │   ├── Sync/                      # CloudRecords (each model ↔ CKRecord, encrypted values, zones), RecordImporter,
 │   │                              #   RecordMerger (three-way conflict merge), SyncProcessor (history out, fetched in,
-│   │                              #   results; testable), SyncCoordinator (CKSyncEngine; never under tests or sample data)
+│   │                              #   results, shares; testable), SyncCoordinator (private + shared CKSyncEngines, share,
+│   │                              #   stop sharing, accept; never under tests or sample data)
 │   ├── RecurringScheduler.swift   # addDue (adds due occurrences through Ledger, catching up), addNow, skipNext, nextDueDate
 │   └── RecurringRunner.swift      # When addDue runs: launch, active, midnight, hourly + wake on the Mac, BGAppRefreshTask on iOS
 └── Extensions/
@@ -196,7 +198,10 @@ Structured data means fewer tokens consumed and better error diagnosis.
   names and Swift version, and (made by hand in Xcode) the `Shared/` folder membership and the Watch app's iOS platform
   filters. Approved for Phase 10 (made with `AddInfoPlist`): `UIBackgroundModes` = `fetch` and
   `BGTaskSchedulerPermittedIdentifiers` = `net.s-church.stirlingmoney.recurring` on the app target, which put them in
-  `Stirling-Money-Info.plist` (merged with the generated Info.plist keys). Ask before any further project change.
+  `Stirling-Money-Info.plist` (merged with the generated Info.plist keys). Approved for Phase 11 (made with
+  `AddEntitlement` and `AddInfoPlist`): iCloud (CloudKit, container `iCloud.net.s-church.stirlingmoney`), Push
+  Notifications (`aps-environment`), `remote-notification` in `UIBackgroundModes`, and `CKSharingSupported`.
+  Ask before any further project change.
 - NEVER use ObservableObject — use @Observable
 - NEVER use NavigationView — use NavigationStack
 - @Model classes are already Observable — do not add @Observable macro

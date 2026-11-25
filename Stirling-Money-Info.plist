@@ -6,6 +6,8 @@
 	<array>
 		<string>net.s-church.stirlingmoney.recurring</string>
 	</array>
+	<key>CKSharingSupported</key>
+	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>

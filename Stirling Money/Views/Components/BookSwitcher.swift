@@ -1,9 +1,11 @@
+import CloudKit
+import CoreTransferable
 import SwiftData
 import SwiftUI
 
 extension View {
-    /// Adds the book menu to the toolbar (switch, new, rename, delete), and the book's name under the title when
-    /// there's more than one book.
+    /// Adds the book menu to the toolbar (switch, new, rename, share, delete or leave), and the book's name under the
+    /// title when there's more than one book or it's shared.
     func bookSwitcher(_ book: Book) -> some View {
         modifier(BookSwitcher(book: book))
     }
@@ -20,6 +22,8 @@ private struct BookSwitcher: ViewModifier {
     @State private var naming: Naming?
     @State private var name = ""
     @State private var isConfirmingDelete = false
+    @State private var isConfirmingStopSharing = false
+    @State private var sharingError: String?
 
     private enum Naming {
         case new, rename
@@ -32,7 +36,7 @@ private struct BookSwitcher: ViewModifier {
     func body(content: Content) -> some View {
         content
             // An empty subtitle shows nothing.
-            .navigationSubtitle(books.count > 1 ? book.name : "")
+            .navigationSubtitle(subtitle)
             .toolbar {
                 ToolbarItem(placement: .navigation) {
                     menu
@@ -50,13 +54,35 @@ private struct BookSwitcher: ViewModifier {
                 }
             }
             .confirmationDialog(
-                "Delete \(book.name)?",
+                book.isOwnedByMe ? "Delete \(book.name)?" : "Leave \(book.name)?",
                 isPresented: $isConfirmingDelete,
                 titleVisibility: .visible
             ) {
-                Button("Delete Book", role: .destructive, action: deleteBook)
+                Button(book.isOwnedByMe ? "Delete Book" : "Leave Book", role: .destructive, action: deleteBook)
             } message: {
-                Text("This deletes its ^[\(book.accounts?.count ?? 0) account](inflect: true) and everything in them, its categories, budgets and goals. This can't be undone.")
+                if book.isOwnedByMe {
+                    if book.isShared {
+                        Text("This deletes its ^[\(book.accounts?.count ?? 0) account](inflect: true) and everything in them, its categories, budgets and goals, for everyone it's shared with. This can't be undone.")
+                    } else {
+                        Text("This deletes its ^[\(book.accounts?.count ?? 0) account](inflect: true) and everything in them, its categories, budgets and goals. This can't be undone.")
+                    }
+                } else {
+                    Text("It's removed from your devices. \(book.ownerName ?? "The owner") would have to share it again.")
+                }
+            }
+            .confirmationDialog(
+                "Stop sharing \(book.name)?",
+                isPresented: $isConfirmingStopSharing,
+                titleVisibility: .visible
+            ) {
+                Button("Stop Sharing", role: .destructive, action: stopSharing)
+            } message: {
+                Text("Everyone you shared it with loses it. It stays on your devices.")
+            }
+            .alert("Sharing Didn't Work", isPresented: Binding { sharingError != nil } set: { if !$0 { sharingError = nil } }) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(sharingError ?? "")
             }
     }
 
@@ -78,14 +104,57 @@ private struct BookSwitcher: ViewModifier {
             Button("Rename \(book.name)…", systemImage: "pencil") {
                 afterMenuCloses { startNaming(.rename) }
             }
-            Button("Delete \(book.name)…", systemImage: "trash", role: .destructive) {
-                afterMenuCloses { isConfirmingDelete = true }
+            .disabled(!book.canEdit)
+
+            if book.isOwnedByMe, SyncCoordinator.shared != nil {
+                // The system's sharing sheet: invite people (by Apple ID, Messages, Mail…) and set each one to
+                // Can Make Changes or View Only; for a shared book, it manages who has it.
+                ShareLink(item: BookShare(syncID: book.syncID, name: book.name), preview: SharePreview(book.name)) {
+                    Label(book.isShared ? "Manage Sharing…" : "Share \(book.name)…", systemImage: "person.crop.circle.badge.plus")
+                }
+                .accessibilityIdentifier("shareBook")
+                if book.isShared {
+                    Button("Stop Sharing…", systemImage: "person.crop.circle.badge.xmark") {
+                        afterMenuCloses { isConfirmingStopSharing = true }
+                    }
+                }
             }
-            .disabled(books.count < 2)
+
+            if book.isOwnedByMe {
+                Button("Delete \(book.name)…", systemImage: "trash", role: .destructive) {
+                    afterMenuCloses { isConfirmingDelete = true }
+                }
+                .disabled(books.count < 2)
+            } else {
+                Button("Leave \(book.name)…", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) {
+                    afterMenuCloses { isConfirmingDelete = true }
+                }
+                .disabled(books.count < 2)
+            }
         } label: {
             Label("Books", systemImage: "books.vertical")
         }
         .accessibilityIdentifier("bookMenu")
+    }
+
+    /// The book's name when there's more than one book or it's shared, with its owner's name if it isn't the user's.
+    private var subtitle: String {
+        guard books.count > 1 || book.isShared else { return "" }
+        guard !book.isOwnedByMe else { return book.name }
+        if let owner = book.ownerName {
+            return String(localized: "\(book.name), shared by \(owner)")
+        }
+        return String(localized: "\(book.name), shared with you")
+    }
+
+    private func stopSharing() {
+        Task {
+            do {
+                try await SyncCoordinator.shared?.stopSharing(book)
+            } catch {
+                sharingError = error.localizedDescription
+            }
+        }
     }
 
     /// The current book's ID; picking one switches to it.
@@ -132,5 +201,20 @@ private struct BookSwitcher: ViewModifier {
         let remaining = books.first { $0 !== book }
         guard (try? Books.delete(book, in: modelContext)) == true else { return }
         currentBookID = remaining?.syncID ?? ""
+    }
+}
+
+/// A book to share, for the system's sharing sheet. Makes the book's zone-wide share when the sheet asks for it,
+/// or hands over the one it has.
+private struct BookShare: Transferable {
+    let syncID: String
+    let name: String
+
+    static var transferRepresentation: some TransferRepresentation {
+        CKShareTransferRepresentation { item in
+            .prepareShare(container: CKContainer(identifier: SyncCoordinator.containerIdentifier)) {
+                try await SyncCoordinator.share(bookWithID: item.syncID)
+            }
+        }
     }
 }

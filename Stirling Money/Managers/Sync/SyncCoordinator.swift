@@ -3,12 +3,17 @@ import Foundation
 import os
 import SwiftData
 
-/// Runs iCloud sync for the user's own books: a `CKSyncEngine` on the private database, driven by `SyncProcessor`.
+/// Runs iCloud sync: two `CKSyncEngine`s driven by one `SyncProcessor`.
 ///
-/// - After each save of the main context, this device's changes are added to the engine's pending changes, which it
-///   sends when it sees fit (and asks for each record through `nextRecordZoneChangeBatch`).
+/// - The **private** engine syncs the user's own books: zones in their private database.
+/// - The **shared** engine syncs books other people shared with the user: the owners' zones, which appear in the
+///   user's shared database once they accept the invitation.
+/// - Each change goes to the engine for its zone: a zone owned by someone else is a shared one
+///   (`SyncProcessor.isSharedWithUser`).
+/// - After each save of the main context, this device's changes are added to the engines' pending changes, which they
+///   send when they see fit (and ask for each record through `nextRecordZoneChangeBatch`).
 /// - Fetched changes, send results and account changes arrive as events (`handleEvent`).
-/// - The engine's state, the history token and records waiting for references are saved in Application Support,
+/// - The engines' state, the history token and records waiting for references are saved in Application Support,
 ///   so nothing is sent or fetched twice across launches.
 ///
 /// Never runs for tests or sample data (`-UseSampleData`), which would upload the sample to the user's iCloud.
@@ -17,12 +22,14 @@ final class SyncCoordinator {
     /// Whether sync runs at all. The app has the iCloud (CloudKit) and Push Notifications capabilities; without
     /// them, touching CloudKit crashes.
     static let isEnabled = true
-    static let containerIdentifier = "iCloud.net.s-church.stirlingmoney"
+    nonisolated static let containerIdentifier = "iCloud.net.s-church.stirlingmoney"
 
     private(set) static var shared: SyncCoordinator?
 
     private let processor: SyncProcessor
-    private var engine: CKSyncEngine?
+    private let container = CKContainer(identifier: containerIdentifier)
+    private var privateEngine: CKSyncEngine?
+    private var sharedEngine: CKSyncEngine?
     private let delegate = EngineDelegate()
     private var observer: (any NSObjectProtocol)?
     private let stateURL: URL
@@ -46,7 +53,9 @@ final class SyncCoordinator {
     // MARK: - Saved state
 
     private struct SavedState: Codable {
+        /// The private engine's state. (Named before there was a shared engine.)
         var engine: CKSyncEngine.State.Serialization?
+        var sharedEngine: CKSyncEngine.State.Serialization?
         var historyToken: DefaultHistoryToken?
         /// `NSKeyedArchiver` data of the records waiting for references.
         var pendingReferences: Data?
@@ -84,14 +93,17 @@ final class SyncCoordinator {
     private func begin() {
         loadState()
         let isFirstRun = saved.engine == nil
-        let container = CKContainer(identifier: Self.containerIdentifier)
         delegate.coordinator = self
-        let configuration = CKSyncEngine.Configuration(
+        privateEngine = CKSyncEngine(CKSyncEngine.Configuration(
             database: container.privateCloudDatabase,
             stateSerialization: saved.engine,
             delegate: delegate
-        )
-        engine = CKSyncEngine(configuration)
+        ))
+        sharedEngine = CKSyncEngine(CKSyncEngine.Configuration(
+            database: container.sharedCloudDatabase,
+            stateSerialization: saved.sharedEngine,
+            delegate: delegate
+        ))
 
         if isFirstRun {
             // Everything goes up once; history before now is covered by that.
@@ -107,6 +119,15 @@ final class SyncCoordinator {
         }
     }
 
+    private var engines: [CKSyncEngine] {
+        [privateEngine, sharedEngine].compactMap(\.self)
+    }
+
+    /// The engine for a zone: the shared one for someone else's.
+    private func engine(for zoneID: CKRecordZone.ID) -> CKSyncEngine? {
+        SyncProcessor.isSharedWithUser(zoneID) ? sharedEngine : privateEngine
+    }
+
     // MARK: - Out
 
     private func enqueueLocalChanges() {
@@ -119,39 +140,48 @@ final class SyncCoordinator {
         saveState()
     }
 
-    /// Adds changes to the engine's pending changes. Returns whether anything was added to send.
+    /// Adds changes to the engines' pending changes. Returns whether anything was added to send.
     @discardableResult
     private func enqueue(_ changes: [SyncProcessor.Change]) -> Bool {
-        guard let engine, !changes.isEmpty else { return false }
-        var database: [CKSyncEngine.PendingDatabaseChange] = []
-        var records: [CKSyncEngine.PendingRecordZoneChange] = []
+        var added = false
         for change in changes {
             switch change {
-            case let .saveZone(zoneID): database.append(.saveZone(CKRecordZone(zoneID: zoneID)))
-            case let .deleteZone(zoneID): database.append(.deleteZone(zoneID))
-            case let .saveRecord(recordID): records.append(.saveRecord(recordID))
-            case let .deleteRecord(recordID): records.append(.deleteRecord(recordID))
+            case let .saveZone(zoneID):
+                // Only an owner makes zones.
+                guard let engine = engine(for: zoneID), engine === privateEngine else { continue }
+                engine.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: zoneID))])
+            case let .deleteZone(zoneID):
+                guard let engine = engine(for: zoneID), engine === privateEngine else { continue }
+                engine.state.add(pendingDatabaseChanges: [.deleteZone(zoneID)])
+            case let .saveRecord(recordID):
+                guard let engine = engine(for: recordID.zoneID) else { continue }
+                engine.state.add(pendingRecordZoneChanges: [.saveRecord(recordID)])
+            case let .deleteRecord(recordID):
+                guard let engine = engine(for: recordID.zoneID) else { continue }
+                engine.state.add(pendingRecordZoneChanges: [.deleteRecord(recordID)])
             case let .cancelSave(name):
-                let waiting = engine.state.pendingRecordZoneChanges.filter {
-                    if case let .saveRecord(id) = $0 {
-                        id.recordName == name
-                    } else {
-                        false
+                for engine in engines {
+                    let waiting = engine.state.pendingRecordZoneChanges.filter {
+                        if case let .saveRecord(id) = $0 {
+                            id.recordName == name
+                        } else {
+                            false
+                        }
                     }
+                    engine.state.remove(pendingRecordZoneChanges: waiting)
                 }
-                engine.state.remove(pendingRecordZoneChanges: waiting)
+                continue
             }
+            added = true
         }
-        engine.state.add(pendingDatabaseChanges: database)
-        engine.state.add(pendingRecordZoneChanges: records)
-        return !database.isEmpty || !records.isEmpty
+        return added
     }
 
     private var isSendRequested = false
 
-    /// Asks the engine to send, once the event being handled is done.
+    /// Asks the engines to send, once the event being handled is done.
     ///
-    /// The engine schedules a send for new pending changes only when no sync is under way. Changes added while it's
+    /// An engine schedules a send for new pending changes only when no sync is under way. Changes added while it's
     /// handling a fetch or a send's results (a merge, a retry after a conflict) would otherwise wait for the next
     /// unrelated save.
     ///
@@ -159,7 +189,7 @@ final class SyncCoordinator {
     /// plain `Task` started there counts as within: it inherits the handler's task context. So the send runs in a
     /// detached task, after the event has finished.
     private func requestSend() {
-        guard engine != nil, !isSendRequested else { return }
+        guard !isSendRequested else { return }
         isSendRequested = true
         Task.detached { [weak self] in
             try? await Task.sleep(for: .milliseconds(500))
@@ -169,16 +199,18 @@ final class SyncCoordinator {
 
     private func sendPendingChanges() async {
         isSendRequested = false
-        guard let engine, !engine.state.pendingRecordZoneChanges.isEmpty || !engine.state.pendingDatabaseChanges.isEmpty
-        else { return }
-        do {
-            try await engine.sendChanges()
-        } catch {
-            log.error("Couldn't send changes: \(error.localizedDescription, privacy: .public)")
+        for engine in engines
+            where !engine.state.pendingRecordZoneChanges.isEmpty || !engine.state.pendingDatabaseChanges.isEmpty
+        {
+            do {
+                try await engine.sendChanges()
+            } catch {
+                log.error("Couldn't send changes: \(error.localizedDescription, privacy: .public)")
+            }
         }
     }
 
-    /// The records for the engine's next send, built from the models now.
+    /// The records for an engine's next send, built from the models now.
     fileprivate func nextBatch(_ context: CKSyncEngine.SendChangesContext, engine: CKSyncEngine) async -> CKSyncEngine.RecordZoneChangeBatch? {
         let pending = engine.state.pendingRecordZoneChanges.filter { context.options.scope.contains($0) }
         guard !pending.isEmpty else { return nil }
@@ -211,10 +243,16 @@ final class SyncCoordinator {
         do {
             switch event {
             case let .stateUpdate(update):
-                saved.engine = update.stateSerialization
+                if engine === sharedEngine {
+                    saved.sharedEngine = update.stateSerialization
+                } else {
+                    saved.engine = update.stateSerialization
+                }
                 saveState()
 
             case let .accountChange(change):
+                // Both engines report it; act once.
+                guard engine === privateEngine else { break }
                 switch change.changeType {
                 case .signIn:
                     // Send everything, for a new account (or the same one after signing back in).
@@ -227,6 +265,8 @@ final class SyncCoordinator {
                 }
 
             case let .fetchedDatabaseChanges(changes):
+                // In the shared database, a deleted zone is a book the owner stopped sharing (or deleted), or one
+                // this user left.
                 for deletion in changes.deletions {
                     try processor.applyDeletedZone(deletion.zoneID)
                 }
@@ -239,7 +279,7 @@ final class SyncCoordinator {
                 saveState()
 
             case let .sentRecordZoneChanges(sent):
-                added = try enqueue(processor.didSave(sent.savedRecords))
+                added = try enqueue(processor.didSave(sent.savedRecords.filter { !($0 is CKShare) }))
                 for failure in sent.failedRecordSaves where try enqueue(processor.didFail(failure.record, error: failure.error)) {
                     added = true
                 }
@@ -257,23 +297,74 @@ final class SyncCoordinator {
         }
     }
 
+    // MARK: - Sharing
+
+    /// The book's zone-wide share, made now if it has none yet. Saves the zone first, in case the book hasn't been
+    /// sent yet. Only for the user's own books.
+    func share(for book: Book) async throws -> CKShare {
+        let zoneID = book.zoneID
+        let database = container.privateCloudDatabase
+        _ = try await database.modifyRecordZones(saving: [CKRecordZone(zoneID: zoneID)], deleting: [])
+
+        let shareID = SyncProcessor.shareID(in: zoneID)
+        let share: CKShare
+        if let existing = try? await database.record(for: shareID) as? CKShare {
+            share = existing
+        } else {
+            let newShare = CKShare(recordZoneID: zoneID)
+            newShare[CKShare.SystemFieldKey.title] = book.name
+            newShare.publicPermission = .none
+            let results = try await database.modifyRecords(saving: [newShare], deleting: []).saveResults
+            guard let saved = try results[shareID]?.get() as? CKShare else {
+                throw CKError(.internalError)
+            }
+            share = saved
+        }
+        try processor.didShare(book, with: share)
+        // The book's own records go up too, if they haven't.
+        enqueueLocalChanges()
+        return share
+    }
+
+    /// The share for the user's own book with this `syncID`, for the sharing sheet.
+    static func share(bookWithID syncID: String) async throws -> CKShare {
+        let zoneID = CKRecordZone.ID(zoneName: Book.zonePrefix + syncID, ownerName: CKCurrentUserDefaultName)
+        guard let coordinator = shared else { throw CKError(.notAuthenticated) }
+        guard let book = try coordinator.processor.book(for: zoneID) else { throw CKError(.unknownItem) }
+        return try await coordinator.share(for: book)
+    }
+
+    /// Stops sharing one of the user's own books: everyone else loses it.
+    func stopSharing(_ book: Book) async throws {
+        _ = try await container.privateCloudDatabase.modifyRecords(saving: [], deleting: [SyncProcessor.shareID(in: book.zoneID)])
+        try processor.didStopSharing(book)
+    }
+
+    /// Accepts an invitation the user tapped, then fetches the book. Returns its `syncID`, to switch to it.
+    func accept(_ metadata: CKShare.Metadata) async throws -> String? {
+        _ = try await container.accept(metadata)
+        try await sharedEngine?.fetchChanges()
+        return Book.syncID(ofZone: metadata.share.recordID.zoneID)
+    }
+
     // MARK: - Asking
 
-    /// Sends and fetches now, such as from "Sync Now" or a push notification.
+    /// Sends and fetches now, such as from "Sync Now".
     func syncNow() async {
-        guard let engine else { return }
-        do {
-            try await engine.sendChanges()
-            try await engine.fetchChanges()
-        } catch {
-            log.error("Sync failed: \(error.localizedDescription, privacy: .public)")
+        for engine in engines {
+            do {
+                try await engine.sendChanges()
+                try await engine.fetchChanges()
+            } catch {
+                log.error("Sync failed: \(error.localizedDescription, privacy: .public)")
+            }
         }
     }
 }
 
-/// The engine's delegate. Its methods may run on any thread; each hops to the main actor, where the store is.
+/// The engines' delegate. Its methods may run on any thread; each hops to the main actor, where the store is.
 private final class EngineDelegate: CKSyncEngineDelegate, @unchecked Sendable {
-    /// Set once, before the engine starts.
+    /// Set once, before the engines start.
     weak var coordinator: SyncCoordinator?
 
     func handleEvent(_ event: CKSyncEngine.Event, syncEngine: CKSyncEngine) async {

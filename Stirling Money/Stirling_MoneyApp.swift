@@ -4,6 +4,12 @@ import SwiftUI
 @main
 struct Stirling_MoneyApp: App {
     @Environment(\.scenePhase) private var scenePhase
+    // Receives invitations to shared books (AppDelegate.swift).
+    #if os(macOS)
+        @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    #else
+        @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    #endif
     @State private var appLock = AppLock(defaults: LaunchMode.settings)
 
     var sharedModelContainer: ModelContainer = {

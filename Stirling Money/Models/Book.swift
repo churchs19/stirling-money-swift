@@ -26,6 +26,8 @@ final class Book {
     var ownerName: String?
     /// The CloudKit user record name of the zone's owner, for a book shared with this user. nil for the user's own
     /// books (`CKCurrentUserDefaultName`).
+    /// Kept on deletion: deleting a book someone shared with you leaves their share, in their zone.
+    @Attribute(.preserveValueOnDeletion)
     var zoneOwnerName: String?
     /// The book record's system fields from the last sync. See `Account.ckSystemFields`.
     var ckSystemFields: Data?

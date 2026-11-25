@@ -1052,18 +1052,40 @@ Its category merging, status UI and notes will be reused, and the branch deleted
        values stayed on the device that made them.
      - The fake server now answers saves with system fields only. With the old ancestor, that reproduces the
        device result (4 tests fail).
-   - **Device test again: the merged version only went up after an unrelated save (a delete); fixed in code,
-     waiting on a retest.**
+   - **Device test again: the merged version only went up after an unrelated save (a delete); fixed.**
      - The engine schedules a send for new pending changes only when no sync is under way. Changes queued while it
        handled a fetch (a merge) or a send's results (a retry after a conflict) waited for the next trigger.
      - `SyncCoordinator.requestSend()` now calls `sendChanges()` half a second after such an event.
      - **That crashed both apps** (a CloudKit assertion in `requestSend()`, in the Mac's and the iPhone's crash
        reports). The engine forbids `sendChanges()` from within its event handler, and a plain `Task` started there
        inherits the handler's task context. The send now runs in `Task.detached`, and only when changes are pending.
-   - **Still to do:** test with two devices on one Apple ID. Each device's existing data is its own "My Book" (each
+   - **Confirmed on devices (Nov 21, 2026):** an iPhone and a Mac on one Apple ID. An offline edit on the iPhone and
+     a different edit to the same transaction on the Mac both synced, without crashing and without needing another
+     save to push them out. Each device's existing data is its own "My Book" (each
      store made its own at the upgrade), so after the first sync both books appear on both devices.
 4. [ ] Sharing: share, accept, permissions, leave, stop sharing, and the shared engine. Two Apple IDs on two devices (or
    a device and a simulator).
+   - **Built (Nov 25, 2026); waiting on a test with two Apple IDs.** `CKSharingSupported` = YES was added with
+     `AddInfoPlist` (approved).
+   - **Two engines:** `SyncCoordinator` runs a private engine and a shared one. Each change goes to the engine for its
+     zone: someone else's zone (`SyncProcessor.isSharedWithUser`) is in the shared database. Only the private
+     engine saves or deletes zones. The shared engine's state is saved next to the private one's.
+   - **Sharing:** "Share <book>…" in the book menu is a `ShareLink` with `CKShareTransferRepresentation.prepareShare`,
+     on iOS and the Mac. `SyncCoordinator.share(for:)` saves the zone, then makes (or reuses) the zone-wide `CKShare`.
+     The system sheet invites people and sets each to Can Make Changes or View Only. Once shared, the item reads
+     "Manage Sharing…".
+   - **Stop Sharing…:** deletes the share. The owner keeps the book; everyone else's copy goes when the zone leaves
+     their shared database.
+   - **Accepting:** `AppDelegate.swift`. On iOS a scene delegate handles `userDidAcceptCloudKitShareWith` (and
+     `cloudKitShareMetadata` at launch); on the Mac, the app delegate. `SyncCoordinator.accept` accepts, fetches the
+     shared database, and the book becomes the current one.
+   - **The share record:** fetched with the zone, it sets `isShared`, `isOwnedByMe`, `ownerName` and `canEdit`
+     (Can Make Changes). None of that is sent; it's this device's copy.
+   - **Leave <book>…:** replaces Delete for someone else's book. The tombstone keeps `zoneOwnerName`, so deleting it
+     deletes the share record in the owner's zone (leaving) instead of the zone. The subtitle reads "<book>, shared
+     by <owner>".
+   - **Tests:** 8 in `SharingTests`. 253 unit tests and 16 UI tests pass, and the Mac builds.
+   - **Not yet:** view-only enforcement (step 5) and recurring transactions in shared books (step 6).
 5. [ ] View-only mode across the screens, and UI tests with a view-only book in the sample data.
 6. [ ] Recurring transactions, widgets and the Watch with books and sharing: deterministic occurrence names, and the
    summary per current book.

@@ -69,10 +69,11 @@ final class SyncProcessor {
         return Self.collapse(changes)
     }
 
-    /// Everything in every book, for the first upload from this device.
+    /// Everything in the user's own books, for the first upload from this device. Books shared with the user are
+    /// the owner's to upload.
     func allChanges() throws -> [Change] {
         var changes: [Change] = []
-        for book in try context.fetch(FetchDescriptor<Book>()) {
+        for book in try context.fetch(FetchDescriptor<Book>()) where book.zoneOwnerName == nil {
             changes.append(.saveZone(book.zoneID))
             changes += book.allRecords().map { .saveRecord($0.recordID) }
         }
@@ -136,6 +137,8 @@ final class SyncProcessor {
         let bookKeys: [PartialKeyPath<Book>] = [
             \.accounts, \.categories, \.budgets, \.goals, \.recurringTransactions, \.transactions,
             \.ckSystemFields, \.ckSyncedValues,
+            // Sharing state is this device's copy of the share, not part of the book's record.
+            \.isShared, \.isOwnedByMe, \.canEdit, \.ownerName, \.zoneOwnerName,
         ]
         return changed(Book.self, ignoring: bookKeys)
             ?? changed(Account.self, ignoring: [
@@ -154,6 +157,11 @@ final class SyncProcessor {
     private func deleted(_ delete: any HistoryDelete) -> [Change] {
         if let book = delete as? DefaultHistoryDelete<Book> {
             guard let syncID = book.tombstone[\.syncID] as? String else { return [] }
+            if let owner = book.tombstone[\.zoneOwnerName] as? String {
+                // Someone else's book: deleting it here leaves their share. Their zone stays.
+                let zoneID = CKRecordZone.ID(zoneName: Book.zonePrefix + syncID, ownerName: owner)
+                return [.deleteRecord(Self.shareID(in: zoneID))]
+            }
             let zoneID = CKRecordZone.ID(zoneName: Book.zonePrefix + syncID, ownerName: CKCurrentUserDefaultName)
             return [.deleteZone(zoneID)]
         }
@@ -202,6 +210,13 @@ final class SyncProcessor {
     func applyFetched(_ records: [CKRecord], deletions: [(id: CKRecord.ID, type: CKRecord.RecordType)]) throws -> [Change] {
         var changes: [Change] = []
         try asSync {
+            // A zone-wide share comes with the zone's records: it says who owns the book and what this user may do.
+            let shares = records.compactMap { $0 as? CKShare }
+            let records = records.filter { !($0 is CKShare) }
+            for share in shares {
+                let book = try book(for: share.recordID.zoneID) ?? makeBook(for: share.recordID.zoneID)
+                Self.apply(share, to: book)
+            }
             for (zoneID, zoneRecords) in Dictionary(grouping: records, by: \.recordID.zoneID) {
                 let book = try book(for: zoneID) ?? makeBook(for: zoneID)
                 let unresolved = try RecordImporter.apply(
@@ -215,12 +230,54 @@ final class SyncProcessor {
                 if deletion.type == Book.recordType {
                     continue // The book goes when its zone does.
                 }
+                if deletion.type == CKRecord.SystemType.share {
+                    // Sharing stopped. For someone else's book, its zone's deletion follows and removes it.
+                    book.isShared = false
+                    continue
+                }
                 if let model = try model(named: deletion.id.recordName, in: book) {
                     context.delete(model)
                 }
             }
         }
         return changes
+    }
+
+    // MARK: - Sharing
+
+    /// The record ID of a zone's zone-wide share.
+    nonisolated static func shareID(in zoneID: CKRecordZone.ID) -> CKRecord.ID {
+        CKRecord.ID(recordName: CKRecordNameZoneWideShare, zoneID: zoneID)
+    }
+
+    /// Whether a zone is someone else's, so it lives in the shared database (and the shared engine sends its changes).
+    nonisolated static func isSharedWithUser(_ zoneID: CKRecordZone.ID) -> Bool {
+        zoneID.ownerName != CKCurrentUserDefaultName
+    }
+
+    /// Copies a book's share into its sharing state: shared, who owns it, and whether this user may edit it.
+    static func apply(_ share: CKShare, to book: Book) {
+        book.isShared = true
+        let ownedByMe = book.zoneOwnerName == nil
+        book.isOwnedByMe = ownedByMe
+        if let name = share.owner.userIdentity.nameComponents {
+            book.ownerName = PersonNameComponentsFormatter.localizedString(from: name, style: .default)
+        }
+        book.canEdit = ownedByMe || share.currentUserParticipant?.permission == .readWrite
+    }
+
+    /// Records a share this device just made or fetched for `book`, as sync (it's no change of the user's).
+    func didShare(_ book: Book, with share: CKShare) throws {
+        try asSync {
+            Self.apply(share, to: book)
+        }
+    }
+
+    /// Records that the owner stopped sharing `book`.
+    func didStopSharing(_ book: Book) throws {
+        try asSync {
+            book.isShared = false
+        }
     }
 
     /// A book's zone was deleted (or a share stopped): the book goes too.
@@ -340,8 +397,10 @@ final class SyncProcessor {
     private func makeBook(for zoneID: CKRecordZone.ID) throws -> Book {
         let book = Book(name: Books.defaultName)
         book.syncID = Book.syncID(ofZone: zoneID) ?? book.syncID
-        if zoneID.ownerName != CKCurrentUserDefaultName {
+        if Self.isSharedWithUser(zoneID) {
             book.zoneOwnerName = zoneID.ownerName
+            book.isOwnedByMe = false
+            book.isShared = true
         }
         context.insert(book)
         return book
