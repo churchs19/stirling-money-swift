@@ -18,15 +18,15 @@ as a SwiftUI + SwiftData app for iOS, iPadOS and macOS.
 | 8 | Budget widgets (iPhone, iPad, Mac, Lock Screen, Watch) | Done; checked on simulators and a real iPhone, Watch and Mac |
 | 9 | Test coverage: isolated unit tests, real UI tests, testable widget, lock and writer logic | Done |
 | 10 | Recurring transactions, added on schedule; widgets and the Watch show them on the day | Done; checked on simulators, a real iPhone and Watch, and the Mac, including a background run |
-| 11 | iCloud sync and sharing books with other Apple IDs (CKSyncEngine) | Planned |
+| 11 | Books, iCloud sync and sharing books with other Apple IDs (CKSyncEngine) | Done; checked on a real iPhone, Mac and Watch and a simulator on a second Apple ID. CloudKit schema deployed to production |
 
 ## Decisions
 
 | Question | Decision |
 |---|---|
 | Platforms | iOS, iPadOS and macOS from one multiplatform target, plus a watchOS app (Phase 7). visionOS is also listed in the target but hasn't been built or tested. |
-| CloudKit sync | **Planned in Phase 11** (Nov 20, 2026; a paid developer account is now available). Models are kept CloudKit-compatible (every property has a default or is optional, every relationship is optional, no unique constraints). |
-| Sharing data with other people | **Planned in Phase 11:** books shared with other Apple IDs through CloudKit sharing, synced by our own `CKSyncEngine` layer because SwiftData's built-in sync has no shared database. |
+| CloudKit sync | **Done in Phase 11** (Nov 20–25, 2026), with our own `CKSyncEngine` layer; SwiftData's mirroring is off. Models stay CloudKit-compatible (every property has a default or is optional, every relationship is optional, no unique constraints). |
+| Sharing data with other people | **Done in Phase 11:** books shared with other Apple IDs as zone-wide `CKShare`s, Can Make Changes or View Only, synced by the shared `CKSyncEngine` (SwiftData's built-in sync has no shared database). |
 | Importing old app data | **Not needed.** No importer will be built. |
 | Ads, analytics, trial licensing | Dropped. |
 
@@ -838,10 +838,11 @@ change balances without opening the app.
 - **Time zones:** occurrences are local calendar days. A transaction's date is the start of that day, like ones
   entered by hand.
 
-### Phase 11: iCloud sync and shared books (planned)
+### Phase 11: iCloud sync and shared books (done)
 
 Sync everything through iCloud, and let an owner share a **book** of accounts with other people by their Apple ID, the
-way the old app's "authorized users" worked. Nothing is built yet: this is the plan and the options considered.
+way the old app's "authorized users" worked. Planned Nov 20, 2026 and built Nov 20–25 in the steps below; the plan
+and the options considered are kept as written, with what was learned recorded under each step.
 
 **Decisions (Nov 20, 2026)**
 - **Books:** data is organized into books, for example Personal, Household or Business. Each book can be shared or not,
@@ -1194,7 +1195,14 @@ Its category merging, status UI and notes will be reused, and the branch deleted
      lacks goes up (`unsentChanges`). **Device test passed:** a fresh install on the simulator logged "Removed 1
      empty books made before the first sync", uploaded nothing, and kept just the iCloud "My Book" and "Home".
    - **Device test passed (Nov 25, 2026):** switching Apple IDs on the simulator behaved as designed.
-8. [ ] The CloudKit schema deployed to production; README, CLAUDE.md and this plan. Delete the `cloudkit-sync` branch.
+8. [x] The CloudKit schema deployed to production; README, CLAUDE.md and this plan. Delete the `cloudkit-sync` branch.
+   - **Docs done (Nov 25, 2026):** the README has books, sync and sharing in the features, the iCloud capabilities
+     under Signing, and a section on the CloudKit schema and testing sharing; CLAUDE.md has an overview of how sync
+     works and the rules learned on devices.
+   - **Schema deployed to production** by the user in the CloudKit Console (Nov 25, 2026). From now on, record
+     types and fields can only be added (and deployed again), never renamed, removed or retyped.
+   - **`cloudkit-sync` deleted**, locally and on GitHub (it held 1d13a7c, the earlier attempt with SwiftData's
+     mirroring; its `CategoryMerger` lives on in `Managers/CategoryMerger.swift`).
 
 **Risks and questions**
 - **Size:** this is the largest phase so far: a sync engine is easy to get subtly wrong. Each step stays shippable (books

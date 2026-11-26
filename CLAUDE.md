@@ -136,6 +136,32 @@ over WatchConnectivity (`WatchSync`, iPhone only):
 The project uses file-system synchronized folders: new files in these folders are picked up automatically.
 The app target defaults to `MainActor` isolation; mark plain value types `nonisolated` when `@Model` code uses them.
 
+## iCloud Sync and Sharing (`Managers/Sync/`)
+
+Our own sync on `CKSyncEngine`; SwiftData's mirroring is off (`cloudKitDatabase: .none`).
+- **Layout:** each `Book` is a zone `Book-<syncID>`; every model is a record named by its `syncID` (`CloudRecords.swift`).
+  Values go in `encryptedValues`, money as `en_US_POSIX` strings; references link records in the zone. Sharing a
+  book is a zone-wide `CKShare`. Once the schema is in production, only add record types and fields.
+- **Two engines** (`SyncCoordinator`): the private one for the user's books, the shared one for books others shared
+  (zones owned by someone else). Their state, the history token and the poll tokens are in `Sync-Private.json`.
+- **Out:** `SyncProcessor.localChanges()` reads SwiftData history, skipping saves authored `"sync"`, updates that touch
+  only to-many relationships or bookkeeping, and anything for a book that's gone or View Only (`withoutGoneBooks`).
+  Deleting a book someone shared leaves it (deletes the share), never the owner's records.
+- **In:** fetched records are applied by `RecordImporter` as author `"sync"`. A record that this device changed but
+  hasn't sent is merged (`RecordMerger.mergeUnsent`, three-way against `ckSyncedValues`), and the merge is queued.
+  `ckSyncedValues` is set from what this device sent, never from the server's answer to a save (it has no values).
+- **Fetching:** without a push, `CKSyncEngine.fetchChanges()` doesn't ask the server, and the owner gets no push for a
+  participant's changes, so the app polls each database every minute while in front (`poll`, with its own tokens).
+  Never call `sendChanges()`/`fetchChanges()` from inside `handleEvent`, even in a `Task` (it inherits the context and
+  CloudKit asserts): use `requestSend()`, which runs in `Task.detached` after the event.
+- **Account changes:** signing out keeps the user's books and removes shared ones; a different Apple ID holds the
+  user's books unsent until they choose in Settings. A device's first upload waits for its first download, so the
+  empty "My Book" a fresh install makes isn't added to iCloud when the user's books are already there.
+- **Tests** (`SyncTests`, `SharingTests`, `AccountAndMergeTests`) drive `SyncProcessor` against `FakeServer` with
+  on-disk `Device`s (history needs a store on disk). The fake server answers saves with system fields only, as
+  CloudKit does. `SyncCoordinator` itself only runs against iCloud: test it on devices (a simulator signed in to a
+  second Apple ID works for sharing; open links with `simctl openurl`, not in Safari).
+
 ## Build & Test — Always Use MCP
 
 Prefer MCP tools over raw shell commands for ALL build operations:
