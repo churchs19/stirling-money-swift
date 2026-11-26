@@ -7,6 +7,8 @@ struct BudgetListEntry: TimelineEntry {
     let budgets: [WidgetSnapshot.BudgetSummary]?
     /// The accent color chosen in the app, for the bars.
     var accent: Color = WidgetAccent.standard
+    /// The book the budgets are in, when there's more than one.
+    var bookName: String?
 }
 
 struct BudgetListProvider: TimelineProvider {
@@ -37,7 +39,7 @@ struct BudgetListProvider: TimelineProvider {
     }
 
     private func entry(snapshot: WidgetSnapshot?, on date: Date) -> BudgetListEntry {
-        BudgetListEntry(date: date, budgets: snapshot?.budgets, accent: WidgetAccent.current)
+        BudgetListEntry(date: date, budgets: snapshot?.budgets, accent: WidgetAccent.current, bookName: snapshot?.bookName)
     }
 }
 
@@ -92,7 +94,7 @@ struct BudgetListWidgetView: View {
 
     private func header(more: Int) -> some View {
         HStack(alignment: .firstTextBaseline) {
-            Text("Budgets")
+            Text(entry.bookName.map { "Budgets · \($0)" } ?? String(localized: "Budgets"))
                 .font(.subheadline.bold())
                 .foregroundStyle(entry.accent)
                 .widgetAccentable()

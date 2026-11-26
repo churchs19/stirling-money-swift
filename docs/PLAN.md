@@ -1137,8 +1137,19 @@ Its category merging, status UI and notes will be reused, and the branch deleted
    - **Device test passed (Nov 25, 2026):** shared View Only with the second Apple ID, the book arrived with
      `canEdit` false. On the simulator it read "Home, shared with you (View Only)", had no editing controls, opened
      nothing on taps, and still received the owner's edits.
-6. [ ] Recurring transactions, widgets and the Watch with books and sharing: deterministic occurrence names, and the
+6. [x] Recurring transactions, widgets and the Watch with books and sharing: deterministic occurrence names, and the
    summary per current book.
+   - **Done (Nov 25, 2026).** Most of it came with earlier steps:
+     - Each occurrence is named `<rule>:<yyyy-MM-dd>` (step 2), so an owner and an editor adding the same one write
+       one record. `twoDevicesAddingTheSameOccurrenceKeepOne` checks it ends as one transaction on each device.
+     - View Only participants never add occurrences (step 5).
+     - The summary has been for the current book since step 1, and it's rewritten when switching.
+   - **New here:** the summary carries `bookName` when the user has more than one book (decoded only if present, so
+     older summaries still load). It names the total in the Balance widget and the Watch's Balance complication
+     (instead of "All Accounts"), heads the All Budgets widget ("Budgets · Home"), and heads each Watch page
+     (`BookHeader`). Switching books with the same figures still rewrites the summary, since the name changed.
+   - 258 unit tests and 9 Watch tests pass, and the Mac builds.
+   - **Left for later, as planned:** choosing a book per widget.
 7. [ ] Settings: sync status, Sync Now, and the iCloud account states. Category merging after fetches.
 8. [ ] The CloudKit schema deployed to production; README, CLAUDE.md and this plan. Delete the `cloudkit-sync` branch.
 

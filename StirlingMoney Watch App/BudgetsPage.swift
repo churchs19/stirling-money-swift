@@ -17,6 +17,8 @@ struct BudgetsPage: View {
                             BudgetRow(budget: budget, now: context.date)
                         }
                     }
+                } header: {
+                    BookHeader()
                 } footer: {
                     UpdatedFooter()
                 }

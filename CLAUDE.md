@@ -95,7 +95,8 @@ Shared/                            # In the app, the widgets, the Watch app and 
 StirlingMoneyWidgets/              # Widget extension: Balance, Goal and Budget (configured with App Intents) and All Budgets (BudgetListWidget, static)
 ```
 
-Widgets can't open the SwiftData store; the app writes `WidgetSnapshot.json` to the App Group shortly after each
+Widgets can't open the SwiftData store; the app writes `WidgetSnapshot.json` (for the current book, named in `bookName`
+when there's more than one) to the App Group shortly after each
 save (plus at launch, on going to the background and on quitting the Mac app), and the widgets read it. `WidgetSnapshot` lives in `Shared/`,
 which belongs to all four app and widget targets; code there must compile for each of them (no SwiftData models, no app-only helpers).
 
@@ -110,9 +111,11 @@ calls it at launch, when the app becomes active, at midnight, hourly and on wake
 complication and Watch page shows `projected(on:)` that day: balances (not posted), goals and budgets by the same rules as
 `Budget.spent` and `Goal.progress` (`BudgetSummary.counts`, `GoalSummary.progress`). Timelines get an entry per due day
 (`timelineDates`). A test compares the projection with what `addDue` really adds; keep the two in step. Nothing runs under
-`LaunchMode.isTesting`. With iCloud sync, two devices could add the same occurrence: de-duplicate by rule and date then.
+`LaunchMode.isTesting`. With iCloud sync, two devices can add the same occurrence: each is named `<rule>:<yyyy-MM-dd>`
+(`RecurringScheduler.occurrenceSyncID`), so both write the same record and CloudKit keeps one. Nothing is added in a
+View Only book.
 
-The Watch can't read the iPhone's store or App Group either, and there's no iCloud sync yet, so the iPhone sends it the same summary
+The Watch can't read the iPhone's store or App Group either, and doesn't sync with iCloud, so the iPhone sends it the same summary
 over WatchConnectivity (`WatchSync`, iPhone only):
 - Each time `WidgetSnapshotWriter` writes a changed summary (after saves, at launch, on going to the background), it sends it as the
   application context. The system keeps only the latest and delivers it when the Watch app next runs.

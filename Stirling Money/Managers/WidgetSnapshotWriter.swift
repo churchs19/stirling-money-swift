@@ -78,7 +78,9 @@ enum WidgetSnapshotWriter {
                 budgets: budgets,
                 transactions: transactions,
                 recurring: context.fetch(FetchDescriptor(predicate: RecurringTransaction.inBook(book))),
-                accentColor: AccentChoice.sharedCustomColor
+                accentColor: AccentChoice.sharedCustomColor,
+                // Named only when there's more than one book, so a single book reads as before.
+                bookName: context.fetchCount(FetchDescriptor<Book>()) > 1 ? book?.name : nil
             )
             guard snapshot.needsWrite(over: try? Data(contentsOf: url)) else { return }
             let data = try JSONEncoder().encode(snapshot)

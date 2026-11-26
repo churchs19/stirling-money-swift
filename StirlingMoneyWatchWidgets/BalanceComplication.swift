@@ -55,7 +55,7 @@ struct BalanceComplicationProvider: AppIntentTimelineProvider {
         case .total:
             content = snapshot.map {
                 BalanceComplicationEntry.Content(
-                    account: nil, name: String(localized: "All Accounts"),
+                    account: nil, name: $0.bookName ?? String(localized: "All Accounts"),
                     balance: $0.total, accountCount: $0.accounts.count
                 )
             }

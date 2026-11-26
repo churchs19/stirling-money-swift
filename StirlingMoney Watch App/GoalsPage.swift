@@ -14,6 +14,8 @@ struct GoalsPage: View {
                     ForEach(goals) { goal in
                         GoalRow(goal: goal)
                     }
+                } header: {
+                    BookHeader()
                 } footer: {
                     UpdatedFooter()
                 }

@@ -77,6 +77,8 @@ nonisolated struct WidgetSnapshot: Codable, Equatable {
     var upcoming: [UpcomingOccurrence] = []
     /// The custom accent color chosen on the iPhone; nil means Stirling Money's purple.
     var accentColor: Color.Resolved? = nil
+    /// The name of the book these figures are for, when the user has more than one; nil when there's only one.
+    var bookName: String? = nil
     var updatedAt: Date
 
     static let appGroup = "group.net.s-church.stirlingmoney"
@@ -148,7 +150,8 @@ nonisolated struct WidgetSnapshot: Codable, Equatable {
 }
 
 extension WidgetSnapshot {
-    /// Decodes snapshots written before budgets and the accent color were added, too.
+    /// Decodes snapshots written before budgets, the accent color, upcoming occurrences and the book name were added,
+    /// too.
     nonisolated init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         accounts = try container.decode([AccountSummary].self, forKey: .accounts)
@@ -156,6 +159,7 @@ extension WidgetSnapshot {
         budgets = try container.decodeIfPresent([BudgetSummary].self, forKey: .budgets) ?? []
         upcoming = try container.decodeIfPresent([UpcomingOccurrence].self, forKey: .upcoming) ?? []
         accentColor = try container.decodeIfPresent(Color.Resolved.self, forKey: .accentColor)
+        bookName = try container.decodeIfPresent(String.self, forKey: .bookName)
         updatedAt = try container.decode(Date.self, forKey: .updatedAt)
     }
 }
