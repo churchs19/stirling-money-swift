@@ -1177,7 +1177,8 @@ Its category merging, status UI and notes will be reused, and the branch deleted
      simulator sent its own "AAA", a check then fetched the iPhone's older one, and the merge deleted the
      simulator's while its transaction form still held it. Saving set the deleted category: none. The merger now
      remembers what replaced each category it removes, and saving a transaction, budget or recurring rule uses
-     the survivor (`CategoryMerger.survivor(of:)`). `aFormHoldingAMergedCategorySavesTheSurvivor` fails without it.
+     the survivor (`CategoryMerger.survivor(of:)`). `aFormHoldingAMergedCategorySavesTheSurvivor` fails without it. **Retest passed:** both
+     devices made "BBB" with a transaction at about the same time, and both transactions ended up in the one kept.
    - **Not tested on devices:** signing out or switching Apple IDs (it needs a spare device or simulator to sign
      out of).
 8. [ ] The CloudKit schema deployed to production; README, CLAUDE.md and this plan. Delete the `cloudkit-sync` branch.
