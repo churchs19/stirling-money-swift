@@ -8,7 +8,7 @@
         static let preview: ModelContainer = {
             let container = try! ModelContainer(
                 for: Schema(AppSchema.models),
-                configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+                configurations: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
             )
             let context = container.mainContext
 
@@ -85,7 +85,51 @@
             toSavings.otherAccount = savings
             subscription.account = creditCard
 
+            // Everything above goes into the first book. A second, smaller book to switch to.
+            try! Books.prepare(in: context)
+            let household = Book(name: "Household", createdAt: .now.addingTimeInterval(1))
+            context.insert(household)
+            let joint = Account(name: "Joint Checking", initialBalance: 640, iconName: "house")
+            context.insert(joint)
+            joint.book = household
+            let essentials = try! Ledger.category(named: "Essentials", book: household, in: context)
+            Ledger.addTransaction(.withdrawal, amount: 120, to: joint, date: daysAgo(2), payee: "Hardware Store", category: essentials, in: context)
+
+            // A third book someone shared as View Only: nothing in it can be changed.
+            let parents = Book(name: "Parents", createdAt: .now.addingTimeInterval(2))
+            parents.isShared = true
+            parents.isOwnedByMe = false
+            parents.canEdit = false
+            parents.ownerName = "Pat"
+            parents.zoneOwnerName = "_pat"
+            context.insert(parents)
+            let parentsSavings = Account(name: "Family Savings", initialBalance: 2500, iconName: "banknote")
+            context.insert(parentsSavings)
+            parentsSavings.book = parents
+            let gifts = try! Ledger.category(named: "Gifts", book: parents, in: context)
+            Ledger.addTransaction(.withdrawal, amount: 75, to: parentsSavings, date: daysAgo(5), payee: "Birthday Gift", category: gifts, in: context)
+            let parentsBudget = Budget(name: "Gifts", amount: 200, startDate: historyStart)
+            context.insert(parentsBudget)
+            parentsBudget.book = parents
+            parentsBudget.category = gifts
+            try! context.save()
+
             return container
         }()
+
+        /// An in-memory store with one empty book, for previews of empty screens.
+        static var emptyPreview: ModelContainer {
+            let container = try! ModelContainer(
+                for: Schema(AppSchema.models),
+                configurations: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+            )
+            try! Books.prepare(in: container.mainContext)
+            return container
+        }
+
+        /// The first book, for previews of screens that show one book.
+        var firstBook: Book {
+            try! mainContext.fetch(FetchDescriptor<Book>(sortBy: Book.order)).first!
+        }
     }
 #endif

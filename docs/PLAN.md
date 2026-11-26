@@ -18,14 +18,15 @@ as a SwiftUI + SwiftData app for iOS, iPadOS and macOS.
 | 8 | Budget widgets (iPhone, iPad, Mac, Lock Screen, Watch) | Done; checked on simulators and a real iPhone, Watch and Mac |
 | 9 | Test coverage: isolated unit tests, real UI tests, testable widget, lock and writer logic | Done |
 | 10 | Recurring transactions, added on schedule; widgets and the Watch show them on the day | Done; checked on simulators, a real iPhone and Watch, and the Mac, including a background run |
+| 11 | Books, iCloud sync and sharing books with other Apple IDs (CKSyncEngine) | Done; checked on a real iPhone, Mac and Watch and a simulator on a second Apple ID. CloudKit schema deployed to production |
 
 ## Decisions
 
 | Question | Decision |
 |---|---|
 | Platforms | iOS, iPadOS and macOS from one multiplatform target, plus a watchOS app (Phase 7). visionOS is also listed in the target but hasn't been built or tested. |
-| CloudKit sync | **Deferred.** Models are kept CloudKit-compatible (every property has a default or is optional, every relationship is optional, no unique constraints) so sync can be turned on later without a migration. |
-| Sharing data with other people | **Deferred.** The old app's "authorized users" would need CloudKit sharing (`CKShare`), which SwiftData doesn't support well. |
+| CloudKit sync | **Done in Phase 11** (Nov 20–25, 2026), with our own `CKSyncEngine` layer; SwiftData's mirroring is off. Models stay CloudKit-compatible (every property has a default or is optional, every relationship is optional, no unique constraints). |
+| Sharing data with other people | **Done in Phase 11:** books shared with other Apple IDs as zone-wide `CKShare`s, Can Make Changes or View Only, synced by the shared `CKSyncEngine` (SwiftData's built-in sync has no shared database). |
 | Importing old app data | **Not needed.** No importer will be built. |
 | Ads, analytics, trial licensing | Dropped. |
 
@@ -836,6 +837,388 @@ change balances without opening the app.
   leaves out transfers). One shared function keeps the two from drifting apart.
 - **Time zones:** occurrences are local calendar days. A transaction's date is the start of that day, like ones
   entered by hand.
+
+### Phase 11: iCloud sync and shared books (done)
+
+Sync everything through iCloud, and let an owner share a **book** of accounts with other people by their Apple ID, the
+way the old app's "authorized users" worked. Planned Nov 20, 2026 and built Nov 20–25 in the steps below; the plan
+and the options considered are kept as written, with what was learned recorded under each step.
+
+**Decisions (Nov 20, 2026)**
+- **Books:** data is organized into books, for example Personal, Household or Business. Each book can be shared or not,
+  and the app has a book switcher.
+- **Permissions:** the owner chooses per person, Can Edit or View Only, in the standard iCloud sharing sheet. View-only
+  people see everything, and the app hides adding, editing and deleting for them. (CloudKit enforces it on the server
+  too.)
+- **Participants keep their own data:** their own books and the books shared with them sit side by side. The app, the
+  widgets and the Watch show one book at a time.
+- **Approach:** keep SwiftData as the local store and add our own sync layer with CloudKit's `CKSyncEngine`.
+
+#### Options considered
+
+SwiftData's built-in CloudKit sync (`ModelConfiguration(cloudKitDatabase:)`) offers only `.automatic`, `.private(_:)`
+and `.none` in the iOS 27 SDK. It has no shared database, so it can sync one person's devices but can't share with
+anyone else.
+
+| | A. SwiftData + `CKSyncEngine` (chosen) | B. Core Data `NSPersistentCloudKitContainer` | C. SwiftData's private sync only |
+|---|---|---|---|
+| Sharing with other Apple IDs | Yes: zone-wide `CKShare` per book, one engine per database | Yes: built in (`share(_:to:)`, `acceptShareInvitations`) | No |
+| Changes to existing code | Models gain a book and a sync ID; views filter by book. `@Query`, forms, `Ledger`, the tests and the widget summary stay | Every model becomes an `NSManagedObject`; `@Query` becomes `@FetchRequest`; drafts, `Ledger`, the tests and the widget builder are rewritten | Almost none (the `cloudkit-sync` branch is nearly done) |
+| Sync code to own | Record mapping, applying fetched changes, conflicts, deletes: about 1,500–2,500 lines and tests | Little: Apple's mirroring does it | None |
+| Control | Full: deterministic record names stop duplicate recurring transactions; our own conflict rules | Little: Apple's merge, no hook for duplicates | Little |
+| Risks | Sync bugs are ours to find; more testing with two Apple IDs | A big rewrite; cross-share relationships aren't allowed; less is visible when it misbehaves | Has to be replaced to add sharing |
+
+Why A: it keeps everything built in Phases 1–10. Sharing by book matches CloudKit's zone-wide shares exactly, one zone
+per book. And the duplicate-occurrence problem from Phase 10 goes away, because record names are derived from the rule
+and the date. B gets sharing for less sync code but rewrites the app around Core Data. C was the old plan; the
+`cloudkit-sync` branch (SwiftData's private sync, `CategoryMerger`, `SyncMonitor` and Settings status) is superseded.
+Its category merging, status UI and notes will be reused, and the branch deleted once Phase 11 lands.
+
+#### Design
+
+**Books in the model**
+- A new `Book` `@Model`: `name`, `createdAt`, `syncID`, and cached sharing state: `isShared`, `isOwnedByMe`, `canEdit`,
+  `ownerName`.
+- `Account`, `Category`, `Budget`, `Goal`, `RecurringTransaction` and `AccountTransaction` each gain `book: Book?`. A
+  transaction's book is always its account's, but storing it keeps the record-to-zone mapping simple.
+- Transfers, goals and budgets only ever relate records in the same book. A book is a closed world, so it fits one
+  CloudKit zone, and CloudKit references can't cross zones anyway.
+- Every model gains `syncID: String = UUID().uuidString`, marked `@Attribute(.preserveValueOnDeletion)`, so a delete's
+  history tombstone says which record to delete in CloudKit.
+- **Upgrading:** the first launch of the new version puts all existing data in a new book, "My Book" (renamable). The
+  new fields are optional or have defaults, so SwiftData's automatic migration covers it.
+- **Switching:** the current book's `syncID` is stored in `LaunchMode.settings`. Every `@Query` and fetch filters by
+  book: a shared `bookPredicate` and a `\.currentBook` environment value. Reports, totals, categories and budgets are
+  then naturally per book.
+
+**CloudKit layout**
+- One CloudKit container: `iCloud.net.s-church.stirlingmoney`.
+- **Owner:** each book is a custom zone (`Book-<syncID>`) in the owner's private database. Sharing a book is a
+  zone-wide `CKShare` on that zone.
+- **Participant:** after accepting, the book's zone appears in their shared database.
+- **Records:** one record type per model. The record name is the model's `syncID`, and relationships are
+  `CKRecord.Reference`s within the zone. Money (`Decimal`) is stored as a string to keep it exact, and dates as dates.
+- **Deterministic names for generated records:** a recurring occurrence is named `"<rule syncID>:<yyyy-MM-dd>"`, and a
+  transfer's halves `"<pair syncID>:out"` and `":in"`. Two devices adding the same occurrence then write the same
+  record, so CloudKit keeps one: no duplicates, no clean-up pass.
+- Each model stores its record's system fields (`ckSystemFields: Data?`), so saves send the change tag and conflicts are
+  detected.
+
+**The sync layer** (`Managers/Sync/`)
+- `SyncCoordinator` owns two `CKSyncEngine`s, one for the private database and one for the shared database. Their saved
+  state goes in the App Group folder.
+- **Local changes out:** after each save, read SwiftData history since the last token, ignoring changes authored
+  `"sync"`. Turn inserts and updates into pending record saves in the right zone, and deletes (tombstones) into pending
+  record deletes. Prune history once it's sent.
+- **Remote changes in:** for fetched records, insert or update models by `syncID` in a model context whose author is
+  `"sync"`. Deleted record IDs delete the matching models. A deleted zone (a share stopped or left) deletes that book
+  locally.
+- **Conflicts** (`serverRecordChanged`):
+  - Fields changed on only one side merge.
+  - When both sides changed the same field, the later change wins, with these exceptions:
+    - `isPosted` prefers true.
+    - A rule's `nextDate` takes the later date, so occurrences aren't added twice.
+    - Deletes win over edits.
+  - Balances are always computed from transactions, so they need no merging.
+- **Category names:** when a fetch brings in a category with the same name as one in the same book, `CategoryMerger`
+  (from the `cloudkit-sync` branch) merges them into the oldest.
+- **Status in Settings:** last synced, errors, the iCloud account state and "Sync Now".
+
+**Sharing**
+- **Owner:** "Share Book…" in the book switcher.
+  - On iOS and iPadOS this is `UICloudSharingController` (or `ShareLink` with `CKShareTransferRepresentation`); on the Mac,
+    `NSSharingService`.
+  - Each person can be set to Can Edit or View Only in the system sheet.
+  - "Manage Sharing…" changes people and permissions, or stops sharing.
+- **Participant:**
+  - Tapping the invitation link opens the app: `CKSharingSupported` in the Info.plist, and a scene delegate handling
+    `userDidAcceptCloudKitShareWith`.
+  - The app accepts the share; the shared engine fetches the zone; the book appears in the switcher with the owner's
+    name.
+  - "Leave Book" removes it.
+- **View-only:** `canEdit` comes from the share's `currentUserParticipant.permission`. Forms, swipe actions, + buttons
+  and recurring actions are hidden or disabled.
+- **Recurring transactions in shared books:** any editor's device may add a due occurrence; the deterministic names
+  make that safe. View-only participants never add them.
+- **Widgets and the Watch:** the summary is written for the current book (with its name). The Watch shows that book.
+  Choosing a book per widget can come later.
+
+**Accounts and privacy**
+- **Signed out of iCloud, or sync turned off:** the app works locally, and changes go up once sync is on.
+- **Signed into a different Apple ID:** shared books from the old account are removed, and the user's own books stay
+  local until they choose to upload or remove them. To be decided while building.
+- **App lock:** still per device. Shared data is protected by each participant's own device.
+
+#### Project changes (each confirmed before it's made, with Xcode's tools)
+1. **iCloud** capability with **CloudKit** and the container `iCloud.net.s-church.stirlingmoney`, on the app target.
+   Widgets and the Watch don't need it; they still read the summary.
+2. **Push Notifications** (`aps-environment`), so CloudKit can tell the app about changes.
+3. **Background Modes:** add Remote notifications to the existing Background fetch.
+4. `CKSharingSupported` = YES in `Stirling-Money-Info.plist`.
+5. **CloudKit Console:** create the container, deploy the schema to production before any TestFlight or App Store
+   build, and only add to it afterwards (never rename or remove fields).
+
+#### Order of work
+1. [x] Books: the `Book` model, `book` and `syncID` on every model, "My Book" for existing data, the switcher, and
+   per-book queries everywhere (the reports and the widget summary too). Tests for upgrading an existing store and for
+   per-book totals. No CloudKit yet: usable on its own.
+   - **Done (Nov 20, 2026).** `Books.prepare` runs at launch. It makes "My Book" if there's no book, and puts anything
+     without a book into the oldest one. Each of those records gets a new `syncID`, because the store's migration gives
+     every existing row the same default. A test upgrades a real on-disk store from before books.
+   - The switcher is a toolbar menu on every tab (`bookSwitcher`): pick, New, Rename, Delete. Deleting the last book
+     isn't allowed. With more than one book, the book's name shows under each title.
+   - Screens take the book in their initializer and build their `@Query` from `Model.inBook(_:)`. Each tab is rebuilt
+     (`.id`) when the book changes. Forms with an account use its book. A `\.currentBook` environment value wasn't
+     needed.
+   - Each book has its own categories (the same name can be in two books). Settings exports the current book. The
+     widget summary is for the current book, and is rewritten on switching.
+   - A widget link to an account in another book switches to that book.
+   - Recurring rules in every book are still added; only the summary is per book.
+   - The sample data has a second book, "Household". 214 unit tests and 16 UI tests pass, and the Mac builds.
+2. [x] Record mapping: each model to and from a `CKRecord`, with deterministic names, `Decimal` as a string and
+   references. Round-trip tests with no network.
+   - **Done (Nov 20, 2026)**, in `Managers/Sync/`.
+   - **`CloudRecords.swift`:**
+     - Each model has a record type named after it. The book is a `Book` record in its own zone (`Book-<syncID>`),
+       named by its `syncID`.
+     - Values go in `encryptedValues`: names, amounts, payees, notes and dates. References can't be encrypted, so
+       `account`, `category`, `recurrence`, `incomingHalf`, `otherAccount` are plain `CKRecord.Reference`s with
+       action `.none`.
+     - Money is a string in `en_US_POSIX` form. Booleans and whole numbers are `Int64`. Enums use their raw value
+       (`kind`, `period`, `frequency`). The book isn't a field: it's the zone.
+     - `makeRecord(in:)` builds on the saved `ckSystemFields`, and `Book.allRecords()` lists a whole zone.
+   - **`RecordImporter`:** applies a batch to one book.
+     - Models are matched by `syncID` within that book, so a record in another book's zone never matches.
+     - Values are applied first, then references. Records whose targets haven't arrived yet are returned and retried
+       with the next batch.
+     - References are only set when they change. Unknown record types are skipped.
+   - **Deterministic names:**
+     - Transfer halves are `<pair>:out` and `<pair>:in`. A recreated counterpart swaps the suffix.
+     - Recurring occurrences are `<rule>:<yyyy-MM-dd>`, and a transfer occurrence adds `:out`/`:in`. "Add Now" uses the
+       occurrence it stands in for, not today.
+   - **New model fields:** `ckSystemFields` on every model, `Book.zoneOwnerName` (for shared books) and
+     `Category.createdAt` (for merging same-named categories into the oldest).
+   - **Tests:** 11 tests in `CloudRecordTests`. They cover a whole book round-tripped in reverse order, references
+     arriving in a later batch, re-applying as an update, book scoping, encryption and exact money, system fields,
+     zone names, transfer names, and two devices naming the same occurrences the same. 225 unit tests pass, and the
+     Mac builds.
+3. [ ] The project changes above (with approval), then the private engine: upload, fetch, apply, conflicts and deletes
+   for the user's own books on their devices. A fake engine delegate in tests; then two devices on one Apple ID.
+   - **Engine written and tested (Nov 20, 2026).** The project changes were made with Xcode's tools (approved):
+     - Entitlements: `com.apple.developer.icloud-services` = CloudKit, `com.apple.developer.icloud-container-identifiers`
+       = `iCloud.net.s-church.stirlingmoney`, and `aps-environment` (Xcode also added the Mac's
+       `com.apple.developer.aps-environment`).
+     - `UIBackgroundModes` = fetch and remote-notification.
+     - Signed iOS and Mac builds registered the container; `CKSyncEngine` handles the pushes itself.
+   - **SwiftData's own CloudKit sync is off:** every `ModelConfiguration` passes `cloudKitDatabase: .none`. With the
+     default (`.automatic`), SwiftData starts mirroring the store to the container as soon as the app has the
+     entitlement. The simulator's log showed it doing that.
+   - Sync never runs under tests or `-UseSampleData` (`LaunchMode.usesSampleData`), so sample data never reaches
+     iCloud.
+   - **`SyncProcessor`** holds the sync logic apart from CloudKit:
+     - **Out:** reads history since the last token. Changes authored `"sync"` are skipped, and so are updates that only
+       touch to-many relationships or sync bookkeeping. Changes become zone and record saves and deletes.
+       `ckSystemFields` is kept on deletion (`preserveValueOnDeletion`), so a tombstone names its record. Something
+       added and deleted before it was ever sent cancels the pending save.
+     - **In:** `applyFetched`, `applyDeletedZone`. Changes are saved with the author `"sync"`, after flushing this
+       device's own unsaved changes.
+     - **Results:**
+       - A record whose model was deleted while its save was on the way is deleted from the server.
+       - Conflicts go through `RecordMerger`: a three-way merge against `ckSyncedValues` (the values as of the last
+         sync). Fields changed on one side take that side; both changed, this device wins, except posted wins and a
+         rule's later `nextDate` (with its `remainingCount`) wins.
+       - `unknownItem` deletes locally (deletes win).
+       - `zoneNotFound`: a synced book is deleted locally; a new one gets its zone made.
+   - **`SyncCoordinator`** wraps `CKSyncEngine` on the private database. Its state, the history token and records
+     waiting for references are saved in `Sync-Private.json`. The first run queues every book. Local changes are
+     queued after each save of the main context.
+   - **Tests:** 15 tests in `SyncTests` use a fake server and two on-disk devices. They cover round trips, no echoes,
+     edits and deletes both ways, cascades, book deletion, cancelled saves, two devices adding the same recurring
+     occurrence (one record, one transaction each), conflict merging, deleted records and missing zones.
+     240 unit tests pass, and the Mac builds.
+   - On the simulator (not signed into iCloud) the engine starts, queues the book's zone, saves its state and waits.
+   - **Device test, Nov 21, 2026: the offline-edit scenario lost one side's edit; fixed.**
+     - `CKSyncEngine` fetches before it sends, so the other device's copy arrived first and overwrote the edit that
+       hadn't gone up.
+     - `RecordImporter` now merges a fetched record with unsent local changes (`RecordMerger.mergeUnsent`). A model
+       has unsent changes when its values differ from `ckSyncedValues`. The pending save then sends the merge.
+     - Merges now write into a copy of the server's record, so the server's own values stay the new ancestor.
+     - Dates are compared to the millisecond, CloudKit's precision.
+   - **Device test again: the iPhone's edit won, and the Mac's note stayed only on the Mac; fixed.**
+     - The common ancestor was taken from the server's answer to a save. In practice that answer had no values, so
+       every field looked changed on both sides and each device kept its own.
+     - The ancestor is now the record this device sent (`SyncProcessor.sent`). An empty ancestor saved by the older
+       build counts as unknown.
+     - A merge made during a fetch is now queued for upload (`applyFetched` returns the saves). Before, the merged
+       values stayed on the device that made them.
+     - The fake server now answers saves with system fields only. With the old ancestor, that reproduces the
+       device result (4 tests fail).
+   - **Device test again: the merged version only went up after an unrelated save (a delete); fixed.**
+     - The engine schedules a send for new pending changes only when no sync is under way. Changes queued while it
+       handled a fetch (a merge) or a send's results (a retry after a conflict) waited for the next trigger.
+     - `SyncCoordinator.requestSend()` now calls `sendChanges()` half a second after such an event.
+     - **That crashed both apps** (a CloudKit assertion in `requestSend()`, in the Mac's and the iPhone's crash
+       reports). The engine forbids `sendChanges()` from within its event handler, and a plain `Task` started there
+       inherits the handler's task context. The send now runs in `Task.detached`, and only when changes are pending.
+   - **Confirmed on devices (Nov 21, 2026):** an iPhone and a Mac on one Apple ID. An offline edit on the iPhone and
+     a different edit to the same transaction on the Mac both synced, without crashing and without needing another
+     save to push them out. Each device's existing data is its own "My Book" (each
+     store made its own at the upgrade), so after the first sync both books appear on both devices.
+4. [x] Sharing: share, accept, permissions, leave, stop sharing, and the shared engine. Two Apple IDs on two devices (or
+   a device and a simulator).
+   - **Built (Nov 25, 2026); waiting on a test with two Apple IDs.** `CKSharingSupported` = YES was added with
+     `AddInfoPlist` (approved).
+   - **Two engines:** `SyncCoordinator` runs a private engine and a shared one. Each change goes to the engine for its
+     zone: someone else's zone (`SyncProcessor.isSharedWithUser`) is in the shared database. Only the private
+     engine saves or deletes zones. The shared engine's state is saved next to the private one's.
+   - **Sharing:** "Share <book>…" in the book menu is a `ShareLink` with `CKShareTransferRepresentation.prepareShare`,
+     on iOS and the Mac. `SyncCoordinator.share(for:)` saves the zone, then makes (or reuses) the zone-wide `CKShare`.
+     The system sheet invites people and sets each to Can Make Changes or View Only. Once shared, the item reads
+     "Manage Sharing…".
+   - **Stop Sharing…:** deletes the share. The owner keeps the book; everyone else's copy goes when the zone leaves
+     their shared database.
+   - **Accepting:** `AppDelegate.swift`. On iOS a scene delegate handles `userDidAcceptCloudKitShareWith` (and
+     `cloudKitShareMetadata` at launch); on the Mac, the app delegate. `SyncCoordinator.accept` accepts, fetches the
+     shared database, and the book becomes the current one.
+   - **The share record:** fetched with the zone, it sets `isShared`, `isOwnedByMe`, `ownerName` and `canEdit`
+     (Can Make Changes). None of that is sent; it's this device's copy.
+   - **Leave <book>…:** replaces Delete for someone else's book. The tombstone keeps `zoneOwnerName`, so deleting it
+     deletes the share record in the owner's zone (leaving) instead of the zone. The subtitle reads "<book>, shared
+     by <owner>".
+   - **Tests:** 8 in `SharingTests`. 253 unit tests and 16 UI tests pass, and the Mac builds.
+   - **Not yet:** view-only enforcement (step 5) and recurring transactions in shared books (step 6).
+   - **Two-Apple-ID test, Nov 25, 2026 (iPhone owner, simulator participant):**
+     - Inviting from Safari did nothing. The invitation is only for people added to the share, and CloudKit said
+       "share not found" until the second Apple ID was added. Then opening the link (as Messages would) accepted it,
+       and the book came across.
+     - The owner's name arrived empty; an empty name now counts as unknown ("shared with you").
+     - **Edits didn't cross in either direction.** The simulator's transaction reached CloudKit, but the owner's
+       Mac never fetched after it (no push for a participant's change, it seems). The simulator gets no pushes at
+       all and fetches only when it comes to the front.
+     - The engines now fetch when the app becomes active and every minute while it stays there
+       (`appBecameActive`). Fetches, sends and refusals are logged with public counts and error codes, since
+       macOS hides the rest.
+     - **Retest passed:** transactions added on the owner's iPhone and on the participant's simulator both reached
+       the other side, and the owner's Mac.
+     - **Stop Sharing didn't remove the book from the simulator until it restarted.** The logs showed why: without
+       a push, `CKSyncEngine.fetchChanges()` doesn't ask the server at all (each timed fetch started and finished
+       in the same millisecond). Only the engine's own startup or foreground schedule, or a push, fetches.
+     - So the app now checks for itself while in front (`SyncCoordinator.poll`). Every minute it asks each
+       database for changes since its own token: one small request per database. Gone zones remove their book;
+       changed zones' records are fetched and applied through `applyFetched`, as the engines' are (applying a
+       record twice just updates it). Its tokens are saved with the engines' state. The first check only notes
+       where things stand. **Retest passed:** after Stop Sharing, the book left the simulator within a minute.
+     - **Re-sharing came back empty for a minute.** The shared engine never learned that the zone went, so it kept
+       its old place there and fetched only the new share. Accepting now downloads the zone directly.
+     - **Leave queued deletes of every record in the owner's zone.** Deleting the book deleted its records here
+       too, and those deletes were read from history as the user's. CloudKit rejected the batch whole ("Atomic
+       failure"), so nothing was deleted; the share's deletion failed with it, so the leave didn't happen either.
+       `SyncProcessor.withoutGoneBooks` now drops changes to records of books that aren't here, except the share's
+       deletion. Deleting the user's own book sends only the zone's deletion. Queued changes for gone books are
+       dropped at launch.
+     - **Retest passed (Nov 25, 2026):** re-accepting brought the whole book at once, and leaving sent exactly one
+       deletion (the share) and no record changes.
+   - **Step 4 done:** share, accept, edits both ways, Stop Sharing and Leave work between an iPhone and Mac on one
+     Apple ID and a simulator on another.
+5. [x] View-only mode across the screens, and UI tests with a view-only book in the sample data.
+   - **Done (Nov 25, 2026).** `\.canEditBook` (`Extensions/View+BookEditing.swift`) is set from `Book.canEdit` on
+     each tab in `RootView`, and sheets inherit it.
+   - With it false, these are hidden or disabled: adding accounts, transactions, budgets, goals, categories and
+     recurring transactions; row taps that open an editor; swipe actions and context menus (delete, edit, posted,
+     Make Recurring, Skip Next, Add Now); the posted checkmark; Edit Account; Rename in the book menu. Reports,
+     search and exporting still work.
+   - The subtitle ends "(View Only)".
+   - `RecurringScheduler` doesn't add occurrences in a View Only book; the owner's or an editor's devices do.
+   - As a safety net, `SyncProcessor.withoutGoneBooks` drops any change to a View Only book, so CloudKit never
+     refuses one.
+   - The sample data has a third book, "Parents", shared View Only by "Pat" (Family Savings $2,425.00, a Gifts
+     budget). `testAViewOnlyBookCantBeChanged` checks the controls are gone and taps open nothing. Unit tests cover
+     the scheduler and sync.
+   - 257 unit tests and 17 UI tests pass, and the Mac builds.
+   - **Device test passed (Nov 25, 2026):** shared View Only with the second Apple ID, the book arrived with
+     `canEdit` false. On the simulator it read "Home, shared with you (View Only)", had no editing controls, opened
+     nothing on taps, and still received the owner's edits.
+6. [x] Recurring transactions, widgets and the Watch with books and sharing: deterministic occurrence names, and the
+   summary per current book.
+   - **Done (Nov 25, 2026).** Most of it came with earlier steps:
+     - Each occurrence is named `<rule>:<yyyy-MM-dd>` (step 2), so an owner and an editor adding the same one write
+       one record. `twoDevicesAddingTheSameOccurrenceKeepOne` checks it ends as one transaction on each device.
+     - View Only participants never add occurrences (step 5).
+     - The summary has been for the current book since step 1, and it's rewritten when switching.
+   - **New here:** the summary carries `bookName` when the user has more than one book (decoded only if present, so
+     older summaries still load). It names the total in the Balance widget and the Watch's Balance complication
+     (instead of "All Accounts"), heads the All Budgets widget ("Budgets · Home"), and heads each Watch page
+     (`BookHeader`). Switching books with the same figures still rewrites the summary, since the name changed.
+   - 258 unit tests and 9 Watch tests pass, and the Mac builds.
+   - **Left for later, as planned:** choosing a book per widget.
+7. [x] Settings: sync status, Sync Now, and the iCloud account states. Category merging after fetches.
+   - **Done (Nov 25, 2026).**
+   - **Settings → iCloud:**
+     - Shows the account's state (On / Not signed in / Restricted / Temporarily unavailable) and when it last
+       synced.
+     - Sync Now sends, then asks the server for changes (`poll`, since the engines' own fetch needs a push).
+     - The footer shows the last error. With no account, it explains that everything stays on the device.
+     - Under tests and sample data, it says sync is off.
+   - **Account changes (decided with the user):**
+     - **Signing out:** the user's own books stay and keep working. Books others shared are removed. Changes go up
+       if the same Apple ID signs back in.
+     - **A different Apple ID** (`switchAccounts`, or signing in as someone other than the saved `accountID`):
+       shared books are removed and the old account's sync state is forgotten (`forgetSyncState`). Nothing of the
+       user's own is sent (`enqueue` holds it) until they choose in Settings: "Upload My Books to This iCloud
+       Account" (`uploadOwnBooks`), or "Remove My Books from This Device…" (`removeOwnBooks`; they stay in the old
+       account's iCloud, and an empty "My Book" takes their place).
+   - **Category merging:** `CategoryMerger`, from the `cloudkit-sync` branch, adapted.
+     - Within a book only; recurring rules move too; ties fall to the name, then the `syncID`; View Only books are
+       left to their owner.
+     - It runs after fetched categories are applied, saved as the user's own change, so the merge (moved
+       references and the deleted duplicate) goes up. Two devices merging at once make the same change.
+   - **Tests:** 9 in `AccountAndMergeTests`, including two devices each making "Food" and ending with one that
+     holds both purchases. 266 unit tests and 17 UI tests pass, and the Mac builds.
+   - **Device test (Nov 25, 2026): a transaction made on the simulator with a new "AAA" lost its category.** The
+     simulator sent its own "AAA", a check then fetched the iPhone's older one, and the merge deleted the
+     simulator's while its transaction form still held it. Saving set the deleted category: none. The merger now
+     remembers what replaced each category it removes, and saving a transaction, budget or recurring rule uses
+     the survivor (`CategoryMerger.survivor(of:)`). `aFormHoldingAMergedCategorySavesTheSurvivor` fails without it. **Retest passed:** both
+     devices made "BBB" with a transaction at about the same time, and both transactions ended up in the one kept.
+   - **Loading overlay (added at the user's request, Nov 25, 2026):** `SyncActivityOverlay` covers the app while a
+     long sync runs (`SyncStatus.activity`):
+     - "Getting your books from iCloud…" on the first sync on a device, until both engines have fetched once (at
+       most two minutes, and not without an account).
+     - "Adding <book>…" from accepting an invitation until the book's records have arrived.
+     - It appears after half a second, so quick syncs don't flash it, and "Continue in Background" hides it.
+     - **Device test passed:** "Adding Home…" showed on the simulator while joining (about four seconds), and the
+       first-sync version showed for about a second on a fresh install.
+   - **A fresh install added an empty "My Book" to iCloud each time.** `Books.prepare` makes one at launch, before
+     sync knows what iCloud has, and the first run uploaded it. Now the first upload on a device waits for the
+     private engine's first fetch (or two minutes) (`finishFirstRun`). If iCloud brought the user's books, an
+     empty, never-sent book is removed without a trace (`removeEmptyPlaceholderBooks`). Then only what iCloud
+     lacks goes up (`unsentChanges`). **Device test passed:** a fresh install on the simulator logged "Removed 1
+     empty books made before the first sync", uploaded nothing, and kept just the iCloud "My Book" and "Home".
+   - **Device test passed (Nov 25, 2026):** switching Apple IDs on the simulator behaved as designed.
+8. [x] The CloudKit schema deployed to production; README, CLAUDE.md and this plan. Delete the `cloudkit-sync` branch.
+   - **Docs done (Nov 25, 2026):** the README has books, sync and sharing in the features, the iCloud capabilities
+     under Signing, and a section on the CloudKit schema and testing sharing; CLAUDE.md has an overview of how sync
+     works and the rules learned on devices.
+   - **Schema deployed to production** by the user in the CloudKit Console (Nov 25, 2026). From now on, record
+     types and fields can only be added (and deployed again), never renamed, removed or retyped.
+   - **`cloudkit-sync` deleted**, locally and on GitHub (it held 1d13a7c, the earlier attempt with SwiftData's
+     mirroring; its `CategoryMerger` lives on in `Managers/CategoryMerger.swift`).
+
+**Risks and questions**
+- **Size:** this is the largest phase so far: a sync engine is easy to get subtly wrong. Each step stays shippable (books
+  work without sync, private sync without sharing), and the tests cover record mapping and conflict rules apart from
+  CloudKit.
+- **Testing sharing needs two Apple IDs.** A second test account on a second device (or a simulator signed in to it) is
+  needed from step 4.
+- **Limits:**
+  - 100 participants per share.
+  - A share per book uses one zone; zone counts aren't a practical concern at this scale.
+  - Very large books take a while on the first download. `CKSyncEngine` pages it.
+- **Schema changes become permanent** once deployed to production. Plan the record types carefully in step 2.
+- **The Watch and widgets** see only the current book. Showing other books would need a per-widget book picker, which
+  is left for later.
+- **Privacy:** everyone with access to a book can see all its accounts. Books are the unit of sharing on purpose; to
+  share less, make a separate book.
 
 ## Open items
 

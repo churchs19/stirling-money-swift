@@ -1,7 +1,7 @@
 # Stirling Money
 
 **Bundle ID:** net.s-church.stirlingmoney
-**Target:** iOS 27+, iPadOS 27+, macOS 27+ (one multiplatform target; visionOS is also listed but unverified); watchOS 27.2+ for the Watch app
+**Target:** iOS 27+, iPadOS 27+, macOS 27+ (one multiplatform target; no visionOS or Mac Catalyst); watchOS 27.2+ for the Watch app
 **Plan:** `docs/PLAN.md` — features being re-implemented from the old Windows Phone app, phase status, decisions
 **Architecture:** SwiftUI + SwiftData
 **Swift version:** 6.2 (app); 6.0 (Watch app, also `MainActor` by default); both widget extensions use the template's Swift 5 mode
@@ -15,9 +15,11 @@
 ```
 Stirling Money/
 ├── Stirling_MoneyApp.swift              # App entry, model container, app lock, widget snapshot on background
+├── AppDelegate.swift              # Accepting shared-book invitations (scene delegate on iOS, app delegate on the Mac)
 ├── Localizable.xcstrings          # String catalog (English); Xcode fills it in when it builds
 ├── Models/
 │   ├── AppSchema.swift            # List of all @Model types for the container
+│   ├── Book.swift                 # @Model: a set of accounts (the unit of sharing); + Model.inBook(_:) predicates
 │   ├── Account.swift              # @Model: balance, posted balance, next check number, optional icon (+ icon choices)
 │   ├── AccentChoice.swift         # Accent color setting: default purple (#7B2CBF, #9D4EDD in dark mode), system (Mac only), or custom; stored in the App Group defaults (StirlingMoneyWidgets/WidgetAccent.swift reads it; keep in step)
 │   ├── AccountLayout.swift        # Tiles (default) / list layout for the accounts screen
@@ -42,7 +44,7 @@ Stirling Money/
 │   └── WidgetSnapshot+Models.swift  # Builds the widget summary from the models (the type itself is in Shared/)
 ├── Views/
 │   ├── RootView.swift             # TabView: Accounts / Budgets / Goals / Reports (sidebar on iPad and Mac)
-│   ├── SettingsView.swift         # Sort, accent color, app lock, export, rate; a sheet from the Accounts ⋯ menu, a Settings window (⌘,) on the Mac
+│   ├── SettingsView.swift         # Sort, accent color, app lock, iCloud (status, Sync Now, the choice after an Apple ID change), export, rate; a sheet from the Accounts ⋯ menu, a Settings window (⌘,) on the Mac
 │   ├── LockView.swift             # Covers the app while locked
 │   ├── AccountsView.swift         # Accounts as tiles or a list (toolbar toggle), total, sort, delete
 │   ├── AccountRegisterView.swift  # One account's transactions, balances, search
@@ -55,18 +57,26 @@ Stirling Money/
 │   ├── RecurringFormView.swift / RecurringListView.swift  # Recurring add/edit sheet; all-accounts Recurring screen (Accounts ⋯ menu)
 │   ├── Reports/                   # ReportsView list + one view per Swift Charts report; ReportSupport.swift
 │   ├── PreviewData.swift          # ModelContainer.preview sample data (DEBUG only)
-│   └── Components/                # AmountText, CurrencyField, TransactionRow, BudgetRow, GoalRow, PostedCheckmark (+ .posted toggle style), AccountTile, AccountIconPicker, AccountIconView (SF Symbol or PaymentFont glyph), NavigationRow, RecurringRow (+ recurringRowActions: Edit, Skip Next, Add Now, Delete)
+│   └── Components/                # BookSwitcher (.bookSwitcher toolbar menu), SyncActivityOverlay (first sync, joining a share), AmountText, CurrencyField, TransactionRow, BudgetRow, GoalRow, PostedCheckmark (+ .posted toggle style), AccountTile, AccountIconPicker, AccountIconView (SF Symbol or PaymentFont glyph), NavigationRow, RecurringRow (+ recurringRowActions: Edit, Skip Next, Add Now, Delete)
 ├── Managers/
-│   ├── Ledger.swift               # Create/edit/delete transactions and transfers; categories
+│   ├── Ledger.swift               # Create/edit/delete transactions and transfers; categories (per book)
+│   ├── Books.swift                # prepare (first book, data from before books), current book, create, delete
+│   ├── CategoryMerger.swift       # Merges same-named categories in a book into the oldest, after fetches
 │   ├── AppLock.swift              # Face ID / Touch ID / passcode lock (LocalAuthentication)
 │   ├── WidgetSnapshotWriter.swift # Writes the snapshot to the App Group, reloads widgets, sends it to the Watch
 │   ├── WatchSync.swift            # iPhone only: WCSession; sends the snapshot as application context, answers Watch requests
+│   ├── Sync/                      # CloudRecords (each model ↔ CKRecord, encrypted values, zones), RecordImporter,
+│   │                              #   RecordMerger (three-way conflict merge), SyncProcessor (history out, fetched in,
+│   │                              #   results, shares; testable), SyncCoordinator (private + shared CKSyncEngines, share,
+│   │                              #   stop sharing, accept, account changes, poll; never under tests or sample data),
+│   │                              #   SyncStatus (what Settings → iCloud shows)
 │   ├── RecurringScheduler.swift   # addDue (adds due occurrences through Ledger, catching up), addNow, skipNext, nextDueDate
 │   └── RecurringRunner.swift      # When addDue runs: launch, active, midnight, hourly + wake on the Mac, BGAppRefreshTask on iOS
 └── Extensions/
     ├── Decimal+Money.swift        # Parsing typed amounts (.localCurrency itself is in Shared/)
     ├── Color+Chart.swift          # ChartPalette: validated chart colors; assign slots in order, never cycle
     ├── View+Accent.swift          # .appAccent() tint for each scene + \.appAccent environment value
+    ├── View+BookEditing.swift     # \.canEditBook: false in a View Only book (RootView sets it; sheets inherit it)
     └── View+Platform.swift        # Touch-only modifiers that do nothing on macOS
 Stirling MoneyTests/               # Swift Testing; in-memory container + UTC calendar in TestSupport.swift
 Stirling MoneyUITests/             # XCUITest on the iPhone simulator with -UITesting; finds controls by accessibility identifier
@@ -87,7 +97,8 @@ Shared/                            # In the app, the widgets, the Watch app and 
 StirlingMoneyWidgets/              # Widget extension: Balance, Goal and Budget (configured with App Intents) and All Budgets (BudgetListWidget, static)
 ```
 
-Widgets can't open the SwiftData store; the app writes `WidgetSnapshot.json` to the App Group shortly after each
+Widgets can't open the SwiftData store; the app writes `WidgetSnapshot.json` (for the current book, named in `bookName`
+when there's more than one) to the App Group shortly after each
 save (plus at launch, on going to the background and on quitting the Mac app), and the widgets read it. `WidgetSnapshot` lives in `Shared/`,
 which belongs to all four app and widget targets; code there must compile for each of them (no SwiftData models, no app-only helpers).
 
@@ -102,9 +113,11 @@ calls it at launch, when the app becomes active, at midnight, hourly and on wake
 complication and Watch page shows `projected(on:)` that day: balances (not posted), goals and budgets by the same rules as
 `Budget.spent` and `Goal.progress` (`BudgetSummary.counts`, `GoalSummary.progress`). Timelines get an entry per due day
 (`timelineDates`). A test compares the projection with what `addDue` really adds; keep the two in step. Nothing runs under
-`LaunchMode.isTesting`. With iCloud sync, two devices could add the same occurrence: de-duplicate by rule and date then.
+`LaunchMode.isTesting`. With iCloud sync, two devices can add the same occurrence: each is named `<rule>:<yyyy-MM-dd>`
+(`RecurringScheduler.occurrenceSyncID`), so both write the same record and CloudKit keeps one. Nothing is added in a
+View Only book.
 
-The Watch can't read the iPhone's store or App Group either, and there's no iCloud sync yet, so the iPhone sends it the same summary
+The Watch can't read the iPhone's store or App Group either, and doesn't sync with iCloud, so the iPhone sends it the same summary
 over WatchConnectivity (`WatchSync`, iPhone only):
 - Each time `WidgetSnapshotWriter` writes a changed summary (after saves, at launch, on going to the background), it sends it as the
   application context. The system keeps only the latest and delivers it when the Watch app next runs.
@@ -122,6 +135,32 @@ over WatchConnectivity (`WatchSync`, iPhone only):
 
 The project uses file-system synchronized folders: new files in these folders are picked up automatically.
 The app target defaults to `MainActor` isolation; mark plain value types `nonisolated` when `@Model` code uses them.
+
+## iCloud Sync and Sharing (`Managers/Sync/`)
+
+Our own sync on `CKSyncEngine`; SwiftData's mirroring is off (`cloudKitDatabase: .none`).
+- **Layout:** each `Book` is a zone `Book-<syncID>`; every model is a record named by its `syncID` (`CloudRecords.swift`).
+  Values go in `encryptedValues`, money as `en_US_POSIX` strings; references link records in the zone. Sharing a
+  book is a zone-wide `CKShare`. Once the schema is in production, only add record types and fields.
+- **Two engines** (`SyncCoordinator`): the private one for the user's books, the shared one for books others shared
+  (zones owned by someone else). Their state, the history token and the poll tokens are in `Sync-Private.json`.
+- **Out:** `SyncProcessor.localChanges()` reads SwiftData history, skipping saves authored `"sync"`, updates that touch
+  only to-many relationships or bookkeeping, and anything for a book that's gone or View Only (`withoutGoneBooks`).
+  Deleting a book someone shared leaves it (deletes the share), never the owner's records.
+- **In:** fetched records are applied by `RecordImporter` as author `"sync"`. A record that this device changed but
+  hasn't sent is merged (`RecordMerger.mergeUnsent`, three-way against `ckSyncedValues`), and the merge is queued.
+  `ckSyncedValues` is set from what this device sent, never from the server's answer to a save (it has no values).
+- **Fetching:** without a push, `CKSyncEngine.fetchChanges()` doesn't ask the server, and the owner gets no push for a
+  participant's changes, so the app polls each database every minute while in front (`poll`, with its own tokens).
+  Never call `sendChanges()`/`fetchChanges()` from inside `handleEvent`, even in a `Task` (it inherits the context and
+  CloudKit asserts): use `requestSend()`, which runs in `Task.detached` after the event.
+- **Account changes:** signing out keeps the user's books and removes shared ones; a different Apple ID holds the
+  user's books unsent until they choose in Settings. A device's first upload waits for its first download, so the
+  empty "My Book" a fresh install makes isn't added to iCloud when the user's books are already there.
+- **Tests** (`SyncTests`, `SharingTests`, `AccountAndMergeTests`) drive `SyncProcessor` against `FakeServer` with
+  on-disk `Device`s (history needs a store on disk). The fake server answers saves with system fields only, as
+  CloudKit does. `SyncCoordinator` itself only runs against iCloud: test it on devices (a simulator signed in to a
+  second Apple ID works for sharing; open links with `simctl openurl`, not in Safari).
 
 ## Build & Test — Always Use MCP
 
@@ -170,12 +209,20 @@ Structured data means fewer tokens consumed and better error diagnosis.
 | Category.recurringTransactions | RecurringTransaction.category | nullify |
 | RecurringTransaction.transactions | AccountTransaction.recurrence | nullify (added transactions stay when the rule is deleted) |
 
+- Every `ModelConfiguration` passes `cloudKitDatabase: .none`: our own `SyncCoordinator` syncs the store, and the
+  default would start SwiftData's built-in mirroring too, now that the app has an iCloud container.
 - Keep models CloudKit-compatible so sync can be turned on later without a migration: every stored property has a default or is optional, every relationship is optional, no `@Attribute(.unique)`.
 - Declare `inverse:` on one side only.
 - A property can't be its own inverse (circular macro error), which is why transfers use two properties. Read `transferCounterpart`.
 - Money is `Decimal`, never `Double`. `AccountTransaction.amount` is signed: negative leaves the account.
 - Enums are stored as raw-value strings (`kindRawValue`, `periodRawValue`) with a computed typed property, so they work in `#Predicate`.
 - Create and delete transactions through `Ledger`, not directly, so signs stay right and transfer pairs are created and deleted together.
+- A book shared as View Only (`Book.canEdit` false) can't be changed: read `@Environment(\.canEditBook)` and hide or
+  disable every control that edits (toolbar adds, row taps that open forms, swipe actions, context menus, toggles).
+  Recurring transactions aren't added there, and sync drops any change to it (`SyncProcessor.withoutGoneBooks`).
+- Everything belongs to a `Book`: set `book` when creating a model (`Ledger` and the drafts take it from the account),
+  and filter every `@Query` and fetch with `Model.inBook(book)`. The current book's `syncID` is in settings
+  (`Books.currentKey`); screens get the book in their initializer. Every model has a `syncID` (`preserveValueOnDeletion`).
 - Insert a model into the context before setting its relationships.
 
 ## Rules
@@ -186,7 +233,10 @@ Structured data means fewer tokens consumed and better error diagnosis.
   names and Swift version, and (made by hand in Xcode) the `Shared/` folder membership and the Watch app's iOS platform
   filters. Approved for Phase 10 (made with `AddInfoPlist`): `UIBackgroundModes` = `fetch` and
   `BGTaskSchedulerPermittedIdentifiers` = `net.s-church.stirlingmoney.recurring` on the app target, which put them in
-  `Stirling-Money-Info.plist` (merged with the generated Info.plist keys). Ask before any further project change.
+  `Stirling-Money-Info.plist` (merged with the generated Info.plist keys). Approved for Phase 11 (made with
+  `AddEntitlement` and `AddInfoPlist`): iCloud (CloudKit, container `iCloud.net.s-church.stirlingmoney`), Push
+  Notifications (`aps-environment`), `remote-notification` in `UIBackgroundModes`, and `CKSharingSupported`.
+  Ask before any further project change.
 - NEVER use ObservableObject — use @Observable
 - NEVER use NavigationView — use NavigationStack
 - @Model classes are already Observable — do not add @Observable macro

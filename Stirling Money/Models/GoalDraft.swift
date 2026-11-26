@@ -57,6 +57,7 @@ struct GoalDraft {
         }
         let goal = Goal(name: trimmedName, targetAmount: target, targetDate: targetDate, initialBalance: account.balance, startDate: now)
         context.insert(goal)
+        goal.book = account.book
         goal.account = account
         return goal
     }

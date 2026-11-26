@@ -4,8 +4,15 @@ import SwiftUI
 /// Every recurring transaction across accounts, grouped by account or in order of their next date.
 struct RecurringListView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.canEditBook) private var canEdit
     @Query private var rules: [RecurringTransaction]
     @Query private var accounts: [Account]
+
+    init(book: Book) {
+        _rules = Query(filter: RecurringTransaction.inBook(book))
+        _accounts = Query(filter: Account.inBook(book))
+    }
+
     @AppStorage("recurringGrouping") private var grouping: Grouping = .account
 
     @State private var editingRule: RecurringTransaction?
@@ -65,12 +72,14 @@ struct RecurringListView: View {
         }
         .navigationTitle("Recurring")
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button("Add Recurring Transaction", systemImage: "plus") {
-                    isAdding = true
+            if canEdit {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Add Recurring Transaction", systemImage: "plus") {
+                        isAdding = true
+                    }
+                    .disabled(accounts.isEmpty)
+                    .accessibilityIdentifier("addRecurring")
                 }
-                .disabled(accounts.isEmpty)
-                .accessibilityIdentifier("addRecurring")
             }
             ToolbarItem(placement: .secondaryAction) {
                 Picker("Show", systemImage: "list.bullet.indent", selection: $grouping) {
@@ -91,7 +100,7 @@ struct RecurringListView: View {
     private func row(_ rule: RecurringTransaction, showsAccount: Bool) -> some View {
         RecurringRow(rule: rule, account: rule.account, showsAccount: showsAccount)
             .accessibilityIdentifier("recurring.\(rule.displayPayee)")
-            .recurringRowActions(rule, context: modelContext) {
+            .recurringRowActions(rule, context: modelContext, canEdit: canEdit) {
                 editingRule = rule
             }
     }
@@ -99,7 +108,7 @@ struct RecurringListView: View {
 
 #Preview {
     NavigationStack {
-        RecurringListView()
+        RecurringListView(book: ModelContainer.preview.firstBook)
     }
     .modelContainer(.preview)
 }

@@ -35,6 +35,17 @@ struct ContentView: View {
     }
 }
 
+/// The book the figures are for, at the head of each page, when the iPhone has more than one book.
+struct BookHeader: View {
+    @Environment(WatchStore.self) private var store
+
+    var body: some View {
+        if let name = store.snapshot?.bookName {
+            Text(name)
+        }
+    }
+}
+
 /// "Updated 5 min ago" at the foot of each page: how current the iPhone's figures are.
 struct UpdatedFooter: View {
     @Environment(WatchStore.self) private var store

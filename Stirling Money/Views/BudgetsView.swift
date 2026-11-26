@@ -4,19 +4,29 @@ import SwiftUI
 /// Every budget with what's been spent in its current period.
 struct BudgetsView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Budget.name) private var budgets: [Budget]
-    /// Needed for all-spending budgets, which count every account.
+    @Environment(\.canEditBook) private var canEdit
+    let book: Book
+    @Query private var budgets: [Budget]
+    /// Needed for all-spending budgets, which count every account in the book.
     @Query private var transactions: [AccountTransaction]
 
     @State private var isAddingBudget = false
     @State private var editingBudget: Budget?
+
+    init(book: Book) {
+        self.book = book
+        _budgets = Query(filter: Budget.inBook(book), sort: \Budget.name)
+        _transactions = Query(filter: AccountTransaction.inBook(book))
+    }
 
     var body: some View {
         NavigationStack {
             List {
                 ForEach(budgets) { budget in
                     Button {
-                        editingBudget = budget
+                        if canEdit {
+                            editingBudget = budget
+                        }
                     } label: {
                         BudgetRow(budget: budget, summary: budget.summary(allTransactions: transactions))
                             .accessibilityIdentifier("budget.\(budget.name)")
@@ -24,16 +34,20 @@ struct BudgetsView: View {
                     }
                     .buttonStyle(.plain)
                     .swipeActions {
-                        Button("Delete", systemImage: "trash", role: .destructive) {
-                            delete(budget)
+                        if canEdit {
+                            Button("Delete", systemImage: "trash", role: .destructive) {
+                                delete(budget)
+                            }
                         }
                     }
                     .contextMenu {
-                        Button("Edit…", systemImage: "pencil") {
-                            afterMenuCloses { editingBudget = budget }
-                        }
-                        Button("Delete", systemImage: "trash", role: .destructive) {
-                            delete(budget)
+                        if canEdit {
+                            Button("Edit…", systemImage: "pencil") {
+                                afterMenuCloses { editingBudget = budget }
+                            }
+                            Button("Delete", systemImage: "trash", role: .destructive) {
+                                delete(budget)
+                            }
                         }
                     }
                 }
@@ -48,19 +62,22 @@ struct BudgetsView: View {
                 }
             }
             .navigationTitle("Budgets")
+            .bookSwitcher(book)
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Add Budget", systemImage: "plus") {
-                        isAddingBudget = true
+                if canEdit {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Add Budget", systemImage: "plus") {
+                            isAddingBudget = true
+                        }
+                        .accessibilityIdentifier("addBudget")
                     }
-                    .accessibilityIdentifier("addBudget")
                 }
             }
             .sheet(isPresented: $isAddingBudget) {
-                BudgetFormView()
+                BudgetFormView(book: book)
             }
             .sheet(item: $editingBudget) { budget in
-                BudgetFormView(budget: budget)
+                BudgetFormView(book: book, budget: budget)
             }
         }
     }
@@ -73,11 +90,12 @@ struct BudgetsView: View {
 }
 
 #Preview("With Budgets") {
-    BudgetsView()
+    BudgetsView(book: ModelContainer.preview.firstBook)
         .modelContainer(.preview)
 }
 
 #Preview("Empty") {
-    BudgetsView()
-        .modelContainer(for: AppSchema.models, inMemory: true)
+    let container = ModelContainer.emptyPreview
+    BudgetsView(book: container.firstBook)
+        .modelContainer(container)
 }

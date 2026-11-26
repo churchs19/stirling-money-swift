@@ -3,6 +3,7 @@ import SwiftUI
 
 /// One register line: a posted toggle, payee with date and details, and the signed amount.
 struct TransactionRow: View {
+    @Environment(\.canEditBook) private var canEdit
     let transaction: AccountTransaction
 
     private var details: String {
@@ -26,6 +27,8 @@ struct TransactionRow: View {
                 PostedCheckmark(isPosted: transaction.isPosted)
             }
             .buttonStyle(.plain)
+            // A View Only book shows the checkmark but can't change it.
+            .disabled(!canEdit)
             .accessibilityLabel(transaction.isPosted ? "Posted" : "Not posted")
             .accessibilityHint("Toggles whether the transaction has cleared the bank")
 

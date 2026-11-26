@@ -5,6 +5,9 @@ struct NewAccountView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
+    /// The book the account goes in.
+    let book: Book
+
     @State private var name = ""
     @State private var balanceText = ""
     @State private var iconName: String?
@@ -87,12 +90,15 @@ struct NewAccountView: View {
 
     private func save() {
         guard canSave, let balance = parsedBalance else { return }
-        modelContext.insert(Account(name: trimmedName, initialBalance: balance, iconName: iconName))
+        let account = Account(name: trimmedName, initialBalance: balance, iconName: iconName)
+        modelContext.insert(account)
+        account.book = book
         dismiss()
     }
 }
 
 #Preview {
-    NewAccountView()
-        .modelContainer(for: AppSchema.models, inMemory: true)
+    let container = ModelContainer.emptyPreview
+    NewAccountView(book: container.firstBook)
+        .modelContainer(container)
 }

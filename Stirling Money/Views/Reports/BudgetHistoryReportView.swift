@@ -4,10 +4,15 @@ import SwiftUI
 
 /// A budget's spending in each of its recent periods, against the budget amount.
 struct BudgetHistoryReportView: View {
-    @Query(sort: \Budget.name) private var budgets: [Budget]
+    @Query private var budgets: [Budget]
     @Query private var transactions: [AccountTransaction]
     @State private var budget: Budget?
     @State private var selectedLabel: String?
+
+    init(book: Book) {
+        _budgets = Query(filter: Budget.inBook(book), sort: \Budget.name)
+        _transactions = Query(filter: AccountTransaction.inBook(book))
+    }
 
     var body: some View {
         List {
@@ -137,7 +142,7 @@ struct BudgetHistoryReportView: View {
 
 #Preview {
     NavigationStack {
-        BudgetHistoryReportView()
+        BudgetHistoryReportView(book: ModelContainer.preview.firstBook)
     }
     .modelContainer(.preview)
 }

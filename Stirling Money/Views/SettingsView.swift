@@ -1,3 +1,4 @@
+import CloudKit
 import StoreKit
 import SwiftData
 import SwiftUI
@@ -12,7 +13,8 @@ struct SettingsView: View {
     @AppStorage(AccentChoice.key, store: AccentChoice.store) private var accentChoice: AccentChoice = .standard
     @AppStorage(AccentChoice.customColorKey, store: AccentChoice.store) private var customAccent = ""
     @Environment(\.self) private var environment
-    @Query private var transactions: [AccountTransaction]
+    @Query(sort: Book.order) private var books: [Book]
+    @AppStorage(Books.currentKey) private var currentBookID = ""
 
     private var version: String {
         let info = Bundle.main.infoDictionary
@@ -69,18 +71,11 @@ struct SettingsView: View {
                 }
             }
 
-            Section {
-                ShareLink(
-                    item: CSVExportFile(text: TransactionCSV.make(transactions), filename: exportFilename),
-                    preview: SharePreview("Stirling Money Transactions", image: Image(systemName: "tablecells"))
-                ) {
-                    Label("Export Transactions", systemImage: "square.and.arrow.up")
-                }
-                .disabled(transactions.isEmpty)
-            } header: {
-                Text("Data")
-            } footer: {
-                Text("A CSV file of every transaction, for a spreadsheet or a backup.")
+            ICloudSection()
+
+            if let book = Books.current(id: currentBookID, in: books) {
+                ExportSection(book: book, showsBookName: books.count > 1)
+                    .id(book.syncID)
             }
 
             Section("About") {
@@ -101,10 +96,6 @@ struct SettingsView: View {
             WidgetSnapshotWriter.scheduleUpdate()
         }
         .navigationTitle("Settings")
-    }
-
-    private var exportFilename: String {
-        "Stirling Money Transactions \(Date.now.formatted(.iso8601.year().month().day())).csv"
     }
 
     /// The custom accent color; it starts from the default until one is picked.
@@ -131,6 +122,125 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+}
+
+/// iCloud sync: the account's state, when it last synced, Sync Now, and the choice after a different Apple ID
+/// signed in.
+private struct ICloudSection: View {
+    @State private var isConfirmingRemove = false
+    @State private var removeError: String?
+
+    var body: some View {
+        if let coordinator = SyncCoordinator.shared {
+            let status = coordinator.status
+            Section {
+                LabeledContent("iCloud Sync", value: status.accountText)
+                    .accessibilityIdentifier("iCloudStatus")
+                if let lastSynced = status.lastSynced {
+                    LabeledContent("Last Synced") {
+                        Text(lastSynced, format: .relative(presentation: .named))
+                    }
+                }
+                Button {
+                    Task { await coordinator.syncNow() }
+                } label: {
+                    if status.isSyncing {
+                        Label("Syncing…", systemImage: "arrow.triangle.2.circlepath")
+                    } else {
+                        Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
+                    }
+                }
+                .disabled(!status.canSync)
+                if status.ownBooksAwaitChoice {
+                    Button("Upload My Books to This iCloud Account", systemImage: "icloud.and.arrow.up") {
+                        coordinator.uploadOwnBooks()
+                    }
+                    Button("Remove My Books from This Device…", systemImage: "trash", role: .destructive) {
+                        isConfirmingRemove = true
+                    }
+                }
+            } header: {
+                Text("iCloud")
+            } footer: {
+                if status.ownBooksAwaitChoice {
+                    Text("A different Apple ID is signed in. Your books are still on this device but haven't been added to this iCloud account. Upload them, or remove them from this device; they stay in the other account's iCloud.")
+                } else if let error = status.lastError {
+                    Text(error)
+                        .foregroundStyle(.red)
+                } else if status.account == .noAccount {
+                    Text("Sign in to iCloud in Settings to sync your books and share them. Until then, everything stays on this device.")
+                } else {
+                    Text("Your books sync with your other devices signed in to the same Apple ID.")
+                }
+            }
+            .confirmationDialog(
+                "Remove your books from this device?",
+                isPresented: $isConfirmingRemove,
+                titleVisibility: .visible
+            ) {
+                Button("Remove from This Device", role: .destructive) {
+                    do {
+                        try coordinator.removeOwnBooks()
+                    } catch {
+                        removeError = error.localizedDescription
+                    }
+                }
+            } message: {
+                Text("They stay in the iCloud account they came from, and return if it signs in again.")
+            }
+            .alert("Couldn't Remove the Books", isPresented: Binding { removeError != nil } set: { if !$0 { removeError = nil } }) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(removeError ?? "")
+            }
+        } else {
+            Section("iCloud") {
+                Text("iCloud sync is off while testing or using sample data.")
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+/// Exports the current book's transactions.
+private struct ExportSection: View {
+    @Query private var transactions: [AccountTransaction]
+    let book: Book
+    /// Whether to name the book, when there's more than one.
+    let showsBookName: Bool
+
+    init(book: Book, showsBookName: Bool) {
+        self.book = book
+        self.showsBookName = showsBookName
+        _transactions = Query(filter: AccountTransaction.inBook(book))
+    }
+
+    var body: some View {
+        Section {
+            ShareLink(
+                item: CSVExportFile(text: TransactionCSV.make(transactions), filename: filename),
+                preview: SharePreview("Stirling Money Transactions", image: Image(systemName: "tablecells"))
+            ) {
+                Label("Export Transactions", systemImage: "square.and.arrow.up")
+            }
+            .disabled(transactions.isEmpty)
+        } header: {
+            Text("Data")
+        } footer: {
+            if showsBookName {
+                Text("A CSV file of every transaction in \(book.name), for a spreadsheet or a backup.")
+            } else {
+                Text("A CSV file of every transaction, for a spreadsheet or a backup.")
+            }
+        }
+    }
+
+    private var filename: String {
+        let date = Date.now.formatted(.iso8601.year().month().day())
+        return showsBookName
+            ? "Stirling Money \(book.name.replacing("/", with: "-")) \(date).csv"
+            : "Stirling Money Transactions \(date).csv"
     }
 }
 

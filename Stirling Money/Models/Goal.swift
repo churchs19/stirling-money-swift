@@ -4,6 +4,19 @@ import SwiftData
 /// A savings target for one account, measured by that account's balance.
 @Model
 final class Goal {
+    /// Its identity across devices (the CloudKit record name). Kept on deletion so the history tombstone says what
+    /// was deleted.
+    @Attribute(.preserveValueOnDeletion)
+    var syncID: String = UUID().uuidString
+    /// The book it belongs to. Set when it's created; see `Books`.
+    var book: Book?
+    /// The CloudKit record's system fields (change tag and so on) from the last sync, so the next save is checked
+    /// against the server's copy. nil until first synced. Kept on deletion: the tombstone's copy names the record.
+    @Attribute(.preserveValueOnDeletion)
+    var ckSystemFields: Data?
+    /// The record's values as of the last sync, for merging a conflict (`RecordMerger`).
+    var ckSyncedValues: Data?
+
     var name: String = ""
     var targetAmount: Decimal = 0
     /// The account's balance when the goal was created; progress is measured from here.

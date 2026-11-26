@@ -69,7 +69,8 @@ struct BalanceWidgetView: View {
 
     @ViewBuilder
     private func content(snapshot: WidgetSnapshot) -> some View {
-        let name = entry.account?.name ?? String(localized: "All Accounts")
+        // The total is the current book's; with more than one book, it's named after it.
+        let name = entry.account?.name ?? snapshot.bookName ?? String(localized: "All Accounts")
         let balance = entry.account?.balance ?? snapshot.total
 
         switch family {

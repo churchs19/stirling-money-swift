@@ -8,5 +8,6 @@ enum AppSchema {
         Budget.self,
         Goal.self,
         RecurringTransaction.self,
+        Book.self,
     ]
 }

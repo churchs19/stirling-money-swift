@@ -53,12 +53,26 @@ struct RecurringRow: View {
 }
 
 extension View {
-    /// Edit, Skip Next, Add Now and Delete for a recurring transaction's row, as swipes and a context menu.
-    func recurringRowActions(_ rule: RecurringTransaction, context: ModelContext, edit: @escaping @MainActor () -> Void) -> some View {
-        let canAdd = rule.problem == nil && !rule.hasEnded()
+    /// Edit, Skip Next, Add Now and Delete for a recurring transaction's row, as swipes and a context menu. None of
+    /// them in a View Only book (`canEdit` false).
+    func recurringRowActions(
+        _ rule: RecurringTransaction,
+        context: ModelContext,
+        canEdit: Bool = true,
+        edit: @escaping @MainActor () -> Void
+    ) -> some View {
+        let canAdd = canEdit && rule.problem == nil && !rule.hasEnded()
         return contentShape(Rectangle())
-            .onTapGesture(perform: edit)
-            .accessibilityAction(named: "Edit", edit)
+            .onTapGesture {
+                if canEdit {
+                    edit()
+                }
+            }
+            .accessibilityAction(named: "Edit") {
+                if canEdit {
+                    edit()
+                }
+            }
             .swipeActions(edge: .leading) {
                 if canAdd {
                     Button("Skip Next", systemImage: "forward") {
@@ -72,13 +86,17 @@ extension View {
                 }
             }
             .swipeActions(edge: .trailing) {
-                Button("Delete", systemImage: "trash", role: .destructive) {
-                    withAnimation { context.delete(rule) }
+                if canEdit {
+                    Button("Delete", systemImage: "trash", role: .destructive) {
+                        withAnimation { context.delete(rule) }
+                    }
                 }
             }
             .contextMenu {
-                Button("Edit…", systemImage: "pencil") {
-                    afterMenuCloses(edit)
+                if canEdit {
+                    Button("Edit…", systemImage: "pencil") {
+                        afterMenuCloses(edit)
+                    }
                 }
                 if canAdd {
                     Button("Skip Next", systemImage: "forward") {
@@ -88,8 +106,10 @@ extension View {
                         _ = RecurringScheduler.addNow(rule, in: context)
                     }
                 }
-                Button("Delete", systemImage: "trash", role: .destructive) {
-                    context.delete(rule)
+                if canEdit {
+                    Button("Delete", systemImage: "trash", role: .destructive) {
+                        context.delete(rule)
+                    }
                 }
             }
     }

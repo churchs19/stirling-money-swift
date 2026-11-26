@@ -4,6 +4,8 @@ import SwiftUI
 /// Lists categories with how many transactions use each; add, rename and delete.
 struct CategoriesView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.canEditBook) private var canEdit
+    let book: Book
     @Query private var categories: [Category]
 
     /// The category being renamed, or nil while adding a new one.
@@ -11,6 +13,11 @@ struct CategoriesView: View {
     @State private var isNaming = false
     @State private var name = ""
     @State private var pendingDeletion: Category?
+
+    init(book: Book) {
+        self.book = book
+        _categories = Query(filter: Category.inBook(book))
+    }
 
     private var sortedCategories: [Category] {
         categories.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
@@ -22,14 +29,16 @@ struct CategoriesView: View {
 
     /// Two categories with the same name would be indistinguishable in pickers.
     private var nameIsTaken: Bool {
-        (try? Ledger.existingCategory(named: trimmedName, excluding: renaming, in: modelContext)) != nil
+        (try? Ledger.existingCategory(named: trimmedName, excluding: renaming, book: book, in: modelContext)) != nil
     }
 
     var body: some View {
         List {
             ForEach(sortedCategories) { category in
                 Button {
-                    startRenaming(category)
+                    if canEdit {
+                        startRenaming(category)
+                    }
                 } label: {
                     LabeledContent(category.name) {
                         Text("^[\(category.transactions?.count ?? 0) transaction](inflect: true)")
@@ -38,16 +47,20 @@ struct CategoriesView: View {
                 }
                 .buttonStyle(.plain)
                 .swipeActions {
-                    Button("Delete", systemImage: "trash", role: .destructive) {
-                        pendingDeletion = category
+                    if canEdit {
+                        Button("Delete", systemImage: "trash", role: .destructive) {
+                            pendingDeletion = category
+                        }
                     }
                 }
                 .contextMenu {
-                    Button("Rename…", systemImage: "pencil") {
-                        afterMenuCloses { startRenaming(category) }
-                    }
-                    Button("Delete…", systemImage: "trash", role: .destructive) {
-                        afterMenuCloses { pendingDeletion = category }
+                    if canEdit {
+                        Button("Rename…", systemImage: "pencil") {
+                            afterMenuCloses { startRenaming(category) }
+                        }
+                        Button("Delete…", systemImage: "trash", role: .destructive) {
+                            afterMenuCloses { pendingDeletion = category }
+                        }
                     }
                 }
             }
@@ -63,11 +76,13 @@ struct CategoriesView: View {
         }
         .navigationTitle("Categories")
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button("Add Category", systemImage: "plus") {
-                    renaming = nil
-                    name = ""
-                    isNaming = true
+            if canEdit {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Add Category", systemImage: "plus") {
+                        renaming = nil
+                        name = ""
+                        isNaming = true
+                    }
                 }
             }
         }
@@ -117,7 +132,9 @@ struct CategoriesView: View {
             renaming.name = trimmedName
         } else {
             withAnimation {
-                modelContext.insert(Category(name: trimmedName))
+                let category = Category(name: trimmedName)
+                modelContext.insert(category)
+                category.book = book
             }
         }
     }
@@ -134,14 +151,15 @@ struct CategoriesView: View {
 
 #Preview("With Categories") {
     NavigationStack {
-        CategoriesView()
+        CategoriesView(book: ModelContainer.preview.firstBook)
     }
     .modelContainer(.preview)
 }
 
 #Preview("Empty") {
+    let container = ModelContainer.emptyPreview
     NavigationStack {
-        CategoriesView()
+        CategoriesView(book: container.firstBook)
     }
-    .modelContainer(for: AppSchema.models, inMemory: true)
+    .modelContainer(container)
 }

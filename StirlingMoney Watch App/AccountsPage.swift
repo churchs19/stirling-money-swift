@@ -15,6 +15,8 @@ struct AccountsPage: View {
                         BalanceText(amount: snapshot.total)
                     }
                     .font(.headline)
+                } header: {
+                    BookHeader()
                 }
 
                 Section {

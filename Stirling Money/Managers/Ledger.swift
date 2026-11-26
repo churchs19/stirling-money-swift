@@ -16,6 +16,7 @@ enum Ledger {
         isPosted: Bool = false,
         checkNumber: Int? = nil,
         category: Category? = nil,
+        syncID: String? = nil,
         in context: ModelContext
     ) -> AccountTransaction {
         precondition(kind != .transfer, "Use Ledger.addTransfer for transfers")
@@ -28,13 +29,19 @@ enum Ledger {
             isPosted: isPosted,
             checkNumber: kind == .check ? checkNumber : nil
         )
+        if let syncID {
+            transaction.syncID = syncID
+        }
         context.insert(transaction)
+        transaction.book = account.book
         transaction.account = account
         transaction.category = category
         return transaction
     }
 
     /// Moves money between two accounts as a linked pair: money out of `source`, into `destination`.
+    ///
+    /// The halves' `syncID`s are `"<pairID>:out"` and `"<pairID>:in"`, so each half can name the other.
     @discardableResult
     static func addTransfer(
         amount: Decimal,
@@ -43,13 +50,18 @@ enum Ledger {
         date: Date = .now,
         note: String = "",
         isPosted: Bool = false,
+        pairID: String = UUID().uuidString,
         in context: ModelContext
     ) -> (outgoing: AccountTransaction, incoming: AccountTransaction) {
         let magnitude = abs(amount)
         let outgoing = AccountTransaction(kind: .transfer, amount: -magnitude, date: date, note: note, isPosted: isPosted)
         let incoming = AccountTransaction(kind: .transfer, amount: magnitude, date: date, note: note, isPosted: isPosted)
+        outgoing.syncID = pairID + outgoingSuffix
+        incoming.syncID = pairID + incomingSuffix
         context.insert(outgoing)
         context.insert(incoming)
+        outgoing.book = source.book
+        incoming.book = destination.book
         outgoing.account = source
         incoming.account = destination
         outgoing.incomingHalf = incoming
@@ -64,32 +76,49 @@ enum Ledger {
         context.delete(transaction)
     }
 
-    /// Finds a category by name, ignoring case and surrounding spaces, or creates it.
+    /// Finds a category in `book` by name, ignoring case and surrounding spaces, or creates it there.
     /// Returns nil for a blank name, meaning "no category".
-    static func category(named name: String, in context: ModelContext) throws -> Category? {
+    static func category(named name: String, book: Book? = nil, in context: ModelContext) throws -> Category? {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
 
-        if let match = try existingCategory(named: trimmed, in: context) {
+        if let match = try existingCategory(named: trimmed, book: book, in: context) {
             return match
         }
         let category = Category(name: trimmed)
         context.insert(category)
+        category.book = book
         return category
     }
 
-    /// The category with this name, ignoring case and surrounding spaces, other than `excluded`.
-    /// Used to stop a rename from creating two categories with the same name.
+    /// The category in `book` with this name, ignoring case and surrounding spaces, other than `excluded`.
+    /// Used to stop a rename from creating two categories with the same name. Other books may use the same names.
     static func existingCategory(
         named name: String,
         excluding excluded: Category? = nil,
+        book: Book? = nil,
         in context: ModelContext
     ) throws -> Category? {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
+        let bookID = book?.persistentModelID
         return try context.fetch(FetchDescriptor<Category>()).first {
-            $0 !== excluded && $0.name.compare(trimmed, options: .caseInsensitive) == .orderedSame
+            $0 !== excluded && $0.book?.persistentModelID == bookID
+                && $0.name.compare(trimmed, options: .caseInsensitive) == .orderedSame
         }
+    }
+
+    static let outgoingSuffix = ":out"
+    static let incomingSuffix = ":in"
+
+    /// The `syncID` for the other half of the transfer half with `syncID`: `:out` and `:in` swapped, or for a half
+    /// made before transfers were named in pairs, its own ID with a suffix.
+    static func counterpartSyncID(of syncID: String, isIncoming: Bool) -> String {
+        let (own, other) = isIncoming ? (incomingSuffix, outgoingSuffix) : (outgoingSuffix, incomingSuffix)
+        if syncID.hasSuffix(own) {
+            return String(syncID.dropLast(own.count)) + other
+        }
+        return syncID + other
     }
 
     /// Deposits are positive; everything else takes money out of the account.
@@ -114,6 +143,8 @@ extension Ledger {
         context: ModelContext
     ) -> AccountTransaction? {
         guard draft.isValid, let amount = draft.amount else { return nil }
+        var draft = draft
+        draft.category = CategoryMerger.survivor(of: draft.category)
 
         var existing = existing
         if let current = existing, (current.kind == .transfer) != (draft.kind == .transfer) {
@@ -188,7 +219,9 @@ extension Ledger {
             kind: .transfer, amount: -half.amount, date: draft.date,
             note: draft.trimmedNote, isPosted: draft.isPosted
         )
+        counterpart.syncID = counterpartSyncID(of: half.syncID, isIncoming: isIncoming)
         context.insert(counterpart)
+        counterpart.book = otherAccount.book
         counterpart.account = otherAccount
         if isIncoming {
             counterpart.incomingHalf = half

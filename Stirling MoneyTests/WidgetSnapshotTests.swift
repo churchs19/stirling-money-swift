@@ -60,6 +60,18 @@ struct WidgetSnapshotTests {
         #expect(snapshot.accounts.first?.iconSymbol == nil)
         #expect(snapshot.budgets.isEmpty)
         #expect(snapshot.accentColor == nil)
+        #expect(snapshot.bookName == nil)
+    }
+
+    @Test func theBooksNameSurvivesJSONAndChangesTheSummary() throws {
+        var named = WidgetSnapshot.sample
+        named.bookName = "Household"
+        let decoded = try JSONDecoder().decode(WidgetSnapshot.self, from: JSONEncoder().encode(named))
+        #expect(decoded.bookName == "Household")
+
+        // Switching books with the same figures still rewrites the summary, so the widgets show the new name.
+        let unnamed = try JSONEncoder().encode(WidgetSnapshot.sample)
+        #expect(named.needsWrite(over: unnamed))
     }
 
     @Test func snapshotSummarizesBudgetsInAnActivePeriod() throws {

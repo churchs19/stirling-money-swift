@@ -21,6 +21,9 @@ struct TransactionFormView: View {
     init(account: Account, transaction: AccountTransaction? = nil) {
         self.account = account
         self.transaction = transaction
+        // Transfers and categories stay within the account's book.
+        _accounts = Query(filter: Account.inBook(account.book))
+        _categories = Query(filter: Category.inBook(account.book))
         _draft = State(initialValue: transaction.map(TransactionDraft.init(editing:)) ?? TransactionDraft(account: account))
     }
 
@@ -168,7 +171,7 @@ struct TransactionFormView: View {
     }
 
     private func addCategory() {
-        if let category = try? Ledger.category(named: newCategoryName, in: modelContext) {
+        if let category = try? Ledger.category(named: newCategoryName, book: account.book, in: modelContext) {
             draft.category = category
         }
     }

@@ -7,6 +7,9 @@ It's a re-implementation of [Stirling Money for Windows Phone](https://github.co
 
 ## Features
 
+- **Books**: separate sets of accounts, categories, budgets and goals (household and personal, say), switched from the books menu on every tab. Everything else in the app (totals, reports, widgets, the Watch, CSV export) is for the current book
+- **iCloud sync**: every book syncs across your devices signed in to the same Apple ID, with changes merged field by field when two devices edit the same thing. Settings → iCloud shows the status and has Sync Now
+- **Sharing**: share a book with other Apple IDs from the books menu, choosing for each person Can Make Changes or View Only. They tap the invitation to add the book; the owner can manage people or stop sharing, and anyone can leave
 - **Accounts and register**: balances (available and posted), the total across accounts, and a searchable list of transactions you can mark as posted
 - **Transactions**: withdrawals, deposits, checks (numbered automatically) and transfers between accounts, kept as linked pairs
 - **Categories**: assign while entering a transaction, or manage them on their own screen
@@ -19,9 +22,7 @@ It's a re-implementation of [Stirling Money for Windows Phone](https://github.co
 - **App lock**: Face ID, Touch ID or the device passcode
 - **Account tiles** (or a list) with an optional icon: an SF Symbol or one of 116 payment logos and currency signs
 - **Accent color**: Stirling Money's purple, one you pick, or (on the Mac) the system's
-- **CSV export** of every transaction
-
-Not yet: iCloud sync and sharing data with other people. Both are deferred; the data model is kept CloudKit-compatible so sync can be added without a migration.
+- **CSV export** of the current book's transactions
 
 ## Requirements
 
@@ -39,6 +40,8 @@ The Watch app is embedded in the iPhone app: run the **StirlingMoney Watch App**
 The app and its widget extension share data through the App Group `group.net.s-church.stirlingmoney`, and so do the Watch app and its complications (in a separate container on the Watch), so all four need provisioning profiles that include it.
 With automatic signing, sign in to Xcode (**Settings → Accounts**) with an account on the project's team. To build under a different team, change the team and bundle identifiers, and the App Group identifier in the four entitlements files and in `Shared/WidgetSnapshot.swift`.
 
+The app target also has the **iCloud** capability (CloudKit, container `iCloud.net.s-church.stirlingmoney`), **Push Notifications**, and the Remote notifications background mode, for sync; the team needs a paid developer account.
+
 To install on a real Apple Watch, Xcode has to see the Watch (paired with a connected iPhone, unlocked, Developer Mode on) so it can register it with the team; otherwise the Watch refuses the app.
 
 ### Background refresh
@@ -48,6 +51,16 @@ Recurring transactions are added in the background through `BGTaskScheduler` (`n
 ```
 e -l objc -- (void)[[BGTaskScheduler sharedScheduler] _simulateLaunchForTaskWithIdentifier:@"net.s-church.stirlingmoney.recurring"]
 ```
+
+### iCloud and the CloudKit schema
+
+Sync is the app's own, built on `CKSyncEngine` (SwiftData's built-in CloudKit mirroring is turned off with `cloudKitDatabase: .none`, since it has no shared database). Each book is a CloudKit zone; sharing one is a zone-wide `CKShare`. Values are stored in encrypted fields, money as exact decimal strings. The details are in `CLAUDE.md` and Phase 11 of the plan.
+
+- **Development builds** use the CloudKit development environment, where record types and fields are created as the app first saves them.
+- **Before any TestFlight or App Store build**, deploy the schema to production: in the [CloudKit Console](https://icloud.developer.apple.com), choose the container, then **Schema → Deploy Schema Changes…** and deploy from Development to Production. Production builds can only use what's been deployed.
+- **After that, only add**: new record types and fields are fine (deploy again), but never rename or delete one, and never change a field's type; devices on older versions still use them.
+- **Testing sharing** needs a second Apple ID, on another device or a simulator signed in to it. Open the invitation link through the system (a tap in Messages or Mail, or `xcrun simctl openurl`), not by pasting it into Safari.
+- Sync never runs with `-UseSampleData` or `-UITesting`, or while hosting unit tests, so sample data never reaches iCloud.
 
 ### Sample data
 
@@ -59,8 +72,8 @@ The Watch app takes `-UseSampleData` too: it shows a built-in sample summary and
 
 | Target | What it covers | Run on |
 |---|---|---|
-| **Stirling MoneyTests** (Swift Testing, about 140 tests) | The money logic: balances, transfers, budget periods and spending, goals, reports, CSV export, the forms, amounts in other locales, the app lock, the widget and Watch summary, widget pickers and links | An iPhone simulator (⌘U with the **Stirling Money** scheme) |
-| **Stirling MoneyUITests** (11 tests + launch time, about 4 minutes) | End to end with the sample data: accounts and total, adding an account, a withdrawal and a transfer, search, marking posted, adding a budget and a goal, every report, layout, accent color | An iPhone simulator |
+| **Stirling MoneyTests** (Swift Testing, about 270 tests) | The money logic: balances, transfers, budget periods and spending, goals, reports, recurring transactions, CSV export, the forms, amounts in other locales, the app lock, the widget and Watch summary, widget pickers and links; books; sync with a fake CloudKit server and two simulated devices (record mapping, conflicts, deletes, sharing, View Only, merging categories, account changes) | An iPhone simulator (⌘U with the **Stirling Money** scheme) |
+| **Stirling MoneyUITests** (17 tests + launch time, about 7 minutes) | End to end with the sample data: accounts and total, adding an account, a withdrawal and a transfer, search, marking posted, adding a budget and a goal, recurring transactions, every report, layout, accent color, switching and adding books, a View Only book | An iPhone simulator |
 | **StirlingMoney Watch AppTests** | How the Watch takes in summaries from the iPhone | A Watch simulator (**StirlingMoney Watch App** scheme) |
 | **StirlingMoney Watch AppUITests** | The Watch's Accounts, Budgets and Goals pages with sample data | A Watch simulator |
 
@@ -71,8 +84,9 @@ The iPhone UI tests launch the app with `-UITesting`, which uses the sample data
 
 | Folder | Contents |
 |---|---|
-| `Stirling Money/Models` | SwiftData models (`Account`, `AccountTransaction`, `Category`, `Budget`, `Goal`) and the logic around them |
-| `Stirling Money/Managers` | `Ledger` (creating and editing transactions and transfers), the app lock, the widget snapshot writer, `WatchSync` (sending the summary to the Watch), `RecurringScheduler` and `RecurringRunner` (adding recurring transactions when they fall due) |
+| `Stirling Money/Models` | SwiftData models (`Book`, `Account`, `AccountTransaction`, `Category`, `Budget`, `Goal`, `RecurringTransaction`) and the logic around them |
+| `Stirling Money/Managers` | `Ledger` (creating and editing transactions and transfers), `Books`, `CategoryMerger`, the app lock, the widget snapshot writer, `WatchSync` (sending the summary to the Watch), `RecurringScheduler` and `RecurringRunner` (adding recurring transactions when they fall due) |
+| `Stirling Money/Managers/Sync` | iCloud sync and sharing: each model as a CloudKit record, the importer and conflict merger, `SyncProcessor` (testable without CloudKit) and `SyncCoordinator` (the two `CKSyncEngine`s) |
 | `Stirling Money/Views` | Screens, `Reports/` and `Components/` |
 | `Stirling Money/Extensions` | Money formatting and parsing, chart colors, macOS-safe view helpers |
 | `Shared` | Code and resources used by the app, the widgets and the Watch targets: the summary and its projection of upcoming recurring transactions, the budget card, the widget pickers, the currency format, PaymentFont |
@@ -82,7 +96,7 @@ The iPhone UI tests launch the app with `-UITesting`, which uses the sample data
 | `Stirling MoneyUITests`, `StirlingMoney Watch AppUITests` | UI tests |
 | `docs` | The re-implementation plan |
 
-[`CLAUDE.md`](CLAUDE.md) has the conventions for working in the code: relationship and delete rules, money as `Decimal`, the macOS rules, and how the widgets and the Watch get their data.
+[`CLAUDE.md`](CLAUDE.md) has the conventions for working in the code: relationship and delete rules, money as `Decimal`, books and View Only, the macOS rules, how the widgets and the Watch get their data, and how sync works.
 
 ## Acknowledgements
 

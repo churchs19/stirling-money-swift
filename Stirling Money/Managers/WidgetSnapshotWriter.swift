@@ -65,18 +65,22 @@ enum WidgetSnapshotWriter {
             if context.hasChanges {
                 try context.save()
             }
-            let budgets = try context.fetch(FetchDescriptor<Budget>())
+            // The widgets and the Watch show the current book.
+            let book = try Books.current(in: context, settings: LaunchMode.settings)
+            let budgets = try context.fetch(FetchDescriptor(predicate: Budget.inBook(book)))
             // Every transaction is only needed for budgets that cover all spending.
             let transactions = budgets.contains { $0.category == nil }
-                ? try context.fetch(FetchDescriptor<AccountTransaction>())
+                ? try context.fetch(FetchDescriptor(predicate: AccountTransaction.inBook(book)))
                 : []
             let snapshot = try WidgetSnapshot(
-                accounts: context.fetch(FetchDescriptor<Account>()),
-                goals: context.fetch(FetchDescriptor<Goal>()),
+                accounts: context.fetch(FetchDescriptor(predicate: Account.inBook(book))),
+                goals: context.fetch(FetchDescriptor(predicate: Goal.inBook(book))),
                 budgets: budgets,
                 transactions: transactions,
-                recurring: context.fetch(FetchDescriptor<RecurringTransaction>()),
-                accentColor: AccentChoice.sharedCustomColor
+                recurring: context.fetch(FetchDescriptor(predicate: RecurringTransaction.inBook(book))),
+                accentColor: AccentChoice.sharedCustomColor,
+                // Named only when there's more than one book, so a single book reads as before.
+                bookName: context.fetchCount(FetchDescriptor<Book>()) > 1 ? book?.name : nil
             )
             guard snapshot.needsWrite(over: try? Data(contentsOf: url)) else { return }
             let data = try JSONEncoder().encode(snapshot)

@@ -12,6 +12,7 @@ extension WidgetSnapshot {
         transactions: [AccountTransaction] = [],
         recurring: [RecurringTransaction] = [],
         accentColor: Color.Resolved? = nil,
+        bookName: String? = nil,
         now: Date = .now,
         calendar: Calendar = .current
     ) {
@@ -80,6 +81,7 @@ extension WidgetSnapshot {
         }
         .sorted { $0.date < $1.date }
         self.accentColor = accentColor
+        self.bookName = bookName
         updatedAt = now
     }
 
