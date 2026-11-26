@@ -1193,8 +1193,7 @@ Its category merging, status UI and notes will be reused, and the branch deleted
      empty, never-sent book is removed without a trace (`removeEmptyPlaceholderBooks`). Then only what iCloud
      lacks goes up (`unsentChanges`). **Device test passed:** a fresh install on the simulator logged "Removed 1
      empty books made before the first sync", uploaded nothing, and kept just the iCloud "My Book" and "Home".
-   - **Not tested on devices:** signing out or switching Apple IDs (it needs a spare device or simulator to sign
-     out of).
+   - **Device test passed (Nov 25, 2026):** switching Apple IDs on the simulator behaved as designed.
 8. [ ] The CloudKit schema deployed to production; README, CLAUDE.md and this plan. Delete the `cloudkit-sync` branch.
 
 **Risks and questions**
