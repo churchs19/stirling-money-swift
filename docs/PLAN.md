@@ -1191,7 +1191,8 @@ Its category merging, status UI and notes will be reused, and the branch deleted
      sync knows what iCloud has, and the first run uploaded it. Now the first upload on a device waits for the
      private engine's first fetch (or two minutes) (`finishFirstRun`). If iCloud brought the user's books, an
      empty, never-sent book is removed without a trace (`removeEmptyPlaceholderBooks`). Then only what iCloud
-     lacks goes up (`unsentChanges`).
+     lacks goes up (`unsentChanges`). **Device test passed:** a fresh install on the simulator logged "Removed 1
+     empty books made before the first sync", uploaded nothing, and kept just the iCloud "My Book" and "Home".
    - **Not tested on devices:** signing out or switching Apple IDs (it needs a spare device or simulator to sign
      out of).
 8. [ ] The CloudKit schema deployed to production; README, CLAUDE.md and this plan. Delete the `cloudkit-sync` branch.
