@@ -1179,6 +1179,12 @@ Its category merging, status UI and notes will be reused, and the branch deleted
      remembers what replaced each category it removes, and saving a transaction, budget or recurring rule uses
      the survivor (`CategoryMerger.survivor(of:)`). `aFormHoldingAMergedCategorySavesTheSurvivor` fails without it. **Retest passed:** both
      devices made "BBB" with a transaction at about the same time, and both transactions ended up in the one kept.
+   - **Loading overlay (added at the user's request, Nov 25, 2026):** `SyncActivityOverlay` covers the app while a
+     long sync runs (`SyncStatus.activity`):
+     - "Getting your books from iCloud…" on the first sync on a device, until both engines have fetched once (at
+       most two minutes, and not without an account).
+     - "Adding <book>…" from accepting an invitation until the book's records have arrived.
+     - It appears after half a second, so quick syncs don't flash it, and "Continue in Background" hides it.
    - **Not tested on devices:** signing out or switching Apple IDs (it needs a spare device or simulator to sign
      out of).
 8. [ ] The CloudKit schema deployed to production; README, CLAUDE.md and this plan. Delete the `cloudkit-sync` branch.

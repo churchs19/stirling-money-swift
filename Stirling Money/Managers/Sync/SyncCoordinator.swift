@@ -119,6 +119,7 @@ final class SyncCoordinator {
 
         dropQueuedChangesForGoneBooks()
         if isFirstRun {
+            beginFirstSyncActivity()
             // Everything goes up once; history before now is covered by that.
             _ = try? processor.localChanges()
             enqueue((try? processor.allChanges()) ?? [])
@@ -359,6 +360,9 @@ final class SyncCoordinator {
                     log.error("Couldn't save a zone: \(failure.error.localizedDescription, privacy: .public)")
                 }
 
+            case .didFetchChanges:
+                firstFetchFinished(by: engine)
+
             default:
                 break
             }
@@ -538,6 +542,12 @@ final class SyncCoordinator {
     /// share of the same book (it doesn't always learn that a zone went), and would then fetch only the changes
     /// since: the new share, but not the book's records.
     func accept(_ metadata: CKShare.Metadata) async throws -> String? {
+        status.activity = .joining(bookName: metadata.share[CKShare.SystemFieldKey.title] as? String)
+        defer {
+            if case .joining = status.activity {
+                status.activity = nil
+            }
+        }
         _ = try await container.accept(metadata)
         let zoneID = metadata.share.recordID.zoneID
         setPollToken(nil, for: zoneKey(zoneID))
@@ -574,6 +584,34 @@ final class SyncCoordinator {
     private func refreshAccountStatus() {
         Task {
             status.account = try? await container.accountStatus()
+            // Nothing will arrive without an account.
+            if status.account != .available, status.activity == .firstSync {
+                status.activity = nil
+            }
+        }
+    }
+
+    // MARK: - The first sync
+
+    /// Engines that haven't finished their first fetch on this device.
+    private var awaitingFirstFetch: Set<ObjectIdentifier> = []
+
+    /// Shows the first-sync overlay until both engines have fetched once (or two minutes, whichever comes first).
+    private func beginFirstSyncActivity() {
+        awaitingFirstFetch = Set(engines.map(ObjectIdentifier.init))
+        status.activity = .firstSync
+        Task {
+            try? await Task.sleep(for: .seconds(120))
+            if status.activity == .firstSync {
+                status.activity = nil
+            }
+        }
+    }
+
+    private func firstFetchFinished(by engine: CKSyncEngine) {
+        guard awaitingFirstFetch.remove(ObjectIdentifier(engine)) != nil, awaitingFirstFetch.isEmpty else { return }
+        if status.activity == .firstSync {
+            status.activity = nil
         }
     }
 

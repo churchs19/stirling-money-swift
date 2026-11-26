@@ -57,7 +57,7 @@ Stirling Money/
 │   ├── RecurringFormView.swift / RecurringListView.swift  # Recurring add/edit sheet; all-accounts Recurring screen (Accounts ⋯ menu)
 │   ├── Reports/                   # ReportsView list + one view per Swift Charts report; ReportSupport.swift
 │   ├── PreviewData.swift          # ModelContainer.preview sample data (DEBUG only)
-│   └── Components/                # BookSwitcher (.bookSwitcher toolbar menu), AmountText, CurrencyField, TransactionRow, BudgetRow, GoalRow, PostedCheckmark (+ .posted toggle style), AccountTile, AccountIconPicker, AccountIconView (SF Symbol or PaymentFont glyph), NavigationRow, RecurringRow (+ recurringRowActions: Edit, Skip Next, Add Now, Delete)
+│   └── Components/                # BookSwitcher (.bookSwitcher toolbar menu), SyncActivityOverlay (first sync, joining a share), AmountText, CurrencyField, TransactionRow, BudgetRow, GoalRow, PostedCheckmark (+ .posted toggle style), AccountTile, AccountIconPicker, AccountIconView (SF Symbol or PaymentFont glyph), NavigationRow, RecurringRow (+ recurringRowActions: Edit, Skip Next, Add Now, Delete)
 ├── Managers/
 │   ├── Ledger.swift               # Create/edit/delete transactions and transfers; categories (per book)
 │   ├── Books.swift                # prepare (first book, data from before books), current book, create, delete

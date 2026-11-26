@@ -64,6 +64,12 @@ struct Stirling_MoneyApp: App {
     /// The app's window: its tabs, covered by the lock screen while locked.
     private var content: some View {
         RootView()
+            // The first sync on this device, or a book someone shared on its way.
+            .overlay {
+                if let status = SyncCoordinator.shared?.status {
+                    SyncActivityHost(status: status)
+                }
+            }
             .overlay {
                 if appLock.isLocked {
                     LockView()

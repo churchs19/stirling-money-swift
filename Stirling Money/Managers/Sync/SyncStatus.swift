@@ -18,6 +18,16 @@ final class SyncStatus {
     /// them to it or remove them (Settings).
     var ownBooksAwaitChoice = false
 
+    /// A long sync the user should know about, shown over the app (`SyncActivityOverlay`); nil the rest of the time.
+    var activity: Activity?
+
+    enum Activity: Equatable {
+        /// The first sync on this device: books already in iCloud are on their way.
+        case firstSync
+        /// Accepting an invitation and fetching the book, named if the share says.
+        case joining(bookName: String?)
+    }
+
     /// A short description of the account's state.
     var accountText: String {
         switch account {
