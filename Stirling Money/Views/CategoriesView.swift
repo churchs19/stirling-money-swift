@@ -4,6 +4,7 @@ import SwiftUI
 /// Lists categories with how many transactions use each; add, rename and delete.
 struct CategoriesView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.canEditBook) private var canEdit
     let book: Book
     @Query private var categories: [Category]
 
@@ -35,7 +36,9 @@ struct CategoriesView: View {
         List {
             ForEach(sortedCategories) { category in
                 Button {
-                    startRenaming(category)
+                    if canEdit {
+                        startRenaming(category)
+                    }
                 } label: {
                     LabeledContent(category.name) {
                         Text("^[\(category.transactions?.count ?? 0) transaction](inflect: true)")
@@ -44,16 +47,20 @@ struct CategoriesView: View {
                 }
                 .buttonStyle(.plain)
                 .swipeActions {
-                    Button("Delete", systemImage: "trash", role: .destructive) {
-                        pendingDeletion = category
+                    if canEdit {
+                        Button("Delete", systemImage: "trash", role: .destructive) {
+                            pendingDeletion = category
+                        }
                     }
                 }
                 .contextMenu {
-                    Button("Rename…", systemImage: "pencil") {
-                        afterMenuCloses { startRenaming(category) }
-                    }
-                    Button("Delete…", systemImage: "trash", role: .destructive) {
-                        afterMenuCloses { pendingDeletion = category }
+                    if canEdit {
+                        Button("Rename…", systemImage: "pencil") {
+                            afterMenuCloses { startRenaming(category) }
+                        }
+                        Button("Delete…", systemImage: "trash", role: .destructive) {
+                            afterMenuCloses { pendingDeletion = category }
+                        }
                     }
                 }
             }
@@ -69,11 +76,13 @@ struct CategoriesView: View {
         }
         .navigationTitle("Categories")
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button("Add Category", systemImage: "plus") {
-                    renaming = nil
-                    name = ""
-                    isNaming = true
+            if canEdit {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Add Category", systemImage: "plus") {
+                        renaming = nil
+                        name = ""
+                        isNaming = true
+                    }
                 }
             }
         }

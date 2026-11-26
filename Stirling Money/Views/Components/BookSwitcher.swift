@@ -83,7 +83,11 @@ private struct BookSwitcher: ViewModifier {
             } message: {
                 Text("Everyone you shared it with loses it. It stays on your devices.")
             }
-            .alert("Sharing Didn't Work", isPresented: Binding { sharingError != nil } set: { if !$0 { sharingError = nil } }) {
+            .alert("Sharing Didn't Work", isPresented: Binding { sharingError != nil } set: {
+                if !$0 {
+                    sharingError = nil
+                }
+            }) {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(sharingError ?? "")
@@ -145,10 +149,12 @@ private struct BookSwitcher: ViewModifier {
     private var subtitle: String {
         guard books.count > 1 || book.isShared else { return "" }
         guard !book.isOwnedByMe else { return book.name }
-        if let owner = book.ownerName, !owner.isEmpty {
-            return String(localized: "\(book.name), shared by \(owner)")
+        let shared = if let owner = book.ownerName, !owner.isEmpty {
+            String(localized: "\(book.name), shared by \(owner)")
+        } else {
+            String(localized: "\(book.name), shared with you")
         }
-        return String(localized: "\(book.name), shared with you")
+        return book.canEdit ? shared : String(localized: "\(shared) (View Only)")
     }
 
     private func stopSharing() {

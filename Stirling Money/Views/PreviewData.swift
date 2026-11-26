@@ -94,6 +94,24 @@
             joint.book = household
             let essentials = try! Ledger.category(named: "Essentials", book: household, in: context)
             Ledger.addTransaction(.withdrawal, amount: 120, to: joint, date: daysAgo(2), payee: "Hardware Store", category: essentials, in: context)
+
+            // A third book someone shared as View Only: nothing in it can be changed.
+            let parents = Book(name: "Parents", createdAt: .now.addingTimeInterval(2))
+            parents.isShared = true
+            parents.isOwnedByMe = false
+            parents.canEdit = false
+            parents.ownerName = "Pat"
+            parents.zoneOwnerName = "_pat"
+            context.insert(parents)
+            let parentsSavings = Account(name: "Family Savings", initialBalance: 2500, iconName: "banknote")
+            context.insert(parentsSavings)
+            parentsSavings.book = parents
+            let gifts = try! Ledger.category(named: "Gifts", book: parents, in: context)
+            Ledger.addTransaction(.withdrawal, amount: 75, to: parentsSavings, date: daysAgo(5), payee: "Birthday Gift", category: gifts, in: context)
+            let parentsBudget = Budget(name: "Gifts", amount: 200, startDate: historyStart)
+            context.insert(parentsBudget)
+            parentsBudget.book = parents
+            parentsBudget.category = gifts
             try! context.save()
 
             return container

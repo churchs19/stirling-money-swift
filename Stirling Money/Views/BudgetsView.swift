@@ -4,6 +4,7 @@ import SwiftUI
 /// Every budget with what's been spent in its current period.
 struct BudgetsView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.canEditBook) private var canEdit
     let book: Book
     @Query private var budgets: [Budget]
     /// Needed for all-spending budgets, which count every account in the book.
@@ -23,7 +24,9 @@ struct BudgetsView: View {
             List {
                 ForEach(budgets) { budget in
                     Button {
-                        editingBudget = budget
+                        if canEdit {
+                            editingBudget = budget
+                        }
                     } label: {
                         BudgetRow(budget: budget, summary: budget.summary(allTransactions: transactions))
                             .accessibilityIdentifier("budget.\(budget.name)")
@@ -31,16 +34,20 @@ struct BudgetsView: View {
                     }
                     .buttonStyle(.plain)
                     .swipeActions {
-                        Button("Delete", systemImage: "trash", role: .destructive) {
-                            delete(budget)
+                        if canEdit {
+                            Button("Delete", systemImage: "trash", role: .destructive) {
+                                delete(budget)
+                            }
                         }
                     }
                     .contextMenu {
-                        Button("Edit…", systemImage: "pencil") {
-                            afterMenuCloses { editingBudget = budget }
-                        }
-                        Button("Delete", systemImage: "trash", role: .destructive) {
-                            delete(budget)
+                        if canEdit {
+                            Button("Edit…", systemImage: "pencil") {
+                                afterMenuCloses { editingBudget = budget }
+                            }
+                            Button("Delete", systemImage: "trash", role: .destructive) {
+                                delete(budget)
+                            }
                         }
                     }
                 }
@@ -57,11 +64,13 @@ struct BudgetsView: View {
             .navigationTitle("Budgets")
             .bookSwitcher(book)
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Add Budget", systemImage: "plus") {
-                        isAddingBudget = true
+                if canEdit {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Add Budget", systemImage: "plus") {
+                            isAddingBudget = true
+                        }
+                        .accessibilityIdentifier("addBudget")
                     }
-                    .accessibilityIdentifier("addBudget")
                 }
             }
             .sheet(isPresented: $isAddingBudget) {

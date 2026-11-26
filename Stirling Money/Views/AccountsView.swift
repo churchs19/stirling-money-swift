@@ -7,6 +7,7 @@ struct AccountsView: View {
     @Binding var path: [Account]
     let book: Book
     @Query private var accounts: [Account]
+    @Environment(\.canEditBook) private var canEdit
     @AppStorage("accountSort") private var sort: AccountSort = .name
     @AppStorage("accountLayout") private var layout: AccountLayout = .tiles
 
@@ -47,11 +48,13 @@ struct AccountsView: View {
                 AccountRegisterView(account: account)
             }
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Add Account", systemImage: "plus") {
-                        isAddingAccount = true
+                if canEdit {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Add Account", systemImage: "plus") {
+                            isAddingAccount = true
+                        }
+                        .accessibilityIdentifier("addAccount")
                     }
-                    .accessibilityIdentifier("addAccount")
                 }
                 ToolbarItem(placement: .primaryAction) {
                     // Shows the layout it switches to.
@@ -184,8 +187,10 @@ struct AccountsView: View {
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("account.\(account.name)")
                     .contextMenu {
-                        Button("Delete Account…", systemImage: "trash", role: .destructive) {
-                            afterMenuCloses { accountPendingDeletion = account }
+                        if canEdit {
+                            Button("Delete Account…", systemImage: "trash", role: .destructive) {
+                                afterMenuCloses { accountPendingDeletion = account }
+                            }
                         }
                     }
                 }
@@ -224,14 +229,16 @@ struct AccountsView: View {
                         }
                         .accessibilityIdentifier("account.\(account.name)")
                         .contextMenu {
-                            Button("Delete Account…", systemImage: "trash", role: .destructive) {
-                                afterMenuCloses { accountPendingDeletion = account }
+                            if canEdit {
+                                Button("Delete Account…", systemImage: "trash", role: .destructive) {
+                                    afterMenuCloses { accountPendingDeletion = account }
+                                }
                             }
                         }
                     }
-                    .onDelete { offsets in
+                    .onDelete(perform: canEdit ? { offsets in
                         accountPendingDeletion = offsets.first.map { sortedAccounts[$0] }
-                    }
+                    } : nil)
                 }
             }
         }

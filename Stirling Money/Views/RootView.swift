@@ -30,18 +30,22 @@ struct RootView: View {
             Tab("Accounts", systemImage: "banknote", value: AppTab.accounts) {
                 AccountsView(book: book, path: $accountPath)
                     .id(book.syncID)
+                    .environment(\.canEditBook, book.canEdit)
             }
             Tab("Budgets", systemImage: "chart.bar", value: AppTab.budgets) {
                 BudgetsView(book: book)
                     .id(book.syncID)
+                    .environment(\.canEditBook, book.canEdit)
             }
             Tab("Goals", systemImage: "flag", value: AppTab.goals) {
                 GoalsView(book: book)
                     .id(book.syncID)
+                    .environment(\.canEditBook, book.canEdit)
             }
             Tab("Reports", systemImage: "chart.pie", value: AppTab.reports) {
                 ReportsView(book: book)
                     .id(book.syncID)
+                    .environment(\.canEditBook, book.canEdit)
             }
         }
         .tabViewStyle(.sidebarAdaptable)

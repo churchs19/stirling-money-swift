@@ -2,7 +2,8 @@ import XCTest
 
 /// End-to-end checks on the iPhone simulator. Each test launches the app with `-UITesting`: the sample data in memory
 /// (Checking $10,229.11, Credit Card -$1,068.38, Savings $10,500.00; total $19,660.73; and a second book, Household,
-/// with Joint Checking $520.00), fresh settings, and no widget summary or Watch. US English, so amounts read the same whatever the simulator's language.
+/// with Joint Checking $520.00, and a View Only book, Parents, with Family Savings $2,425.00), fresh settings, and no
+/// widget summary or Watch. US English, so amounts read the same whatever the simulator's language.
 @MainActor
 final class Stirling_MoneyUITests: XCTestCase {
     private var app: XCUIApplication!
@@ -115,6 +116,30 @@ final class Stirling_MoneyUITests: XCTestCase {
         // Every tab shows the same book: Household has no budgets.
         tab("Budgets")
         XCTAssertTrue(app.staticTexts["No Budgets"].waitForExistence(timeout: 5))
+    }
+
+    func testAViewOnlyBookCantBeChanged() {
+        waitFor(element("bookMenu")).tap()
+        waitFor(app.buttons["Parents"].firstMatch).tap()
+
+        // The sample's View Only book: Family Savings, $2,500 less a $75 gift.
+        expectLabel(of: "account.Family Savings", toContain: "$2,425.00")
+        XCTAssertFalse(element("addAccount").exists, "no adding accounts")
+
+        openAccount("Family Savings")
+        XCTAssertFalse(element("addTransaction").exists, "no adding transactions")
+        // Tapping a transaction doesn't open the editor.
+        waitFor(element("transaction.Birthday Gift")).tap()
+        XCTAssertFalse(element("save").waitForExistence(timeout: 2))
+        back()
+
+        tab("Budgets")
+        waitFor(element("budget.Gifts")).tap()
+        XCTAssertFalse(element("save").waitForExistence(timeout: 2), "no editing budgets")
+        XCTAssertFalse(element("addBudget").exists)
+
+        tab("Goals")
+        XCTAssertFalse(element("addGoal").waitForExistence(timeout: 2))
     }
 
     func testANewBookStartsEmpty() {

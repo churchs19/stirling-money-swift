@@ -9,6 +9,7 @@ struct NetIncomeReportView: View {
     init(book: Book) {
         _transactions = Query(filter: AccountTransaction.inBook(book))
     }
+
     @AppStorage("reportRange") private var range: ReportRange = .sixMonths
     @State private var selectedDate: Date?
 

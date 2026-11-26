@@ -69,11 +69,14 @@ final class SyncProcessor {
         return try withoutGoneBooks(Self.collapse(changes))
     }
 
-    /// Drops changes to the records of books that are no longer here.
+    /// Drops changes to the records of books that are no longer here, or that this user may only view.
     ///
     /// Deleting a book deletes everything in it, and each of those deletes is in the history. For the user's own
     /// book, the zone's deletion already removes them. For a book someone else shared, they must never be sent:
     /// leaving would otherwise delete the owner's records. Only the share's own deletion (leaving) goes.
+    ///
+    /// A View Only book can't be changed in the app; anything that changes it anyway (a migration, a fix-up) stays
+    /// on this device instead of being refused by CloudKit.
     func withoutGoneBooks(_ changes: [Change]) throws -> [Change] {
         var bookIsHere: [CKRecordZone.ID: Bool] = [:]
         return try changes.filter { change in
@@ -89,7 +92,7 @@ final class SyncProcessor {
             if let known = bookIsHere[zoneID] {
                 return known
             }
-            let isHere = try book(for: zoneID) != nil
+            let isHere = try book(for: zoneID)?.canEdit ?? false
             bookIsHere[zoneID] = isHere
             return isHere
         }

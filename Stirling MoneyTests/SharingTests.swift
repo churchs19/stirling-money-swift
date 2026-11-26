@@ -69,6 +69,39 @@ struct SharingTests {
         #expect(try device.processor.localChanges() == [.deleteRecord(SyncProcessor.shareID(in: ownersZone))])
     }
 
+    @Test func aViewOnlyBooksChangesStayOnThisDevice() throws {
+        let device = try Device()
+        try device.processor.applyFetched([CKShare(recordZoneID: ownersZone)], deletions: [])
+        let book = try #require(try device.context.fetch(FetchDescriptor<Book>()).first)
+        book.canEdit = false
+        try device.context.save()
+        _ = try device.processor.localChanges()
+
+        let account = Account(name: "Sneaky")
+        device.context.insert(account)
+        account.book = book
+        try device.context.save()
+        #expect(try device.processor.localChanges().isEmpty, "CloudKit would refuse them")
+    }
+
+    @Test func recurringTransactionsArentAddedInAViewOnlyBook() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let book = Book(name: "Parents")
+        book.canEdit = false
+        context.insert(book)
+        let savings = Account(name: "Family Savings")
+        context.insert(savings)
+        savings.book = book
+        var draft = RecurringDraft(account: savings, now: day(2026, 11, 1), calendar: utc)
+        draft.payee = "Allowance"
+        draft.amountText = "20"
+        _ = try #require(draft.save(in: context, now: day(2026, 11, 1), calendar: utc))
+
+        #expect(try RecurringScheduler.addDue(in: context, now: day(2026, 12, 15), calendar: utc) == 0)
+        #expect(try RecurringScheduler.nextDueDate(in: context, calendar: utc) == nil)
+    }
+
     @Test func deletingAnOwnBookWithRecordsSendsOnlyTheZone() throws {
         let device = try Device()
         let book = Book(name: "Personal")

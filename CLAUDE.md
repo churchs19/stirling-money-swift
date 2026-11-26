@@ -1,7 +1,7 @@
 # Stirling Money
 
 **Bundle ID:** net.s-church.stirlingmoney
-**Target:** iOS 27+, iPadOS 27+, macOS 27+ (one multiplatform target; visionOS is also listed but unverified); watchOS 27.2+ for the Watch app
+**Target:** iOS 27+, iPadOS 27+, macOS 27+ (one multiplatform target; no visionOS or Mac Catalyst); watchOS 27.2+ for the Watch app
 **Plan:** `docs/PLAN.md` — features being re-implemented from the old Windows Phone app, phase status, decisions
 **Architecture:** SwiftUI + SwiftData
 **Swift version:** 6.2 (app); 6.0 (Watch app, also `MainActor` by default); both widget extensions use the template's Swift 5 mode
@@ -74,6 +74,7 @@ Stirling Money/
     ├── Decimal+Money.swift        # Parsing typed amounts (.localCurrency itself is in Shared/)
     ├── Color+Chart.swift          # ChartPalette: validated chart colors; assign slots in order, never cycle
     ├── View+Accent.swift          # .appAccent() tint for each scene + \.appAccent environment value
+    ├── View+BookEditing.swift     # \.canEditBook: false in a View Only book (RootView sets it; sheets inherit it)
     └── View+Platform.swift        # Touch-only modifiers that do nothing on macOS
 Stirling MoneyTests/               # Swift Testing; in-memory container + UTC calendar in TestSupport.swift
 Stirling MoneyUITests/             # XCUITest on the iPhone simulator with -UITesting; finds controls by accessibility identifier
@@ -185,6 +186,9 @@ Structured data means fewer tokens consumed and better error diagnosis.
 - Money is `Decimal`, never `Double`. `AccountTransaction.amount` is signed: negative leaves the account.
 - Enums are stored as raw-value strings (`kindRawValue`, `periodRawValue`) with a computed typed property, so they work in `#Predicate`.
 - Create and delete transactions through `Ledger`, not directly, so signs stay right and transfer pairs are created and deleted together.
+- A book shared as View Only (`Book.canEdit` false) can't be changed: read `@Environment(\.canEditBook)` and hide or
+  disable every control that edits (toolbar adds, row taps that open forms, swipe actions, context menus, toggles).
+  Recurring transactions aren't added there, and sync drops any change to it (`SyncProcessor.withoutGoneBooks`).
 - Everything belongs to a `Book`: set `book` when creating a model (`Ledger` and the drafts take it from the account),
   and filter every `@Query` and fetch with `Model.inBook(book)`. The current book's `syncID` is in settings
   (`Books.currentKey`); screens get the book in their initializer. Every model has a `syncID` (`preserveValueOnDeletion`).

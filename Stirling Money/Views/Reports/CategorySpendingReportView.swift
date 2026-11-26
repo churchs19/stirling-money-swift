@@ -9,6 +9,7 @@ struct CategorySpendingReportView: View {
     init(book: Book) {
         _transactions = Query(filter: AccountTransaction.inBook(book))
     }
+
     @AppStorage("reportRange") private var range: ReportRange = .sixMonths
     @State private var selectedAngle: Double?
 
@@ -95,7 +96,9 @@ struct CategorySpendingReportView: View {
     }
 
     private func name(of slice: CategorySlice) -> String {
-        if slice.isOther { return String(localized: "Other") }
+        if slice.isOther {
+            return String(localized: "Other")
+        }
         return slice.categoryName ?? String(localized: "Uncategorized")
     }
 
@@ -110,7 +113,9 @@ struct CategorySpendingReportView: View {
         var running = 0.0
         for slice in slices {
             running += slice.amount.chartValue
-            if angle <= running { return slice }
+            if angle <= running {
+                return slice
+            }
         }
         return nil
     }

@@ -1119,7 +1119,22 @@ Its category merging, status UI and notes will be reused, and the branch deleted
        deletion (the share) and no record changes.
    - **Step 4 done:** share, accept, edits both ways, Stop Sharing and Leave work between an iPhone and Mac on one
      Apple ID and a simulator on another.
-5. [ ] View-only mode across the screens, and UI tests with a view-only book in the sample data.
+5. [x] View-only mode across the screens, and UI tests with a view-only book in the sample data.
+   - **Done (Nov 25, 2026).** `\.canEditBook` (`Extensions/View+BookEditing.swift`) is set from `Book.canEdit` on
+     each tab in `RootView`, and sheets inherit it.
+   - With it false, these are hidden or disabled: adding accounts, transactions, budgets, goals, categories and
+     recurring transactions; row taps that open an editor; swipe actions and context menus (delete, edit, posted,
+     Make Recurring, Skip Next, Add Now); the posted checkmark; Edit Account; Rename in the book menu. Reports,
+     search and exporting still work.
+   - The subtitle ends "(View Only)".
+   - `RecurringScheduler` doesn't add occurrences in a View Only book; the owner's or an editor's devices do.
+   - As a safety net, `SyncProcessor.withoutGoneBooks` drops any change to a View Only book, so CloudKit never
+     refuses one.
+   - The sample data has a third book, "Parents", shared View Only by "Pat" (Family Savings $2,425.00, a Gifts
+     budget). `testAViewOnlyBookCantBeChanged` checks the controls are gone and taps open nothing. Unit tests cover
+     the scheduler and sync.
+   - 257 unit tests and 17 UI tests pass, and the Mac builds.
+   - **Not yet tested on devices:** sharing as View Only with the second Apple ID.
 6. [ ] Recurring transactions, widgets and the Watch with books and sharing: deterministic occurrence names, and the
    summary per current book.
 7. [ ] Settings: sync status, Sync Now, and the iCloud account states. Category merging after fetches.

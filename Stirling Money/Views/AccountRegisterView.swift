@@ -4,6 +4,7 @@ import SwiftUI
 /// An account's transactions, newest first, with its available and posted balances.
 struct AccountRegisterView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.canEditBook) private var canEdit
     let account: Account
 
     @State private var searchText = ""
@@ -64,7 +65,7 @@ struct AccountRegisterView: View {
                     ForEach(upcoming) { rule in
                         RecurringRow(rule: rule, account: account)
                             .accessibilityIdentifier("recurring.\(rule.displayPayee(in: account))")
-                            .recurringRowActions(rule, context: modelContext) {
+                            .recurringRowActions(rule, context: modelContext, canEdit: canEdit) {
                                 recurringForm = .edit(rule)
                             }
                     }
@@ -88,41 +89,51 @@ struct AccountRegisterView: View {
                             // so a tap gesture (not a row button) opens the editor.
                             .contentShape(Rectangle())
                             .onTapGesture {
-                                editingTransaction = transaction
+                                if canEdit {
+                                    editingTransaction = transaction
+                                }
                             }
                             .accessibilityAction(named: "Edit") {
-                                editingTransaction = transaction
+                                if canEdit {
+                                    editingTransaction = transaction
+                                }
                             }
                             .swipeActions(edge: .leading) {
-                                Button(
-                                    transaction.isPosted ? "Mark Unposted" : "Mark Posted",
-                                    systemImage: transaction.isPosted ? "circle" : "checkmark.circle"
-                                ) {
-                                    transaction.isPosted.toggle()
+                                if canEdit {
+                                    Button(
+                                        transaction.isPosted ? "Mark Unposted" : "Mark Posted",
+                                        systemImage: transaction.isPosted ? "circle" : "checkmark.circle"
+                                    ) {
+                                        transaction.isPosted.toggle()
+                                    }
+                                    .tint(.green)
+                                    recurringButton(for: transaction)
+                                        .tint(.purple)
                                 }
-                                .tint(.green)
-                                recurringButton(for: transaction)
-                                    .tint(.purple)
                             }
                             .swipeActions(edge: .trailing) {
-                                Button("Delete", systemImage: "trash", role: .destructive) {
-                                    delete(transaction)
+                                if canEdit {
+                                    Button("Delete", systemImage: "trash", role: .destructive) {
+                                        delete(transaction)
+                                    }
                                 }
                             }
                             // Swipes are awkward with a mouse; Mac and iPad pointer users right-click instead.
                             .contextMenu {
-                                Button("Edit…", systemImage: "pencil") {
-                                    afterMenuCloses { editingTransaction = transaction }
-                                }
-                                Button(
-                                    transaction.isPosted ? "Mark Unposted" : "Mark Posted",
-                                    systemImage: transaction.isPosted ? "circle" : "checkmark.circle"
-                                ) {
-                                    transaction.isPosted.toggle()
-                                }
-                                recurringButton(for: transaction, afterMenu: true)
-                                Button("Delete", systemImage: "trash", role: .destructive) {
-                                    delete(transaction)
+                                if canEdit {
+                                    Button("Edit…", systemImage: "pencil") {
+                                        afterMenuCloses { editingTransaction = transaction }
+                                    }
+                                    Button(
+                                        transaction.isPosted ? "Mark Unposted" : "Mark Posted",
+                                        systemImage: transaction.isPosted ? "circle" : "checkmark.circle"
+                                    ) {
+                                        transaction.isPosted.toggle()
+                                    }
+                                    recurringButton(for: transaction, afterMenu: true)
+                                    Button("Delete", systemImage: "trash", role: .destructive) {
+                                        delete(transaction)
+                                    }
                                 }
                             }
                     }
@@ -132,20 +143,22 @@ struct AccountRegisterView: View {
         .searchable(text: $searchText, prompt: "Search Transactions")
         .navigationTitle(account.name)
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button("Add Transaction", systemImage: "plus") {
-                    isAddingTransaction = true
+            if canEdit {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Add Transaction", systemImage: "plus") {
+                        isAddingTransaction = true
+                    }
+                    .accessibilityIdentifier("addTransaction")
                 }
-                .accessibilityIdentifier("addTransaction")
-            }
-            ToolbarItem(placement: .secondaryAction) {
-                Button("Add Recurring Transaction", systemImage: "repeat") {
-                    recurringForm = .new
+                ToolbarItem(placement: .secondaryAction) {
+                    Button("Add Recurring Transaction", systemImage: "repeat") {
+                        recurringForm = .new
+                    }
                 }
-            }
-            ToolbarItem(placement: .secondaryAction) {
-                Button("Edit Account", systemImage: "pencil") {
-                    isEditingAccount = true
+                ToolbarItem(placement: .secondaryAction) {
+                    Button("Edit Account", systemImage: "pencil") {
+                        isEditingAccount = true
+                    }
                 }
             }
         }

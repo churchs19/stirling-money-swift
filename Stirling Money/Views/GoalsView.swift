@@ -4,6 +4,7 @@ import SwiftUI
 /// Every savings goal with its progress.
 struct GoalsView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.canEditBook) private var canEdit
     let book: Book
     @Query private var goals: [Goal]
     @Query private var accounts: [Account]
@@ -22,7 +23,9 @@ struct GoalsView: View {
             List {
                 ForEach(goals) { goal in
                     Button {
-                        editingGoal = goal
+                        if canEdit {
+                            editingGoal = goal
+                        }
                     } label: {
                         GoalRow(goal: goal)
                             .accessibilityIdentifier("goal.\(goal.name)")
@@ -30,16 +33,20 @@ struct GoalsView: View {
                     }
                     .buttonStyle(.plain)
                     .swipeActions {
-                        Button("Delete", systemImage: "trash", role: .destructive) {
-                            delete(goal)
+                        if canEdit {
+                            Button("Delete", systemImage: "trash", role: .destructive) {
+                                delete(goal)
+                            }
                         }
                     }
                     .contextMenu {
-                        Button("Edit…", systemImage: "pencil") {
-                            afterMenuCloses { editingGoal = goal }
-                        }
-                        Button("Delete", systemImage: "trash", role: .destructive) {
-                            delete(goal)
+                        if canEdit {
+                            Button("Edit…", systemImage: "pencil") {
+                                afterMenuCloses { editingGoal = goal }
+                            }
+                            Button("Delete", systemImage: "trash", role: .destructive) {
+                                delete(goal)
+                            }
                         }
                     }
                 }
@@ -64,12 +71,14 @@ struct GoalsView: View {
             .navigationTitle("Goals")
             .bookSwitcher(book)
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Add Goal", systemImage: "plus") {
-                        isAddingGoal = true
+                if canEdit {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Add Goal", systemImage: "plus") {
+                            isAddingGoal = true
+                        }
+                        .accessibilityIdentifier("addGoal")
+                        .disabled(accounts.isEmpty)
                     }
-                    .accessibilityIdentifier("addGoal")
-                    .disabled(accounts.isEmpty)
                 }
             }
             .sheet(isPresented: $isAddingGoal) {

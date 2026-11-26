@@ -16,7 +16,8 @@ enum RecurringScheduler {
     static func addDue(in context: ModelContext, now: Date = .now, calendar: Calendar = .current) throws -> Int {
         let today = calendar.startOfDay(for: now)
         var added = 0
-        for rule in try context.fetch(FetchDescriptor<RecurringTransaction>()) where rule.problem == nil {
+        // Not in a View Only book: the owner's (or an editor's) devices add them, and CloudKit would refuse ours.
+        for rule in try context.fetch(FetchDescriptor<RecurringTransaction>()) where rule.problem == nil && rule.book?.canEdit != false {
             var count = 0
             while count < catchUpLimit, !rule.hasEnded(calendar: calendar), calendar.startOfDay(for: rule.nextDate) <= today {
                 addOccurrence(of: rule, on: rule.nextDate, occurrence: rule.nextDate, in: context, calendar: calendar)
@@ -58,7 +59,7 @@ enum RecurringScheduler {
     /// The earliest day a rule next falls due, for scheduling the next background run. nil when none will.
     static func nextDueDate(in context: ModelContext, calendar: Calendar = .current) throws -> Date? {
         try context.fetch(FetchDescriptor<RecurringTransaction>())
-            .filter { $0.problem == nil && !$0.hasEnded(calendar: calendar) }
+            .filter { $0.problem == nil && !$0.hasEnded(calendar: calendar) && $0.book?.canEdit != false }
             .map(\.nextDate)
             .min()
     }
