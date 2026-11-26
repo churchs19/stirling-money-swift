@@ -94,6 +94,41 @@ struct AccountAndMergeTests {
         #expect(try context.fetch(FetchDescriptor<Stirling_Money.Category>()).map(\.syncID) == ["a"])
     }
 
+    @Test func aFormHoldingAMergedCategorySavesTheSurvivor() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let book = Book(name: "Home")
+        context.insert(book)
+        let checking = Account(name: "Checking")
+        context.insert(checking)
+        checking.book = book
+        let mine = try #require(try Ledger.category(named: "AAA", book: book, in: context))
+        try context.save()
+
+        // The form picks this device's new "AAA"…
+        var draft = TransactionDraft(account: checking)
+        draft.amountText = "1.50"
+        draft.payee = "Test Sim"
+        draft.category = mine
+
+        // …while another device's older "AAA" arrives and the merge removes this one.
+        let theirs = Stirling_Money.Category(name: "AAA")
+        theirs.createdAt = mine.createdAt.addingTimeInterval(-60)
+        context.insert(theirs)
+        theirs.book = book
+        try CategoryMerger.mergeDuplicates(in: context)
+        try context.save()
+
+        let saved = try #require(Ledger.save(draft, in: checking, context: context))
+        #expect(saved.category === theirs, "not the deleted category, and not none")
+
+        var budget = BudgetDraft()
+        budget.name = "AAA"
+        budget.amountText = "10"
+        budget.category = mine
+        #expect(budget.save(book: book, in: context)?.category === theirs)
+    }
+
     @Test func twoDevicesMakingTheSameCategoryEndWithOne() throws {
         let server = FakeServer()
         let phone = try Device()

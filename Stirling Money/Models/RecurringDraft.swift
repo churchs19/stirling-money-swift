@@ -222,7 +222,7 @@ struct RecurringDraft {
         target.book = account.book
         target.account = account
         target.otherAccount = kind == .transfer ? otherAccount : nil
-        target.category = kind == .transfer ? nil : category
+        target.category = kind == .transfer ? nil : CategoryMerger.survivor(of: category)
         return target
     }
 }

@@ -143,6 +143,8 @@ extension Ledger {
         context: ModelContext
     ) -> AccountTransaction? {
         guard draft.isValid, let amount = draft.amount else { return nil }
+        var draft = draft
+        draft.category = CategoryMerger.survivor(of: draft.category)
 
         var existing = existing
         if let current = existing, (current.kind == .transfer) != (draft.kind == .transfer) {

@@ -1173,6 +1173,11 @@ Its category merging, status UI and notes will be reused, and the branch deleted
        references and the deleted duplicate) goes up. Two devices merging at once make the same change.
    - **Tests:** 9 in `AccountAndMergeTests`, including two devices each making "Food" and ending with one that
      holds both purchases. 266 unit tests and 17 UI tests pass, and the Mac builds.
+   - **Device test (Nov 25, 2026): a transaction made on the simulator with a new "AAA" lost its category.** The
+     simulator sent its own "AAA", a check then fetched the iPhone's older one, and the merge deleted the
+     simulator's while its transaction form still held it. Saving set the deleted category: none. The merger now
+     remembers what replaced each category it removes, and saving a transaction, budget or recurring rule uses
+     the survivor (`CategoryMerger.survivor(of:)`). `aFormHoldingAMergedCategorySavesTheSurvivor` fails without it.
    - **Not tested on devices:** signing out or switching Apple IDs (it needs a spare device or simulator to sign
      out of).
 8. [ ] The CloudKit schema deployed to production; README, CLAUDE.md and this plan. Delete the `cloudkit-sync` branch.

@@ -77,7 +77,7 @@ struct BudgetDraft {
             context.insert(budget)
             budget.book = book
         }
-        budget.category = category
+        budget.category = CategoryMerger.survivor(of: category)
         return budget
     }
 }

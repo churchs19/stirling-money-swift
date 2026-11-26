@@ -35,11 +35,26 @@ enum CategoryMerger {
                 for rule in duplicate.recurringTransactions ?? [] {
                     rule.category = keeper
                 }
+                replacements[duplicate.persistentModelID] = keeper
                 context.delete(duplicate)
                 merged += 1
             }
         }
         return merged
+    }
+
+    /// The category that took each merged-away one's place, for forms still holding the old one.
+    private static var replacements: [PersistentIdentifier: Category] = [:]
+
+    /// The category to save for `category`: the one it was merged into, if a merge removed it while a form was open
+    /// (a merge runs whenever another device's categories arrive), otherwise itself.
+    static func survivor(of category: Category?) -> Category? {
+        guard let category else { return nil }
+        var current = category
+        while let keeper = replacements[current.persistentModelID] {
+            current = keeper
+        }
+        return current
     }
 
     private struct Key: Hashable {
