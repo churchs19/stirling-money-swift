@@ -1063,7 +1063,7 @@ Its category merging, status UI and notes will be reused, and the branch deleted
      a different edit to the same transaction on the Mac both synced, without crashing and without needing another
      save to push them out. Each device's existing data is its own "My Book" (each
      store made its own at the upgrade), so after the first sync both books appear on both devices.
-4. [ ] Sharing: share, accept, permissions, leave, stop sharing, and the shared engine. Two Apple IDs on two devices (or
+4. [x] Sharing: share, accept, permissions, leave, stop sharing, and the shared engine. Two Apple IDs on two devices (or
    a device and a simulator).
    - **Built (Nov 25, 2026); waiting on a test with two Apple IDs.** `CKSharingSupported` = YES was added with
      `AddInfoPlist` (approved).
@@ -1114,7 +1114,11 @@ Its category merging, status UI and notes will be reused, and the branch deleted
        failure"), so nothing was deleted; the share's deletion failed with it, so the leave didn't happen either.
        `SyncProcessor.withoutGoneBooks` now drops changes to records of books that aren't here, except the share's
        deletion. Deleting the user's own book sends only the zone's deletion. Queued changes for gone books are
-       dropped at launch. Leave still to retest.
+       dropped at launch.
+     - **Retest passed (Nov 25, 2026):** re-accepting brought the whole book at once, and leaving sent exactly one
+       deletion (the share) and no record changes.
+   - **Step 4 done:** share, accept, edits both ways, Stop Sharing and Leave work between an iPhone and Mac on one
+     Apple ID and a simulator on another.
 5. [ ] View-only mode across the screens, and UI tests with a view-only book in the sample data.
 6. [ ] Recurring transactions, widgets and the Watch with books and sharing: deterministic occurrence names, and the
    summary per current book.
