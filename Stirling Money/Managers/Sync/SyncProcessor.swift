@@ -269,6 +269,13 @@ final class SyncProcessor {
                 }
             }
         }
+        // Another device may have made a category this one also has. Merging is this device's own change, so it's
+        // saved without the sync author and goes up like any edit.
+        if records.contains(where: { $0.recordType == Category.recordType }),
+           try CategoryMerger.mergeDuplicates(in: context) > 0
+        {
+            try context.save()
+        }
         return changes
     }
 
@@ -310,6 +317,47 @@ final class SyncProcessor {
     func didStopSharing(_ book: Book) throws {
         try asSync {
             book.isShared = false
+        }
+    }
+
+    // MARK: - Account changes
+
+    /// Removes the books other people shared with the user: they belong to the iCloud account that just left.
+    func removeSharedBooks() throws {
+        try asSync {
+            for book in try context.fetch(FetchDescriptor<Book>()) where book.zoneOwnerName != nil {
+                context.delete(book)
+            }
+            pendingReferences = pendingReferences.filter { !Self.isSharedWithUser($0.key) }
+        }
+    }
+
+    /// Forgets what the old account's server had: every model's system fields and synced values, so the next upload
+    /// (to whichever account) starts fresh and conflicts aren't judged against another account's records.
+    func forgetSyncState() throws {
+        try asSync {
+            for book in try context.fetch(FetchDescriptor<Book>()) {
+                book.ckSystemFields = nil
+                book.ckSyncedValues = nil
+                book.isShared = false
+                for model in ((book.accounts ?? []) as [any CloudRecordMapped]) + (book.categories ?? [])
+                    + (book.transactions ?? []) + (book.budgets ?? []) + (book.goals ?? []) + (book.recurringTransactions ?? [])
+                {
+                    model.ckSystemFields = nil
+                    model.ckSyncedValues = nil
+                }
+            }
+            pendingReferences = [:]
+        }
+    }
+
+    /// Removes the user's own books from this device, without sending anything: they stay in the iCloud account
+    /// they came from.
+    func removeOwnBooks() throws {
+        try asSync {
+            for book in try context.fetch(FetchDescriptor<Book>()) where book.zoneOwnerName == nil {
+                context.delete(book)
+            }
         }
     }
 

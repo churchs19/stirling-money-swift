@@ -1,3 +1,4 @@
+import CloudKit
 import StoreKit
 import SwiftData
 import SwiftUI
@@ -70,6 +71,8 @@ struct SettingsView: View {
                 }
             }
 
+            ICloudSection()
+
             if let book = Books.current(id: currentBookID, in: books) {
                 ExportSection(book: book, showsBookName: books.count > 1)
                     .id(book.syncID)
@@ -117,6 +120,84 @@ struct SettingsView: View {
                 if await appLock.authenticate(reason: String(localized: "Confirm it's you to turn on the lock.")) {
                     requiresUnlock = true
                 }
+            }
+        }
+    }
+}
+
+/// iCloud sync: the account's state, when it last synced, Sync Now, and the choice after a different Apple ID
+/// signed in.
+private struct ICloudSection: View {
+    @State private var isConfirmingRemove = false
+    @State private var removeError: String?
+
+    var body: some View {
+        if let coordinator = SyncCoordinator.shared {
+            let status = coordinator.status
+            Section {
+                LabeledContent("iCloud Sync", value: status.accountText)
+                    .accessibilityIdentifier("iCloudStatus")
+                if let lastSynced = status.lastSynced {
+                    LabeledContent("Last Synced") {
+                        Text(lastSynced, format: .relative(presentation: .named))
+                    }
+                }
+                Button {
+                    Task { await coordinator.syncNow() }
+                } label: {
+                    if status.isSyncing {
+                        Label("Syncing…", systemImage: "arrow.triangle.2.circlepath")
+                    } else {
+                        Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
+                    }
+                }
+                .disabled(!status.canSync)
+                if status.ownBooksAwaitChoice {
+                    Button("Upload My Books to This iCloud Account", systemImage: "icloud.and.arrow.up") {
+                        coordinator.uploadOwnBooks()
+                    }
+                    Button("Remove My Books from This Device…", systemImage: "trash", role: .destructive) {
+                        isConfirmingRemove = true
+                    }
+                }
+            } header: {
+                Text("iCloud")
+            } footer: {
+                if status.ownBooksAwaitChoice {
+                    Text("A different Apple ID is signed in. Your books are still on this device but haven't been added to this iCloud account. Upload them, or remove them from this device; they stay in the other account's iCloud.")
+                } else if let error = status.lastError {
+                    Text(error)
+                        .foregroundStyle(.red)
+                } else if status.account == .noAccount {
+                    Text("Sign in to iCloud in Settings to sync your books and share them. Until then, everything stays on this device.")
+                } else {
+                    Text("Your books sync with your other devices signed in to the same Apple ID.")
+                }
+            }
+            .confirmationDialog(
+                "Remove your books from this device?",
+                isPresented: $isConfirmingRemove,
+                titleVisibility: .visible
+            ) {
+                Button("Remove from This Device", role: .destructive) {
+                    do {
+                        try coordinator.removeOwnBooks()
+                    } catch {
+                        removeError = error.localizedDescription
+                    }
+                }
+            } message: {
+                Text("They stay in the iCloud account they came from, and return if it signs in again.")
+            }
+            .alert("Couldn't Remove the Books", isPresented: Binding { removeError != nil } set: { if !$0 { removeError = nil } }) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(removeError ?? "")
+            }
+        } else {
+            Section("iCloud") {
+                Text("iCloud sync is off while testing or using sample data.")
+                    .foregroundStyle(.secondary)
             }
         }
     }

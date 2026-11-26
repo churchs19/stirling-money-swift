@@ -26,6 +26,9 @@ final class SyncCoordinator {
 
     private(set) static var shared: SyncCoordinator?
 
+    /// What Settings shows.
+    let status = SyncStatus()
+
     private let processor: SyncProcessor
     private let container = CKContainer(identifier: containerIdentifier)
     private var privateEngine: CKSyncEngine?
@@ -62,6 +65,10 @@ final class SyncCoordinator {
         /// The change tokens of this app's own checks while in front (`poll`), by database and by zone. Separate
         /// from the engines' own, which they keep to themselves.
         var pollTokens: [String: Data]?
+        /// The iCloud user this device last synced as, to tell signing back in from a different Apple ID.
+        var accountID: String?
+        /// A different Apple ID signed in, and the user hasn't chosen yet what happens to their own books.
+        var ownBooksAwaitChoice: Bool?
     }
 
     private var saved = SavedState()
@@ -95,6 +102,8 @@ final class SyncCoordinator {
 
     private func begin() {
         loadState()
+        status.ownBooksAwaitChoice = saved.ownBooksAwaitChoice ?? false
+        refreshAccountStatus()
         let isFirstRun = saved.engine == nil
         delegate.coordinator = self
         privateEngine = CKSyncEngine(CKSyncEngine.Configuration(
@@ -173,6 +182,10 @@ final class SyncCoordinator {
     private func enqueue(_ changes: [SyncProcessor.Change]) -> Bool {
         var added = false
         for change in changes {
+            // Until the user chooses, nothing of their own goes to a different Apple ID's iCloud.
+            if status.ownBooksAwaitChoice, !Self.isForSharedEngine(change) {
+                continue
+            }
             switch change {
             case let .saveZone(zoneID):
                 // Only an owner makes zones.
@@ -203,6 +216,14 @@ final class SyncCoordinator {
             added = true
         }
         return added
+    }
+
+    private static func isForSharedEngine(_ change: SyncProcessor.Change) -> Bool {
+        switch change {
+        case let .saveZone(zoneID), let .deleteZone(zoneID): SyncProcessor.isSharedWithUser(zoneID)
+        case let .saveRecord(id), let .deleteRecord(id): SyncProcessor.isSharedWithUser(id.zoneID)
+        case .cancelSave: true
+        }
     }
 
     private var isSendRequested = false
@@ -281,16 +302,28 @@ final class SyncCoordinator {
             case let .accountChange(change):
                 // Both engines report it; act once.
                 guard engine === privateEngine else { break }
+                refreshAccountStatus()
                 switch change.changeType {
-                case .signIn:
-                    // Send everything, for a new account (or the same one after signing back in).
-                    added = try enqueue(processor.allChanges())
-                case .signOut, .switchAccounts:
-                    // Local data stays. What happens to it on another Apple ID is decided in step 7.
-                    log.notice("The iCloud account changed")
+                case let .signIn(currentUser):
+                    if let previous = saved.accountID, previous != currentUser.recordName {
+                        // Signed out, then a different Apple ID signed in.
+                        try switchedAccount(to: currentUser.recordName)
+                    } else {
+                        // The first sign-in, or the same Apple ID back: send everything.
+                        saved.accountID = currentUser.recordName
+                        added = try enqueue(processor.allChanges())
+                    }
+                case .signOut:
+                    // The user's own books stay and keep working here; changes go up if the same Apple ID signs
+                    // back in. Books others shared belong to the account that left.
+                    log.notice("Signed out of iCloud")
+                    try processor.removeSharedBooks()
+                case let .switchAccounts(_, currentUser):
+                    try switchedAccount(to: currentUser.recordName)
                 @unknown default:
                     break
                 }
+                saveState()
 
             case let .fetchedDatabaseChanges(changes):
                 log.notice("\(self.name(of: engine), privacy: .public): \(changes.modifications.count, privacy: .public) zones changed, \(changes.deletions.count, privacy: .public) deleted")
@@ -301,6 +334,7 @@ final class SyncCoordinator {
                 }
 
             case let .fetchedRecordZoneChanges(changes):
+                status.lastSynced = .now
                 log.notice("\(self.name(of: engine), privacy: .public): fetched \(changes.modifications.count, privacy: .public) records, \(changes.deletions.count, privacy: .public) deletions")
                 added = try enqueue(processor.applyFetched(
                     changes.modifications.map(\.record),
@@ -309,6 +343,8 @@ final class SyncCoordinator {
                 saveState()
 
             case let .sentRecordZoneChanges(sent):
+                status.lastSynced = .now
+                status.lastError = sent.failedRecordSaves.first.map { $0.error.localizedDescription }
                 log.notice("\(self.name(of: engine), privacy: .public): saved \(sent.savedRecords.count, privacy: .public), deleted \(sent.deletedRecordIDs.count, privacy: .public), \(sent.failedRecordSaves.count, privacy: .public) saves refused")
                 for failure in sent.failedRecordSaves {
                     log.notice("Refused \(failure.record.recordType, privacy: .public): \(failure.error.code.rawValue, privacy: .public) \(failure.error.localizedDescription, privacy: .public)")
@@ -327,6 +363,7 @@ final class SyncCoordinator {
                 break
             }
         } catch {
+            status.lastError = error.localizedDescription
             log.error("Couldn't apply a sync event: \(error.localizedDescription, privacy: .public)")
         }
     }
@@ -514,14 +551,63 @@ final class SyncCoordinator {
 
     /// Sends and fetches now, such as from "Sync Now".
     func syncNow() async {
-        for engine in engines {
-            do {
+        guard !status.isSyncing else { return }
+        status.isSyncing = true
+        defer { status.isSyncing = false }
+        refreshAccountStatus()
+        do {
+            for engine in engines {
                 try await engine.sendChanges()
-                try await engine.fetchChanges()
-            } catch {
-                log.error("Sync failed: \(error.localizedDescription, privacy: .public)")
             }
+            // The engines' own fetch does nothing without a push; this asks the server.
+            await pollAll()
+            status.lastSynced = .now
+            status.lastError = nil
+        } catch {
+            status.lastError = error.localizedDescription
+            log.error("Sync failed: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    // MARK: - The iCloud account
+
+    private func refreshAccountStatus() {
+        Task {
+            status.account = try? await container.accountStatus()
+        }
+    }
+
+    /// A different Apple ID is now signed in. Books shared with the old one go; the user's own books stay here,
+    /// unsent, until they choose in Settings (`uploadOwnBooks` or `removeOwnBooks`).
+    private func switchedAccount(to accountID: String) throws {
+        log.notice("A different Apple ID signed in")
+        try processor.removeSharedBooks()
+        try processor.forgetSyncState()
+        saved.pollTokens = nil
+        saved.accountID = accountID
+        setOwnBooksAwaitChoice(true)
+    }
+
+    private func setOwnBooksAwaitChoice(_ waiting: Bool) {
+        status.ownBooksAwaitChoice = waiting
+        saved.ownBooksAwaitChoice = waiting
+        saveState()
+    }
+
+    /// Settings, after a different Apple ID signed in: upload the user's own books to it.
+    func uploadOwnBooks() {
+        setOwnBooksAwaitChoice(false)
+        if enqueue((try? processor.allChanges()) ?? []) {
+            requestSend()
+        }
+    }
+
+    /// Settings, after a different Apple ID signed in: remove the user's own books from this device. They stay in
+    /// the old account's iCloud. A new, empty book takes their place.
+    func removeOwnBooks() throws {
+        try processor.removeOwnBooks()
+        setOwnBooksAwaitChoice(false)
+        try Books.prepare(in: processor.context)
     }
 }
 

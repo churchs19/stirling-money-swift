@@ -1150,7 +1150,31 @@ Its category merging, status UI and notes will be reused, and the branch deleted
      (`BookHeader`). Switching books with the same figures still rewrites the summary, since the name changed.
    - 258 unit tests and 9 Watch tests pass, and the Mac builds.
    - **Left for later, as planned:** choosing a book per widget.
-7. [ ] Settings: sync status, Sync Now, and the iCloud account states. Category merging after fetches.
+7. [x] Settings: sync status, Sync Now, and the iCloud account states. Category merging after fetches.
+   - **Done (Nov 25, 2026).**
+   - **Settings → iCloud:**
+     - Shows the account's state (On / Not signed in / Restricted / Temporarily unavailable) and when it last
+       synced.
+     - Sync Now sends, then asks the server for changes (`poll`, since the engines' own fetch needs a push).
+     - The footer shows the last error. With no account, it explains that everything stays on the device.
+     - Under tests and sample data, it says sync is off.
+   - **Account changes (decided with the user):**
+     - **Signing out:** the user's own books stay and keep working. Books others shared are removed. Changes go up
+       if the same Apple ID signs back in.
+     - **A different Apple ID** (`switchAccounts`, or signing in as someone other than the saved `accountID`):
+       shared books are removed and the old account's sync state is forgotten (`forgetSyncState`). Nothing of the
+       user's own is sent (`enqueue` holds it) until they choose in Settings: "Upload My Books to This iCloud
+       Account" (`uploadOwnBooks`), or "Remove My Books from This Device…" (`removeOwnBooks`; they stay in the old
+       account's iCloud, and an empty "My Book" takes their place).
+   - **Category merging:** `CategoryMerger`, from the `cloudkit-sync` branch, adapted.
+     - Within a book only; recurring rules move too; ties fall to the name, then the `syncID`; View Only books are
+       left to their owner.
+     - It runs after fetched categories are applied, saved as the user's own change, so the merge (moved
+       references and the deleted duplicate) goes up. Two devices merging at once make the same change.
+   - **Tests:** 9 in `AccountAndMergeTests`, including two devices each making "Food" and ending with one that
+     holds both purchases. 266 unit tests and 17 UI tests pass, and the Mac builds.
+   - **Not tested on devices:** signing out or switching Apple IDs (it needs a spare device or simulator to sign
+     out of).
 8. [ ] The CloudKit schema deployed to production; README, CLAUDE.md and this plan. Delete the `cloudkit-sync` branch.
 
 **Risks and questions**

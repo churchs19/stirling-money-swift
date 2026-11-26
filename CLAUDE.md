@@ -44,7 +44,7 @@ Stirling Money/
 │   └── WidgetSnapshot+Models.swift  # Builds the widget summary from the models (the type itself is in Shared/)
 ├── Views/
 │   ├── RootView.swift             # TabView: Accounts / Budgets / Goals / Reports (sidebar on iPad and Mac)
-│   ├── SettingsView.swift         # Sort, accent color, app lock, export, rate; a sheet from the Accounts ⋯ menu, a Settings window (⌘,) on the Mac
+│   ├── SettingsView.swift         # Sort, accent color, app lock, iCloud (status, Sync Now, the choice after an Apple ID change), export, rate; a sheet from the Accounts ⋯ menu, a Settings window (⌘,) on the Mac
 │   ├── LockView.swift             # Covers the app while locked
 │   ├── AccountsView.swift         # Accounts as tiles or a list (toolbar toggle), total, sort, delete
 │   ├── AccountRegisterView.swift  # One account's transactions, balances, search
@@ -61,13 +61,15 @@ Stirling Money/
 ├── Managers/
 │   ├── Ledger.swift               # Create/edit/delete transactions and transfers; categories (per book)
 │   ├── Books.swift                # prepare (first book, data from before books), current book, create, delete
+│   ├── CategoryMerger.swift       # Merges same-named categories in a book into the oldest, after fetches
 │   ├── AppLock.swift              # Face ID / Touch ID / passcode lock (LocalAuthentication)
 │   ├── WidgetSnapshotWriter.swift # Writes the snapshot to the App Group, reloads widgets, sends it to the Watch
 │   ├── WatchSync.swift            # iPhone only: WCSession; sends the snapshot as application context, answers Watch requests
 │   ├── Sync/                      # CloudRecords (each model ↔ CKRecord, encrypted values, zones), RecordImporter,
 │   │                              #   RecordMerger (three-way conflict merge), SyncProcessor (history out, fetched in,
 │   │                              #   results, shares; testable), SyncCoordinator (private + shared CKSyncEngines, share,
-│   │                              #   stop sharing, accept; never under tests or sample data)
+│   │                              #   stop sharing, accept, account changes, poll; never under tests or sample data),
+│   │                              #   SyncStatus (what Settings → iCloud shows)
 │   ├── RecurringScheduler.swift   # addDue (adds due occurrences through Ledger, catching up), addNow, skipNext, nextDueDate
 │   └── RecurringRunner.swift      # When addDue runs: launch, active, midnight, hourly + wake on the Mac, BGAppRefreshTask on iOS
 └── Extensions/
