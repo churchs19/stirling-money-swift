@@ -13,7 +13,7 @@ as a SwiftUI + SwiftData app for iOS, iPadOS and macOS.
 | 3 | Entering and editing transactions; categories | Done (`a87cf70`) |
 | 4 | Budgets and goals | Done (`368965c`) |
 | 5 | Reports | Done (`0a38edc`) |
-| 6 | Platform features (widgets, app lock, export, settings) | Done; sync still deferred |
+| 6 | Platform features (widgets, app lock, export, settings) | Done; sync came in Phase 11 |
 | 7 | Apple Watch app (read-only) and complications | Done; checked on simulators and a real iPhone and Watch |
 | 8 | Budget widgets (iPhone, iPad, Mac, Lock Screen, Watch) | Done; checked on simulators and a real iPhone, Watch and Mac |
 | 9 | Test coverage: isolated unit tests, real UI tests, testable widget, lock and writer logic | Done |
@@ -172,8 +172,8 @@ Original → replacement:
 | Live Tiles per account and goal | WidgetKit widgets, using an App Group to share the data store |
 | App password | Face ID / passcode via `LocalAuthentication` |
 | SkyDrive backup | CSV/JSON export via `ShareLink` or `.fileExporter`; iCloud if sync is turned on |
-| Azure sync | SwiftData CloudKit sync (deferred, see Decisions) |
-| Authorized users | CloudKit sharing (deferred, see Decisions) |
+| Azure sync | iCloud sync with our own `CKSyncEngine` layer (Phase 11) |
+| Authorized users | Books shared with other Apple IDs, Can Make Changes or View Only (Phase 11) |
 | Rate the app | `RequestReviewAction` |
 | 44-language strings | String Catalog, English first |
 | Settings | A Settings screen; on macOS, a `Settings` scene |
@@ -1002,7 +1002,7 @@ Its category merging, status UI and notes will be reused, and the branch deleted
      arriving in a later batch, re-applying as an update, book scoping, encryption and exact money, system fields,
      zone names, transfer names, and two devices naming the same occurrences the same. 225 unit tests pass, and the
      Mac builds.
-3. [ ] The project changes above (with approval), then the private engine: upload, fetch, apply, conflicts and deletes
+3. [x] The project changes above (with approval), then the private engine: upload, fetch, apply, conflicts and deletes
    for the user's own books on their devices. A fake engine delegate in tests; then two devices on one Apple ID.
    - **Engine written and tested (Nov 20, 2026).** The project changes were made with Xcode's tools (approved):
      - Entitlements: `com.apple.developer.icloud-services` = CloudKit, `com.apple.developer.icloud-container-identifiers`
@@ -1223,5 +1223,5 @@ Its category merging, status UI and notes will be reused, and the branch deleted
 ## Open items
 
 - **Long register rows**: the details line now wraps to two lines instead of being cut off at one. Check it on a narrow iPhone.
-- **visionOS** is listed in the target but hasn't been built. There's no visionOS simulator installed.
 - **The register sorts transactions in memory.** That's fine for personal ledgers; switch to a `@Query` with a predicate if large accounts get slow.
+- **A book per widget**: widgets and complications show the current book. Choosing a book per widget (another picker, like the account and budget ones) was left for later in Phase 11.
