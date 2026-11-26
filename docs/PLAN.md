@@ -1185,8 +1185,13 @@ Its category merging, status UI and notes will be reused, and the branch deleted
        most two minutes, and not without an account).
      - "Adding <book>…" from accepting an invitation until the book's records have arrived.
      - It appears after half a second, so quick syncs don't flash it, and "Continue in Background" hides it.
-     - **Device test passed:** "Adding Home…" showed on the simulator while joining (about four seconds). The
-       first-sync version hasn't been seen yet.
+     - **Device test passed:** "Adding Home…" showed on the simulator while joining (about four seconds), and the
+       first-sync version showed for about a second on a fresh install.
+   - **A fresh install added an empty "My Book" to iCloud each time.** `Books.prepare` makes one at launch, before
+     sync knows what iCloud has, and the first run uploaded it. Now the first upload on a device waits for the
+     private engine's first fetch (or two minutes) (`finishFirstRun`). If iCloud brought the user's books, an
+     empty, never-sent book is removed without a trace (`removeEmptyPlaceholderBooks`). Then only what iCloud
+     lacks goes up (`unsentChanges`).
    - **Not tested on devices:** signing out or switching Apple IDs (it needs a spare device or simulator to sign
      out of).
 8. [ ] The CloudKit schema deployed to production; README, CLAUDE.md and this plan. Delete the `cloudkit-sync` branch.

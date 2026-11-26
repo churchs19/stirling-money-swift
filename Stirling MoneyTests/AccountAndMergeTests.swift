@@ -167,6 +167,57 @@ struct AccountAndMergeTests {
         }
     }
 
+    // MARK: A device's first sync
+
+    @Test func aNewDevicesEmptyBookGoesWhenICloudHasTheUsersBooks() throws {
+        let server = FakeServer()
+        let phone = try Device()
+        let home = Book(name: "Home")
+        phone.context.insert(home)
+        try phone.context.save()
+        try phone.send(to: server)
+
+        // A fresh install: "My Book" made at launch, then the first download brings "Home".
+        let newDevice = try Device()
+        let placeholder = try Books.prepare(in: newDevice.context)
+        _ = try newDevice.processor.localChanges()
+        try newDevice.fetch(from: server)
+
+        #expect(try newDevice.processor.removeEmptyPlaceholderBooks() == 1)
+        #expect(try newDevice.context.fetch(FetchDescriptor<Book>()).map(\.name) == ["Home"])
+        #expect(try newDevice.processor.unsentChanges().isEmpty, "Home is already in iCloud")
+        #expect(try newDevice.processor.localChanges().isEmpty, "the placeholder was never sent, so nothing to delete")
+        _ = placeholder
+    }
+
+    @Test func aBookWithSomethingInItIsKept() throws {
+        let server = FakeServer()
+        let phone = try Device()
+        phone.context.insert(Book(name: "Home"))
+        try phone.context.save()
+        try phone.send(to: server)
+
+        let newDevice = try Device()
+        let mine = try Books.prepare(in: newDevice.context)
+        let wallet = Account(name: "Wallet")
+        newDevice.context.insert(wallet)
+        wallet.book = mine
+        try newDevice.context.save()
+        try newDevice.fetch(from: server)
+
+        #expect(try newDevice.processor.removeEmptyPlaceholderBooks() == 0)
+        let unsent = try newDevice.processor.unsentChanges()
+        #expect(unsent.contains(.saveZone(mine.zoneID)))
+        #expect(unsent.contains(.saveRecord(CKRecord.ID(recordName: wallet.syncID, zoneID: mine.zoneID))))
+    }
+
+    @Test func withNothingInICloudTheFirstBookStays() throws {
+        let device = try Device()
+        let mine = try Books.prepare(in: device.context)
+        #expect(try device.processor.removeEmptyPlaceholderBooks() == 0)
+        #expect(try device.processor.unsentChanges().contains(.saveZone(mine.zoneID)))
+    }
+
     // MARK: Account changes
 
     @Test func signingOutRemovesOnlyBooksOthersShared() throws {

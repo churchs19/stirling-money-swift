@@ -120,9 +120,10 @@ final class SyncCoordinator {
         dropQueuedChangesForGoneBooks()
         if isFirstRun {
             beginFirstSyncActivity()
-            // Everything goes up once; history before now is covered by that.
+            // History before now is covered by the first upload, which waits for the first download
+            // (`finishFirstRun`): an empty "My Book" made at launch shouldn't go up if iCloud already has the user's.
             _ = try? processor.localChanges()
-            enqueue((try? processor.allChanges()) ?? [])
+            isFirstRunUploadPending = true
         } else {
             enqueueLocalChanges()
         }
@@ -306,7 +307,10 @@ final class SyncCoordinator {
                 refreshAccountStatus()
                 switch change.changeType {
                 case let .signIn(currentUser):
-                    if let previous = saved.accountID, previous != currentUser.recordName {
+                    if isFirstRunUploadPending {
+                        // The first download decides what goes up (`finishFirstRun`).
+                        saved.accountID = currentUser.recordName
+                    } else if let previous = saved.accountID, previous != currentUser.recordName {
                         // Signed out, then a different Apple ID signed in.
                         try switchedAccount(to: currentUser.recordName)
                     } else {
@@ -361,7 +365,9 @@ final class SyncCoordinator {
                 }
 
             case .didFetchChanges:
-                firstFetchFinished(by: engine)
+                if firstFetchFinished(by: engine) {
+                    added = true
+                }
 
             default:
                 break
@@ -597,6 +603,9 @@ final class SyncCoordinator {
     private var awaitingFirstFetch: Set<ObjectIdentifier> = []
 
     /// Shows the first-sync overlay until both engines have fetched once (or two minutes, whichever comes first).
+    /// The first upload on this device waits for the private engine's first fetch.
+    private var isFirstRunUploadPending = false
+
     private func beginFirstSyncActivity() {
         awaitingFirstFetch = Set(engines.map(ObjectIdentifier.init))
         status.activity = .firstSync
@@ -605,13 +614,38 @@ final class SyncCoordinator {
             if status.activity == .firstSync {
                 status.activity = nil
             }
+            // No fetch in two minutes (offline, say): upload what's here anyway.
+            if finishFirstRun() {
+                requestSend()
+            }
         }
     }
 
-    private func firstFetchFinished(by engine: CKSyncEngine) {
-        guard awaitingFirstFetch.remove(ObjectIdentifier(engine)) != nil, awaitingFirstFetch.isEmpty else { return }
+    /// Notes an engine's first fetch on this device. Returns whether that queued the first upload.
+    private func firstFetchFinished(by engine: CKSyncEngine) -> Bool {
+        let queued = engine === privateEngine && finishFirstRun()
+        guard awaitingFirstFetch.remove(ObjectIdentifier(engine)) != nil, awaitingFirstFetch.isEmpty else { return queued }
         if status.activity == .firstSync {
             status.activity = nil
+        }
+        return queued
+    }
+
+    /// After the first download on this device: drops the empty book made at launch if iCloud already had the user's
+    /// books, then queues everything of theirs that iCloud doesn't have yet. Returns whether anything was queued.
+    @discardableResult
+    private func finishFirstRun() -> Bool {
+        guard isFirstRunUploadPending else { return false }
+        isFirstRunUploadPending = false
+        do {
+            let removed = try processor.removeEmptyPlaceholderBooks()
+            if removed > 0 {
+                log.notice("Removed \(removed, privacy: .public) empty books made before the first sync")
+            }
+            return enqueue(try processor.unsentChanges())
+        } catch {
+            log.error("Couldn't finish the first sync: \(error.localizedDescription, privacy: .public)")
+            return false
         }
     }
 

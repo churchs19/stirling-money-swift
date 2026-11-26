@@ -109,6 +109,47 @@ final class SyncProcessor {
         return changes
     }
 
+    /// The user's own books and records that have never been sent (no system fields), for the end of a device's
+    /// first sync: what came from iCloud is already there.
+    func unsentChanges() throws -> [Change] {
+        var changes: [Change] = []
+        for book in try context.fetch(FetchDescriptor<Book>()) where book.zoneOwnerName == nil {
+            let zoneID = book.zoneID
+            if book.ckSystemFields == nil {
+                changes.append(.saveZone(zoneID))
+                changes.append(.saveRecord(CKRecord.ID(recordName: book.syncID, zoneID: zoneID)))
+            }
+            let models: [any CloudRecordMapped] = (book.categories ?? []) + (book.accounts ?? [])
+                + (book.transactions ?? []) + (book.budgets ?? []) + (book.goals ?? []) + (book.recurringTransactions ?? [])
+            changes += models
+                .filter { $0.ckSystemFields == nil }
+                .map { .saveRecord(CKRecord.ID(recordName: $0.syncID, zoneID: zoneID)) }
+        }
+        return changes
+    }
+
+    /// Removes the empty book a fresh install makes at launch ("My Book"), once the first sync has brought the
+    /// user's books from iCloud: otherwise every new device would add another empty book everywhere. Only books that
+    /// were never sent and hold nothing go, and only when iCloud provided at least one of the user's own. Returns how
+    /// many went.
+    @discardableResult
+    func removeEmptyPlaceholderBooks() throws -> Int {
+        let own = try context.fetch(FetchDescriptor<Book>()).filter { $0.zoneOwnerName == nil }
+        guard own.contains(where: { $0.ckSystemFields != nil }) else { return 0 }
+        let placeholders = own.filter { book in
+            book.ckSystemFields == nil
+                && (book.accounts ?? []).isEmpty && (book.categories ?? []).isEmpty && (book.budgets ?? []).isEmpty
+                && (book.goals ?? []).isEmpty && (book.recurringTransactions ?? []).isEmpty
+                && (book.transactions ?? []).isEmpty
+        }
+        try asSync {
+            for book in placeholders {
+                context.delete(book)
+            }
+        }
+        return placeholders.count
+    }
+
     /// Drops history this device has already read, so the store doesn't keep it forever.
     func pruneHistory() throws {
         guard let token = historyToken else { return }
