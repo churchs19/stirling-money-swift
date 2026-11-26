@@ -1134,7 +1134,9 @@ Its category merging, status UI and notes will be reused, and the branch deleted
      budget). `testAViewOnlyBookCantBeChanged` checks the controls are gone and taps open nothing. Unit tests cover
      the scheduler and sync.
    - 257 unit tests and 17 UI tests pass, and the Mac builds.
-   - **Not yet tested on devices:** sharing as View Only with the second Apple ID.
+   - **Device test passed (Nov 25, 2026):** shared View Only with the second Apple ID, the book arrived with
+     `canEdit` false. On the simulator it read "Home, shared with you (View Only)", had no editing controls, opened
+     nothing on taps, and still received the owner's edits.
 6. [ ] Recurring transactions, widgets and the Watch with books and sharing: deterministic occurrence names, and the
    summary per current book.
 7. [ ] Settings: sync status, Sync Now, and the iCloud account states. Category merging after fetches.
