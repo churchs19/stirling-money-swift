@@ -62,6 +62,12 @@ Sync is the app's own, built on `CKSyncEngine` (SwiftData's built-in CloudKit mi
 - **Testing sharing** needs a second Apple ID, on another device or a simulator signed in to it. Open the invitation link through the system (a tap in Messages or Mail, or `xcrun simctl openurl`), not by pasting it into Safari.
 - Sync never runs with `-UseSampleData` or `-UITesting`, or while hosting unit tests, so sample data never reaches iCloud.
 
+### TestFlight and the App Store
+
+TestFlight and App Store builds sync with CloudKit's **production** environment; builds run from Xcode use development. Installing a TestFlight build over a development one is safe: the app notices the change, keeps its data, and uploads it to production (shared books have to be shared again). Put every device on the same kind of build, or they won't see each other's changes.
+
+To upload: archive the **Stirling Money** scheme for **Any iOS Device** (Product → Archive), then **Distribute App → App Store Connect → Upload**. The Watch app and the widgets are inside it. The Mac is a separate archive. Raise the build number (`CURRENT_PROJECT_VERSION`) for each upload. The app declares no non-exempt encryption (`ITSAppUsesNonExemptEncryption` = NO; it uses Apple's own), and its privacy manifests (`PrivacyInfo.xcprivacy`) give the reasons it reads `UserDefaults`.
+
 ### Sample data
 
 In Debug builds, launch with the argument `-UseSampleData` (Product → Scheme → Edit Scheme → Arguments) to use a set of sample accounts, transactions, budgets and goals held in memory. Your real data isn't touched.

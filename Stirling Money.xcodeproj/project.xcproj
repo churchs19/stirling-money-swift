@@ -124,6 +124,7 @@
         "GENERATE_INFOPLIST_FILE": "YES",
         "INFOPLIST_FILE": "Stirling-Money-Info.plist",
         "INFOPLIST_KEY_CFBundleDisplayName": "Stirling Money",
+        "INFOPLIST_KEY_ITSAppUsesNonExemptEncryption": "NO",
         "INFOPLIST_KEY_LSApplicationCategoryType": "public.app-category.finance",
         "INFOPLIST_KEY_NSFaceIDUsageDescription": "Stirling Money uses Face ID to keep your accounts private when the app lock is on.",
         "INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]": "YES",

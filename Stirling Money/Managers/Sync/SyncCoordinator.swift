@@ -69,6 +69,8 @@ final class SyncCoordinator {
         var accountID: String?
         /// A different Apple ID signed in, and the user hasn't chosen yet what happens to their own books.
         var ownBooksAwaitChoice: Bool?
+        /// The CloudKit environment of the last sync (development or production). Not saved before Nov 25, 2026.
+        var environment: CloudEnvironment?
     }
 
     private var saved = SavedState()
@@ -102,6 +104,11 @@ final class SyncCoordinator {
 
     private func begin() {
         loadState()
+        let environment = CloudEnvironment.current
+        if CloudEnvironment.needsMigration(saved: saved.environment, hasSyncedBefore: saved.engine != nil, current: environment) {
+            moveToNewEnvironment(environment)
+        }
+        saved.environment = environment
         status.ownBooksAwaitChoice = saved.ownBooksAwaitChoice ?? false
         refreshAccountStatus()
         let isFirstRun = saved.engine == nil
@@ -605,6 +612,29 @@ final class SyncCoordinator {
     /// Shows the first-sync overlay until both engines have fetched once (or two minutes, whichever comes first).
     /// The first upload on this device waits for the private engine's first fetch.
     private var isFirstRunUploadPending = false
+    /// This first sync is moving the user's books to a new CloudKit environment: everything here goes up, empty
+    /// books included.
+    private var isMovingEnvironment = false
+
+    /// This build syncs with a different CloudKit environment than the last sync did, such as a TestFlight build
+    /// installed over a development one. The new environment has none of the old one's records, zones or shares,
+    /// so: keep everything local, drop books others shared (those shares live in the old environment), forget the
+    /// old sync state, and sync as if for the first time. The user's own books then go up with the same names, so a
+    /// second device moving later matches them instead of making copies.
+    private func moveToNewEnvironment(_ environment: CloudEnvironment) {
+        log.notice("Moving sync to the \(environment.rawValue, privacy: .public) environment")
+        do {
+            try processor.removeSharedBooks()
+            try processor.forgetSyncState()
+        } catch {
+            log.error("Couldn't reset for the new environment: \(error.localizedDescription, privacy: .public)")
+        }
+        saved.engine = nil
+        saved.sharedEngine = nil
+        saved.pollTokens = nil
+        isMovingEnvironment = true
+        saveState()
+    }
 
     private func beginFirstSyncActivity() {
         awaitingFirstFetch = Set(engines.map(ObjectIdentifier.init))
@@ -638,7 +668,8 @@ final class SyncCoordinator {
         guard isFirstRunUploadPending else { return false }
         isFirstRunUploadPending = false
         do {
-            let removed = try processor.removeEmptyPlaceholderBooks()
+            // Not when moving environments: every book here is the user's, empty or not.
+            let removed = isMovingEnvironment ? 0 : try processor.removeEmptyPlaceholderBooks()
             if removed > 0 {
                 log.notice("Removed \(removed, privacy: .public) empty books made before the first sync")
             }

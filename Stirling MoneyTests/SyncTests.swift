@@ -99,6 +99,11 @@ final class Device {
         }
     }
 
+    /// Queues changes for the next `send`, as the coordinator does at the end of a first sync.
+    func queue(_ changes: [SyncProcessor.Change]) {
+        queuedByFetch += changes
+    }
+
     /// Fetches what changed on the server since the last fetch.
     func fetch(from server: FakeServer) throws {
         let events = server.log[fetched...]

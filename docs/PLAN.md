@@ -1224,4 +1224,9 @@ Its category merging, status UI and notes will be reused, and the branch deleted
 
 - **Long register rows**: the details line now wraps to two lines instead of being cut off at one. Check it on a narrow iPhone.
 - **The register sorts transactions in memory.** That's fine for personal ledgers; switch to a `@Query` with a predicate if large accounts get slow.
+- **TestFlight (Nov 25, 2026):** prepared, not yet uploaded. `CloudEnvironment` moves a device's sync from
+  development to production when a TestFlight build replaces a development one (keeping its data, re-uploading it,
+  matching by name). The Mac's development profile has no `get-task-allow`, so the push entitlement decides. Added
+  `ITSAppUsesNonExemptEncryption` = NO and privacy manifests for the app and widgets. Still to do: the App Store
+  Connect app record, then archive and upload.
 - **A book per widget**: widgets and complications show the current book. Choosing a book per widget (another picker, like the account and budget ones) was left for later in Phase 11.

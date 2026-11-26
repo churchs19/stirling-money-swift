@@ -154,6 +154,11 @@ Our own sync on `CKSyncEngine`; SwiftData's mirroring is off (`cloudKitDatabase:
   participant's changes, so the app polls each database every minute while in front (`poll`, with its own tokens).
   Never call `sendChanges()`/`fetchChanges()` from inside `handleEvent`, even in a `Task` (it inherits the context and
   CloudKit asserts): use `requestSend()`, which runs in `Task.detached` after the event.
+- **Environments:** development builds sync with CloudKit's development environment, TestFlight and App Store
+  builds with production; each has its own data. `CloudEnvironment.current` reads it from the embedded provisioning
+  profile's push entitlement (`aps-environment`, `com.apple.developer.aps-environment` on the Mac; no profile means
+  production). When it changes, `moveToNewEnvironment` keeps local data, drops shared books, forgets the old sync
+  state and uploads everything, matching records by name so a second device moving later makes no copies.
 - **Account changes:** signing out keeps the user's books and removes shared ones; a different Apple ID holds the
   user's books unsent until they choose in Settings. A device's first upload waits for its first download, so the
   empty "My Book" a fresh install makes isn't added to iCloud when the user's books are already there.
@@ -236,6 +241,9 @@ Structured data means fewer tokens consumed and better error diagnosis.
   `Stirling-Money-Info.plist` (merged with the generated Info.plist keys). Approved for Phase 11 (made with
   `AddEntitlement` and `AddInfoPlist`): iCloud (CloudKit, container `iCloud.net.s-church.stirlingmoney`), Push
   Notifications (`aps-environment`), `remote-notification` in `UIBackgroundModes`, and `CKSharingSupported`.
+  Approved for TestFlight (Nov 25, 2026): `ITSAppUsesNonExemptEncryption` = NO (an `INFOPLIST_KEY_` build setting,
+  added with `AddInfoPlist`) and privacy manifests (`PrivacyInfo.xcprivacy`) in `Stirling Money/` (UserDefaults:
+  CA92.1, 1C8F.1) and `StirlingMoneyWidgets/` (1C8F.1). Add a reason there before using another required-reason API.
   Ask before any further project change.
 - NEVER use ObservableObject — use @Observable
 - NEVER use NavigationView — use NavigationStack
